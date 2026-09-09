@@ -12,11 +12,12 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 
 | Chunk | State | Notes |
 |---|---|---|
-| C0 · Template trim | **DONE** | Identity + auth + server trim. 320 tests, 5 skipped (Docker down) |
-| C1 · `:libraries:cascade` | not started | Blocked on C0 |
-| C1a · `tools/balance` | not started | Blocked on C1 |
-| C2 · Theme + design system | not started | Can run parallel to C1 |
-| C3 · `:features:game` | not started | Blocked on C1, C2 |
+| C0 · Template trim | **DONE** | `04803ff`. Identity + auth + server trim |
+| C1 · `:libraries:cascade` | **DONE**, ruling landing | `96e6b92`. 89 engine tests, green on JVM + Native |
+| C1b · Merge-position ruling | **IN PROGRESS** | Partner's cell (D6), wildcard symmetry confirmed |
+| C1a · `tools/balance` | not started | Unblocked once C1b lands |
+| C2 · Theme + design system | **MOSTLY DONE** | `e6e95b3`. Steps 1-8 done; step 9 HUD primitives outstanding, see `todos.md` |
+| C3 · `:features:game` | not started | Blocked on C1b + the C2 remainder |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
 | C5 · Tutorial | not started | |
@@ -57,6 +58,10 @@ These are not suggestions. A change that violates one gets reverted, not debated
    failed. Do not report green without running it.
 10. **Say what you did not verify.** Skipped tests, untested platforms, environment gaps get
     written down. A subagent that glosses a gap costs more than one that fails loudly.
+11. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
+    three and edits them concurrently with your run; your write will be silently lost (this has
+    already happened once, L10). Put learnings, owner items and deferred work **in your report**
+    instead. You *may* edit `SPEC.md`, `BUILD-PLAN.md` and `decisions.md` for your own chunk.
 
 ## Reference repos
 
@@ -187,11 +192,81 @@ and enforces it.
 It also ORs the in-app toggle with the **OS** setting, which Sodogku never reads. Cards has the
 `expect fun isReduceMotionEnabled()` with real platform implementations; that gets ported.
 
+### D5 · `EngineConfig` travels inside `GameState`
+
+SPEC 4.1's field list omits it, and C1 added it deliberately. A seed only reproduces a run if the
+numbers it was played under travel with it. Otherwise the day a remote spawn-table value moves,
+every Daily Challenge replay and every seed-attached bug report silently replays *differently*
+rather than failing loudly. Wrong answers that look right are the expensive kind.
+
+The undo ring went the other way and is **not** a field on `GameState`: it holds whole
+`GameState`s, so nesting it would make one serialized state carry eight boards, and SPEC 11
+rewrites that blob on every drop. It is a sibling `UndoRing` value.
+
+`level` is also stored rather than derived from `blocksDropped`, forced by SPEC 18.10: a derived
+level snaps straight back on the next drop, so the continue the player watched an ad for would
+last under a second.
+
+### D6 · The merged block appears in the partner's cell, in both orientations
+
+Owner ruling, 2026-09-09. Replaces two rules with one. See `SPEC.md` 4.3 for the full reasoning.
+
+The contradiction was inherited from the original design document, which stated "the INITIATING
+block's cell" as its rule and "one 8 in the left cell" (the partner's) in its own worked example.
+C1 implemented the rule as literally written and pinned the losing branch as a test so the
+decision would announce itself, which is exactly the right way to handle a spec contradiction you
+cannot resolve yourself.
+
+**This is a merge rule, so it is now fixed.** SPEC 4.3 says merge rules are not negotiable once
+shipped.
+
+Wildcard symmetry was confirmed in the same ruling: a value block landing beside a resting
+Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
+symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
+does nothing.
+
 ---
 
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L14 · Two agents compiling the same shared target will report each other's half-written files as failures
+
+C1 reported `:apps:compose:compileKotlinIosSimulatorArm64` as broken by a `CHHapticPattern`
+overload ambiguity in C2's `HapticEngine.ios.kt`. It was genuinely broken at the moment C1
+compiled, and C2 fixed it before finishing. The orchestrator re-ran the gate after both agents
+completed and it was green.
+
+C1's handling was the correct pattern and worth copying: it grepped every build file to prove no
+module depends on `:libraries:cascade` yet, concluded the engine could not be causal, and proved
+its own iOS coverage independently via `:libraries:cascade:iosSimulatorArm64Test` rather than
+relying on the shared app target.
+
+**Orchestrator rule:** a build failure reported by one agent while another is mid-flight is
+provisional. Re-run the gate yourself before acting on it.
+
+### L15 · `:apps:compose:compileKotlinIosSimulatorArm64` does not run a single test
+
+It compiles. The engine's determinism guarantee lives or dies on
+`:libraries:cascade:iosSimulatorArm64Test`, which actually executes the suite on Kotlin/Native and
+is **not** in the standard verification command from the working agreement.
+
+C1 ran it by hand and confirmed all 5 `DeterminismTest` cases execute with `[iosSimulatorArm64]`
+suffixes, asserting the same FNV-1a digest the JVM run asserts. That is the strongest correctness
+claim in the project so far, and the standard gate would not have caught its absence.
+
+Any chunk touching the engine runs the Native test task explicitly.
+
+### L16 · detekt cannot say anything about a Compose-free module
+
+Default rule sets are disabled repo-wide, and both custom rules (`VerifyStrings`,
+`AnimatedStateReadInComposition`) are Compose-specific. On `:libraries:cascade` a clean detekt run
+is structurally indistinguishable from no run at all.
+
+This is the `AGENTS.md` landmine in a new shape: there, the risk was a rule failing to dispatch;
+here, the rule dispatches fine and has nothing it could possibly match. Do not read "detekt green"
+as coverage on a pure-Kotlin module.
 
 ### L1 · Sodogku has no colourblind palettes, so there is nothing to port
 
@@ -258,6 +333,93 @@ For the block ramp specifically, lay it out as a **matrix**: one row per tier, o
 palette, plus a column carrying the measured ΔE to the neighbouring tier as text. Two tiers
 colliding in one palette then shows up as two adjacent cells in a column, rather than needing five
 separate previews compared from memory.
+
+### L6 · `VerifyStrings` was baselined here too, and a baseline that covers everything enforces nothing
+
+Confirmed in C0, exactly as Sodogku found. The baseline had 53 entries covering every template
+screen, so the rule was inert. C0 pruned it to 28 (15 stale for deleted files, 10 replaced with
+real resources) and made `OnboardingScreen` the worked example.
+
+**Any chunk that replaces a template screen deletes that screen's baseline entries rather than
+inheriting them.** The remaining 28 are unverified copy on screens nobody has rewritten yet:
+`HomeScreen`, `BugReportScreen`, `FeedbackScreen`, `ShakeDialog`, `SplashScreen`,
+`AccessDeniedScreen`, `BlockingErrorScreen`, and the UI catalog.
+
+### L7 · A fresh clone of this repo does not build
+
+Two one-time traps, both of which cost C0 time:
+
+- The build fails with an install-hooks message until `./scripts/install_hooks.sh` is run.
+- `local.properties` is gitignored and absent, so every Android task dies with "SDK location not
+  found". C0 created one with `sdk.dir`.
+
+### L8 · The generated resources package drops the leading namespace segment
+
+It is `drop2048.libraries.resources.generated.resources`, **not**
+`com.dangerfield.drop2048.libraries.resources.generated.resources`. Compose's resource generator
+does this. Expect to get the import wrong once.
+
+### L9 · A directory that does not match its `package` declaration compiles silently
+
+`libraries/resources/.../com/dangerfield/drop2048e/.../Resources.kt` sat under a path with a stray
+`e` while declaring the correct package. Kotlin allows the mismatch, so it compiled and nothing
+complained. C0 fixed it. Worth a glance if another rename artifact surfaces, because the symptom
+is nothing at all.
+
+### L11 · SPEC 9's "haptics respect the OS setting" is not implementable
+
+C2 built the Off / Light / Strong setting. **The OS half cannot be honoured as written.**
+
+- iOS has no public API for whether system haptics are enabled. `UIFeedbackGenerator` silently
+  no-ops and tells you nothing.
+- Android exposes `Settings.System.HAPTIC_FEEDBACK_ENABLED`, but it governs
+  `View.performHapticFeedback`, not direct `Vibrator` calls, so it does not apply to a real haptic
+  engine.
+
+Reduce motion is different and *is* readable from the OS on both platforms, which is why that half
+works. The spec line has been amended. Do not let a later chunk "fix" this by reading a setting
+that does not mean what it looks like it means.
+
+### L12 · Authoring a palette numerically beats authoring it by eye, and the CVD simulation is the part that matters
+
+C2 did not pick five palettes and then check them. It fixed a hue band per tier as the design
+decision, then hill-climbed saturation and lightness inside those bands against the constraint
+set. For the three colour-vision ramps the objective included ΔE measured **after a Viénot 1999
+dichromat simulation**, so they are separated for the player they are for rather than for a
+designer's monitor.
+
+The simulation lives in `commonTest` only. The app ships designed palettes; a runtime filter would
+be the wrong answer and is what most apps do.
+
+Measured on the shipped Kotlin, not the authoring harness:
+
+| Palette | min adjacent ΔE | min any-pair ΔE | luminance span | min ink contrast |
+|---|---|---|---|---|
+| Default | 26.06 | 24.57 | 0.757 | 4.66:1 |
+| Deuteranopia | 34.53 | 19.51 | 0.679 | 4.77:1 |
+| Protanopia | 37.34 | 18.82 | 0.667 | 5.28:1 |
+| Tritanopia | 43.29 | 17.79 | 0.711 | 4.68:1 |
+| HighContrast | 29.05 | 20.72 | 0.508 | 6.31:1 |
+
+The Default ramp takes the light ink on 4 of 11 tiers, which is what stops the "ink is the
+higher-contrast candidate" assertion from being vacuously true of a constant.
+
+### L13 · The `AnimatedStateReadInComposition` detekt rule was proven to dispatch, not assumed
+
+The watch list says a clean detekt run does not prove a custom rule ran. C2 actually did the
+check: it planted a `val x by animateFloatAsState(...)` read in composition, confirmed the build
+failed on the rule by name, removed it, and re-ran green.
+
+**That is the standard.** Any chunk that relies on a custom rule proves dispatch the same way
+rather than trusting a clean run.
+
+### L10 · Two agents editing this file concurrently silently lose work
+
+C0's learnings were written into this file while the orchestrator was editing the same section,
+and the orchestrator's write won. Four learnings were lost and had to be recovered from the
+agent's report.
+
+**Subagents no longer edit this file.** They report, the orchestrator writes. Standing rule 11.
 
 ---
 

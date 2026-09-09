@@ -24,13 +24,33 @@ confirm anything actually runs on a phone.
 
 **Blocks:** any "does it feel right on iOS" judgement, so effectively C3.
 
-### Docker running
+### Docker running, and one command to run once it is
 
-The integration harness and the server's Postgres tests self-skip when Docker is unreachable, and
-a skipped test reads exactly like a passing one in the summary. Start Docker Desktop before
-asking for a full verification run.
+C0 rewrote the integration harness onto the remote-config endpoint and **it has never actually
+run**. Docker was down, so all 5 of the suite's skipped tests self-skipped, and a skipped test
+reads exactly like a passing one in the summary.
 
-**Blocks:** honest verification of C0 and C7.
+Start Docker Desktop, then:
+
+```bash
+./gradlew :apps:integration:testDebugUnitTest :apps:server:test
+```
+
+That covers `HarnessSmokeTest` plus the four Testcontainers Postgres tests
+(`PostgresAppConfigSourceTest`, `PostgresAppConfigAdminRepositoryTest`,
+`PostgresAppConfigManifestRepositoryTest`, `DatabaseSchemaTest`).
+
+**Blocks:** trusting C7's config path. Worth doing before C7 rather than during it.
+
+### Revoke the now-dead Supabase credentials
+
+C0 deleted the entire Supabase auth stack. If a Supabase project exists for this app, these are
+now dead and should be revoked rather than left live:
+
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Fly secrets
+- The same two as GitHub Actions secrets
+
+**Keep `DATABASE_URL`.** The Postgres itself is still in use by the config server.
 
 ### Play both control schemes and pick (C3a)
 
@@ -100,6 +120,35 @@ spec's $3.99 because coins, powerups and Zen are cut). Created in both stores.
 **Needed by:** C10.
 
 ---
+
+### Look at the five block palettes rendered
+
+They are numerically sound and **nobody has seen them.** C2 authored them by hill-climbing against
+a constraint set rather than by eye, and every one clears its contrast, ΔE and luminance floors.
+That guarantees they are distinguishable. It does not guarantee they are nice.
+
+Open `BlockTierPreview` in `libraries/ui/.../catalog/DesignSystemPreview.kt`. It lays the ramp out
+as a matrix, one row per tier and one column per palette, so a collision shows up as two adjacent
+cells rather than needing five previews compared from memory.
+
+Specifically worth your eye: **the Protanopia ramp is five yellow-greens and one blue family.** It
+passes every floor and may still read as drab.
+
+### Decide whether "high contrast" should look loud
+
+That palette is all pale faces with dark numerals, which is what maximises measured contrast
+(6.31:1, the highest of the five) and is the opposite of what most people picture when they read
+"high contrast". The rationale is in its KDoc. It is defensible and it may still be wrong for what
+players expect from the setting name.
+
+### Feel the haptics on a real iPhone and a real Android
+
+Nothing about the haptic engine is tested or observed — both platform implementations compile and
+that is the entire guarantee. The Android `VibrationEffect` waveform envelopes, the
+amplitude-control fallback, the pre-Oreo path, and the whole iOS Core Haptics path are unexercised.
+
+**The burst envelope and the stacked-out double are guesses.** SPEC 21 puts the burst at half of
+what makes this game feel good, so these need hands on hardware, not a code review.
 
 ## Decisions I need from you
 

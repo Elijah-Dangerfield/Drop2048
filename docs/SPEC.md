@@ -139,8 +139,19 @@ moved. Blocks that gravity moved use priority Down, Left, Right; there is no "la
 direction" for them. Terminate when the queue is empty. **Hard cap of 100 steps**, and hitting it
 is an error the engine reports, not a silent break.
 
-New block position: the **lower** cell on a vertical merge, the **initiating** block's cell on a
-horizontal one.
+**New block position: the partner's cell.** One rule, both orientations.
+
+The original spec had two rules ("the lower cell if vertical, the initiating block's cell if
+horizontal") and then contradicted itself in its own worked example, which put the new 8 in the
+left cell — the partner's. Only the worked example produces the cascade the design was pitched
+on.
+
+They unify. A vertical merge's "lower cell" *is* the partner's cell, because the initiator falls
+onto the partner from above. Stating it as the partner's cell in both orientations is one rule
+instead of two, matches both worked examples, and makes a horizontal merge pull the result toward
+the match, which is what makes chains happen. Section 21 says chains are what the game is for.
+
+Ruled 2026-09-09. This is a merge rule, so it is now fixed.
 
 ### 4.4 The balance harness
 
@@ -182,7 +193,7 @@ not powerups.
 
 | Block | Behavior | From level | Rate |
 |---|---|---|---|
-| **Wildcard** | On landing, merges with the first neighbor found via the priority order and takes that neighbor's value doubled. Value blocks only: it skips Stones and other Wildcards. With no eligible neighbor it rests inert and is re-evaluated whenever an adjacent cell changes. | 5 | 3% |
+| **Wildcard** | On landing, merges with the first neighbor found via the priority order and takes that neighbor's value doubled. Value blocks only: it skips Stones and other Wildcards. With no eligible neighbor it rests inert. **Wildcard merges are symmetric**: a value block landing beside a resting Wildcard merges with it too. | 5 | 3% |
 | **Bomb** | Does not merge. Destroys itself and its four orthogonal neighbors, then gravity and normal cascade resolution continue. | 8 | 3% |
 | **Stone** | No value, cannot merge, cannot be destroyed except by a Bomb or a row burst. | 12 | 5% |
 
