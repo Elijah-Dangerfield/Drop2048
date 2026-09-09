@@ -15,10 +15,9 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C0 · Template trim | **DONE** | `04803ff`. Identity + auth + server trim |
 | C1 · `:libraries:cascade` | **DONE** | `96e6b92`. 89 engine tests, green on JVM + Native |
 | C1b · Merge-position ruling | **DONE** | `3b14046`. Partner's cell (D6), one code path, digest re-pinned |
-| C1a · `tools/balance` | **IN PROGRESS** | Spawn table is now untuned against the new merge rule |
-| C2 · Theme + design system | **MOSTLY DONE** | `e6e95b3`. Steps 1-8 done |
-| C2b · HUD primitives | **IN PROGRESS** | C2's step 9 remainder |
-| C3 · `:features:game` | not started | Blocked on C1a + C2b |
+| C1a · `tools/balance` | **DONE** | `bc0a4fe`. Table measured and kept. See L18-L21 |
+| C2 · Theme + design system | **DONE** | `e6e95b3` + `546eb04`. All 9 steps |
+| C3 · `:features:game` | **IN PROGRESS** | The "is it fun" gate |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
 | C5 · Tutorial | not started | |
@@ -262,6 +261,27 @@ live numbers are directly comparable.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L22 · Top-level `val`s initialise in declaration order, and a colour derived from one below it comes out transparent
+
+C2b declared `SPECIAL_STYLES` above `DARK_INK` / `LIGHT_INK` in the same file. Kotlin initialises
+top-level properties in declaration order, so the derivation ran while both inks were still zeroed
+and **every special block got a fully transparent ink**.
+
+No warning. No crash. Correct-looking code. It would have shipped as invisible numerals on three
+block types.
+
+It was caught only because `BlockPaletteTest` measures the *derived* ink rather than trusting the
+derivation — the same property that caught Sodogku's three hand-picked inks. **That is twice now
+the palette test has earned its keep on a bug nothing else could see.** L2 said write the test
+before authoring the palettes; this is why.
+
+The fix is a declaration-order move with a KDoc line saying why it has to stay there.
+
+### L23 · There is no per-module detekt task
+
+Only a root `:detekt`. `:libraries:ui:detekt` does not exist. Worth knowing before someone
+concludes a module is unchecked because its task is missing.
 
 ### L18 · The merge ruling made the game harder, and it is what makes the spawn table fit
 

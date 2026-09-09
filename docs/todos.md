@@ -12,25 +12,24 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
-### Finish C2 step 9 — the four HUD primitives
+### The specials' marks need an eyes-on pass at real cell size (C3)
 
-C2 delivered steps 1 through 8 and stopped short of step 9's component set. **C3 needs all four**
-and should not hand-roll them:
+`StarArmWidth`, `BombRadius`, `FuseReach` and `MarkFraction` in `BlockFace.kt` are reasoned, not
+seen. Nobody has checked whether the drawn star reads as a star or the fuse reads as a bomb at a
+real ~44dp cell. Cheap to retune: four constants in one file.
 
-- `ScoreCounter` + `abbreviateScore` — port and strip from
-  `Sodogku/.../components/game/ScoreCounter.kt:48-136`, with its test. Sodogku's delta-scaled
-  duration beats Cards' fixed one for a game where a merge pays 40 and a burst pays 4,000.
-- `FloatingPoints` → the `CHAIN xN` callout — `ScoreCounter.kt:206-243`. Nonce-keyed rise-and-fade
-  is exactly right; swap the copy and scale by cascade step.
-- `LevelProgressBar` — port as-is from `Cards/.../components/LevelProgressBar.kt`.
-- `pulsingBorder` — port as-is from `Cards/.../components/PulsingBorder.kt`. This is what SPEC 8.3's
-  danger state needs, and its KDoc cites four production ANR traces from resolving the colour in
-  composition instead of in draw.
+### `CHAIN xN` needs a string resource, and a format decision
 
-### Add the three specials to the block palette
+`ChainCallout` takes its copy as a parameter, because `:libraries:ui` holds no strings. C3 supplies
+it. Note `x2` is not a word that translates the same everywhere, so this is a format decision, not
+just a string.
 
-`Wildcard`, `Bomb` and `Stone` (SPEC 5.2) have no `BlockStyle` and are absent from `TIER_VALUES`.
-The palette currently covers the 11 numeric tiers only, so C3 has nothing to draw a special with.
+### A screenshot-test harness
+
+Everything C2b built holds still under `LocalInspectionMode` **precisely so a capture would work**,
+and no capture harness exists. This is the first chunk where the gap costs something real: the
+score roll, the chain callout, the danger pulse and the three special marks are all unobserved, and
+the catalog page shows what they look like and never what they do.
 
 ### Wire the real settings into `AppThemeProvider`
 
@@ -68,13 +67,6 @@ Both survived C0 because they are structurally welded to `NetworkClientImpl`'s 4
 `App.kt`'s routing, and removing them meant surgery for no gain. But **nothing can trigger either
 one today** — the server's ban gate went with the auth stack. Revisit once the server surface is
 final in C7. Keep only if something can actually produce the envelope.
-
-### Fold D7 and D8 into `SPEC.md`
-
-Both rulings live in `ORCHESTRATION.md` only, because C2b had `SPEC.md` open when they were made.
-D7 (highest tier means reached-during-run) touches SPEC 4.4, 8.4, 11 and 17, and all four must
-agree or the stats page will never show a 2048. D8 (clutter stays number-blocks-only) touches
-SPEC 17 and 4.4.
 
 ## Soon
 
@@ -136,11 +128,14 @@ C2 capped the climb at an octave, which SPEC 9 does not mention and nobody has a
 The gesture cannot be unit tested; `BoardGeometry` underneath it is, thoroughly. Worth a UI test
 in C3a when Drag ships as a control scheme.
 
-### Port the design system pieces Sodogku already proved
+### Pull the remaining Sodogku design-system pieces as their chunk arrives
 
-`ORCHESTRATION.md` has the table. C2 takes the color, motion and haptics foundations; the rest
-gets pulled as the chunk that needs it arrives. Do not port the whole thing up front: an unported
-component costs nothing, a ported-and-unused one costs maintenance forever.
+The C2 foundations are done. What is left in `ORCHESTRATION.md`'s port table is chunk-gated:
+`Focus` and `CoachMark` for C5's tutorial, the streak and daily components for C6, `UnlockToast`
+and `ShareButton` for C9.
+
+**Do not port them up front.** An unported component costs nothing; a ported-and-unused one costs
+maintenance forever.
 
 ### Decide whether `:features:onboarding` keeps its name
 

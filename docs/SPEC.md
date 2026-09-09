@@ -208,11 +208,27 @@ clog":
 - **Greedy**: takes the immediate merge if one exists, else the emptiest column.
 - **Lookahead-1**: greedy, but uses the next-block preview.
 
-It reports, per policy, over 10,000 runs: median and p90 level reached, distribution of highest
-tier at run end, cause of death, cascade depth histogram, and the **clutter metric** (count of
-blocks on the board with no matching partner anywhere, sampled every 10 drops). Section 19 of the
-original spec names clutter as the early warning for a mistuned spawn floor. Here it is measured
-before a single frame is rendered.
+It reports, per policy, over 10,000 runs: median and p90 level reached, the distribution of
+**highest tier reached**, cause of death, cascade depth histogram, and the **clutter metric**
+(count of number blocks on the board with no matching partner anywhere, sampled every 10 drops).
+Section 19 of the original spec names clutter as the early warning for a mistuned spawn floor.
+Here it is measured before a single frame is rendered.
+
+**"Highest tier" always means reached during the run, never on the board at the end.** A 2048
+bursts its own row, so it is never at rest when a run ends; the literal reading reports 0% for the
+game's defining moment. Every place that asks this question uses the same reading: the harness
+here, `run_record.highest_tier` (11), "BIGGEST" on the stacked-out sheet (8.4), and the weekly
+distribution (17).
+
+**Clutter counts number blocks only.** Stones and inert Wildcards are excluded on purpose. Clutter
+exists to warn that the *spawn floor* is mistuned, and Stones arrive from the special rate rather
+than the spawn table, so folding them in blurs two causes into one number that cannot diagnose
+either. If board congestion needs measuring, that is a second count of permanent obstructions, not
+a change to this one.
+
+The harness and the live telemetry in 17 must compute clutter from **the same function in
+`:libraries:cascade`**. The entire value of the metric is that offline and live numbers are
+directly comparable.
 
 It also counts the drops whose block exceeds the cap 5.3B would impose at *landing* time. The cap
 is read two drops early, so it can only ever be too loose, and this is the number that would show
@@ -603,8 +619,9 @@ Minimum set to actually tune the thing.
 - **Funnel.** Tutorial step reached, completed, skipped; first run completed; day 1 / 3 / 7
   return.
 
-**The two numbers watched weekly:** median level reached, and the distribution of highest tier at
-run end. Nobody reaching 1024 means too hard. Most runs ending above 2048 means too easy.
+**The two numbers watched weekly:** median level reached, and the distribution of highest tier
+**reached** (see 4.4 — a 2048 bursts, so "at run end" would report zero of them). Nobody reaching
+1024 means too hard. Most runs reaching 2048 means too easy.
 
 Every event goes in `docs/practices/app-events.md` in the same change that adds it.
 

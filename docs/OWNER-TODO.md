@@ -121,6 +121,16 @@ spec's $3.99 because coins, powerups and Zen are cut). Created in both stores.
 
 ---
 
+### Confirm the three special block colours
+
+Electric violet Wildcard, near-black plum Bomb, neutral grey Stone. They clear every measured
+floor, and Stone's worst case anywhere is ΔE 26.1 against the tritanopia ramp's 2.
+
+Worth your eye because these are the first three colours in the game chosen for **where they
+aren't** rather than for what they look like. The Bomb in particular is nearly black.
+
+`BlockSpecialPreview` in `DesignSystemPreview.kt`.
+
 ### Look at the five block palettes rendered
 
 They are numerically sound and **nobody has seen them.** C2 authored them by hill-climbing against
@@ -214,12 +224,16 @@ Drop 2048 has `Brand`, `SansSerif` and `Serif`. Sodogku added a fourth, a rounde
 and that single choice is most of why it reads as a game rather than a utility. Drop 2048 needs an
 equivalent, and it is a taste call.
 
-The second one is not taste. **Every block carries a number and the score counts up constantly**,
-so both need a face with **tabular (monospaced) digits**, or block faces will visibly jitter as
-values change and the score will wobble on every merge. No sibling repo has one. Pick a family
-with a real tabular figure set, and check the licence covers app embedding.
+The second one is not taste and it is now **blocking two visible things**: block faces jitter as
+values change, and the score visibly wobbles while it counts. Both need a face with **tabular
+(monospaced) digits**. No sibling repo has one.
 
-**Needed by:** C2.
+Every number in the game already routes through one token, so **the swap is a single declaration**
+in `libraries/ui/.../system/typography/FontFamily.kt`. Pick a family with a real tabular figure
+set and check the licence covers app embedding. Open-licence candidates: Roboto Mono, JetBrains
+Mono, Inter (has `tnum`), Nunito Sans.
+
+**Needed by:** C3, where it becomes visible for the first time.
 
 ### Art
 
