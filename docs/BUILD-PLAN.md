@@ -129,10 +129,10 @@ Notes for whoever builds on it:
 
 - **The transcript is the only channel points travel down.**
   `next.score == previous.score + transcript.points` after every transition, and
-  a test asserts it over a whole run. That means the transcript carries five step
-  kinds SPEC 4.2 does not name (hard drop bonus, survival, level up, board
-  cleared, plus the gravity settle it does). The alternative was a second scoring
-  channel the floating numbers could drift from.
+  a test asserts it over a whole run. That means the transcript carries four step
+  kinds beyond the four SPEC 4.2 originally listed (hard drop bonus, survival,
+  level up, board cleared). The alternative was a second scoring channel the
+  floating numbers could drift from. SPEC 4.2 now says so.
 - **Determinism is pinned as a digest, not compared in-process.** A seed plus 600
   scripted inputs is serialized and reduced to an FNV-1a constant asserted in
   `commonTest`, so the same number has to come out on JVM, Android and iOS. It
@@ -144,7 +144,12 @@ Notes for whoever builds on it:
   Kotlin/Native. Run it whenever the engine changes.
 - Three spec conflicts surfaced and are written up in `decisions.md`: the
   horizontal merge position vs. the worked example in this file, Wildcard merge
-  symmetry, and where `EngineConfig` and the undo ring live.
+  symmetry, and where `EngineConfig` and the undo ring live. **The first was
+  ruled on the same day**: the merged block lands in the partner's cell in both
+  orientations, so the worked example above is now literally what the engine
+  does, and SPEC 4.3 carries the example itself. Wildcard symmetry was confirmed
+  and is now in SPEC 5.2. Re-pinning the determinism digest was part of that
+  change.
 - The module has no `implementation` dependencies. It has one `api` dependency,
   `kotlinx-serialization-core`, which `@Serializable` requires; and the
   `drop2048.kotlin.multiplatform` convention plugin still injects

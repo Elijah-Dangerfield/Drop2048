@@ -25,8 +25,12 @@ sealed interface ResolutionStep {
     val points: Int
 
     /**
-     * Two blocks combined. [into] is the lower cell on a vertical merge and the
-     * *initiating* block's cell on a horizontal one (SPEC 4.3).
+     * Two blocks combined. [into] is the **partner's** cell in every orientation
+     * (SPEC 4.3) — a vertical merge's lower cell is the partner's cell, so the
+     * two orientations are one rule. It therefore always equals [partner]; it
+     * stays a separate field so the UI can animate "initiator travels to into"
+     * without having to know the position rule, and so a future rule change is a
+     * change to one value rather than to what [partner] means.
      */
     @Serializable
     @SerialName("merge")

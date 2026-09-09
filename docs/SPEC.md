@@ -118,6 +118,12 @@ screen. This is what makes "input during resolution is ignored" free rather than
 makes the cascade-step audio pitch (see 9) a trivial `transcript.map { it.step }`, and makes the
 whole of section 6's algorithm testable without a renderer.
 
+**The transcript carries more step kinds than the four named above**: the hard drop bonus,
+survival, level up and board cleared are steps too, tagged with cascade step 0. That is deliberate.
+It buys the invariant `next.score == previous.score + transcript.points` after every transition,
+which is asserted over a whole run. The alternative was a second scoring channel that the floating
+numbers on screen could drift away from. Anything that awards points goes down this one channel.
+
 ### 4.3 Merge rules
 
 Unchanged from the original spec, and they are not negotiable once shipped.
@@ -152,6 +158,33 @@ instead of two, matches both worked examples, and makes a horizontal merge pull 
 the match, which is what makes chains happen. Section 21 says chains are what the game is for.
 
 Ruled 2026-09-09. This is a merge rule, so it is now fixed.
+
+**Worked example.** A 4 lands between two 4s, with an 8 already sitting below the left one. `v` is
+the block the player dropped.
+
+```
+        v
+.  4    4    4   .          .  4    4    4   .          .  .    8    4   .
+.  8    S    S   .          .  8    S    S   .          .  8    S    S   .
+   before                      landed                      step 1: merged left
+```
+
+The landing 4's priority order is Down (a Stone, not eligible), then Left. The left 4 is the
+partner, so the new 8 lands in **its** cell, directly above the existing 8.
+
+```
+.  .    8    4   .          .  .    .    4   .
+.  8    S    S   .          .  16   S    S   .
+   step 1                      step 2: cascades down
+```
+
+Step 2: the 8 that step 1 created is in the queue, its Down is the 8 below, and they make a 16 in
+the lower cell. The right 4 is never touched — first match only. Two merges, and the chain the
+design is pitched on.
+
+Move the pre-existing 8 under the *landing* cell instead and the same drop produces one merge and
+stops, because the new 8 goes to the partner's cell and is then diagonal to it. Both arrangements
+are pinned as tests (`PriorityOrderTest`) so this rule cannot change quietly.
 
 ### 4.4 The balance harness
 
@@ -223,6 +256,12 @@ Clamp down to the highest allowed tier when the draw exceeds it.
 
 A is what makes 2048 reachable inside one run instead of a thousand-merge grind. B is the safety
 valve that stops a 64 landing on a board of 2s.
+
+**The cap is evaluated at draw time, not at landing time**, which means it reads the board as it
+was *two drops earlier*. That is forced by 5.4: the preview shows two blocks and is non-optional,
+so a block has to be decided before it can be shown, and a preview that can still change is a lie
+to the player and useless to the lookahead policies in 4.4. The cost is that the cap can be one or
+two merges out of date on a fast-moving board. Take that over a preview that rewrites itself.
 
 **This whole table is a remote-config key** (see 10). It will be wrong on launch day and the fix
 should not need a store release.
@@ -313,6 +352,14 @@ counting up.
 Hard drop's bonus stays a token. On a 5x8 board the maximum is 14 points against merges worth
 hundreds, which is a nudge toward confident play, not a strategy. (Original spec's open question
 5, resolved: leave it small.)
+
+**Survival on a drop that levels up pays the level the block was dropped at**, before advancement.
+The drop was survived under the old level's speed, so that is the level it earned. The level-up
+bonus for the new level is awarded on the same drop and is where the new level shows up.
+
+**Bomb detonation counts neighbours only, not the bomb itself.** That is what makes 18.4's "a bomb
+with no neighbours scores nothing" fall out of `50 x blocksDestroyed` instead of needing a special
+case. Read the two together or they look like they disagree.
 
 ## 8. In-run presentation
 
@@ -550,6 +597,8 @@ Decided now, because every one of them will come up.
 2. **Wildcard beside a Wildcard.** They do not merge. Both stay inert.
 3. **Wildcard beside a Stone.** Stone is not eligible. Skip it in the priority order.
 4. **Bomb with no neighbors.** Destroys only itself, no score. Slightly disappointing, and fine.
+   Section 7's `50 x blocksDestroyed` only agrees with that if the bomb's own cell is excluded from
+   the count, so it is.
 5. **Burst clears a Stone.** Yes. Without this, Stone-heavy late game is unwinnable.
 6. **Two 2048s in one cascade step.** Both rows burst, both bonuses award. Same row, it bursts
    once and counts once.

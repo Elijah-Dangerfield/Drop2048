@@ -19,6 +19,12 @@ import kotlin.test.assertTrue
  * If one of these constants has to change, that is a **breaking change to every
  * recorded Daily Challenge score**, not a test fixup. Read SPEC 10's "never
  * remote" list before touching it.
+ *
+ * Re-pinned once, 2026-09-09, when SPEC 4.3's merge position was ruled to be the
+ * partner's cell in both orientations. Merge outcomes moved, so the pin had to
+ * move with them; it was re-derived from the engine, not from the old numbers.
+ * No scores existed yet. Every later change to these constants needs the same
+ * kind of written reason.
  */
 class DeterminismTest {
 
@@ -113,9 +119,9 @@ class DeterminismTest {
         const val FNV_OFFSET = -0x340d631b7bdddcdbL
         const val FNV_PRIME = 0x100000001b3L
 
-        const val PINNED_SCORE = 942L
-        const val PINNED_BLOCKS_DROPPED = 27
+        const val PINNED_SCORE = 862L
+        const val PINNED_BLOCKS_DROPPED = 25
         const val PINNED_LEVEL = 2
-        const val PINNED_DIGEST = 1_066_253_885_288_734_400L
+        const val PINNED_DIGEST = 9_182_672_379_078_956_347L
     }
 }

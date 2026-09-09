@@ -9,9 +9,9 @@ import kotlin.test.assertTrue
  * SPEC 4.3's merge rules, one test per clause.
  *
  * Covered: the four-slot priority order and its dedup when the last input
- * direction is left or right, "never up", where the new block lands for
- * vertical and horizontal merges, which blocks may initiate, and the
- * bottom-to-top / left-to-right ordering of the merge queue.
+ * direction is left or right, "never up", the partner's cell as the landing
+ * cell in both orientations, which blocks may initiate, and the bottom-to-top /
+ * left-to-right ordering of the merge queue.
  *
  * NOT covered here: multi-step cascades (`CascadeLoopTest`), scoring
  * (`ScoringTest`), Wildcard and Bomb eligibility (`SpecialsTest`), and the
@@ -49,7 +49,7 @@ class MergeRulesTest {
 
         val merge = resolution.steps.filterIsInstance<ResolutionStep.Merge>().single()
         assertEquals(Cell(2, 6), merge.partner)
-        assertEquals(Cell(1, 6), merge.into)
+        assertEquals(Cell(2, 6), merge.into)
         assertEquals(tier(4), resolution.board[Cell(0, 6)]?.numberValue)
     }
 
@@ -97,12 +97,12 @@ class MergeRulesTest {
     }
 
     @Test
-    fun aHorizontalMergeLandsInTheInitiatingBlocksCell() {
+    fun aHorizontalMergeLandsInThePartnersCell() {
         val board = boardOf("4 4 . . .")
         val resolution = resolve(board, Cell(1, 7), lastDirection = null)
 
-        assertEquals(tier(8), resolution.board[Cell(1, 7)]?.numberValue)
-        assertNull(resolution.board[Cell(0, 7)])
+        assertEquals(tier(8), resolution.board[Cell(0, 7)]?.numberValue)
+        assertNull(resolution.board[Cell(1, 7)])
     }
 
     @Test

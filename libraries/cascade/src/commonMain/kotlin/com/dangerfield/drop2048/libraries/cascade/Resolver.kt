@@ -135,6 +135,16 @@ internal object Resolver {
      * SPEC 4.3's priority order, first match only, never up: down, then the last
      * input direction this drop, then left, then right. Blocks that gravity moved
      * have no last input direction, so their order collapses to down, left, right.
+     *
+     * **The merged block lands in the partner's cell, in every orientation.** A
+     * vertical merge's "lower cell" *is* the partner's, because the initiator
+     * falls onto the partner from above, so one rule covers both and there is one
+     * code path rather than a branch on direction. Stating it that way is not
+     * cosmetic: it makes a horizontal merge pull the result toward the match,
+     * which is the thing that lines the new block up over what is underneath the
+     * partner and lets a chain continue. SPEC 21 says chains are what the game is
+     * for, and the spec's own worked example (a 4 landing between two 4s with an 8
+     * below the left one, cascading to a 16) only reaches its 16 under this rule.
      */
     private fun merge(board: Board, seed: Seed, step: Int, multiplier: Int): MergeOutcome? {
         val initiator = board[seed.cell] ?: return null
@@ -151,18 +161,16 @@ internal object Resolver {
             val target = seed.cell + direction
             val partner = board[target] ?: continue
             val outcome = combine(initiator, partner) ?: continue
-            val into = if (direction == Direction.DOWN) target else seed.cell
             val next = board
                 .with(seed.cell, null)
-                .with(target, null)
-                .with(into, NumberBlock(outcome.first))
+                .with(target, NumberBlock(outcome.first))
             return MergeOutcome(
                 board = next,
                 step = ResolutionStep.Merge(
                     step = step,
                     initiator = seed.cell,
                     partner = target,
-                    into = into,
+                    into = target,
                     result = outcome.first,
                     kind = outcome.second,
                     points = outcome.first.points * multiplier,
@@ -177,12 +185,16 @@ internal object Resolver {
      *
      * A Wildcard takes its partner's value doubled and is eligible against value
      * blocks only, so it skips Stones (SPEC 18.3) and other Wildcards
-     * (SPEC 18.2). The relationship is symmetric: a value block landing beside a
-     * resting Wildcard merges with it too. SPEC 5.2 describes only the
-     * Wildcard-initiated direction, but the asymmetry would make a Wildcard the
-     * board can no longer reach into dead weight, and "a Wildcard next to a 1024
-     * makes a 2048" reads to a player as a property of the pair, not of which one
-     * moved last.
+     * (SPEC 18.2).
+     *
+     * **The relationship is symmetric** — a value block landing beside a resting
+     * Wildcard merges with it too — and SPEC 5.2 says so. The reason it has to:
+     * SPEC 5.2 explicitly lets a Wildcard rest inert when it lands with no
+     * eligible neighbour. Without symmetry that inert Wildcard can never be
+     * consumed again, so it becomes a permanent obstacle that a player reads as a
+     * bug, because the obvious move — drop a value block next to it — does
+     * nothing. "A Wildcard next to a 1024 makes a 2048" is a property of the pair
+     * as a player sees it, not of which of the two moved last.
      */
     private fun combine(initiator: Block, partner: Block): Pair<BlockValue, MergeKind>? {
         val initiatorValue = initiator.numberValue

@@ -6,7 +6,45 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — Ruled: the merged block lands in the partner's cell, both orientations
+
+**Supersedes the entry below it.** The owner ruled on the contradiction C1 found,
+and ruled the other way: SPEC 4.3 now says **the partner's cell**, in every
+orientation, and the vertical "lower cell" wording is gone because a vertical
+merge's lower cell already *is* the partner's cell.
+
+**Why the ruling goes this way.** One rule instead of two. It matches both worked
+examples rather than only one. And a horizontal merge that pulls the result
+*toward* the match is what lines the new block up over whatever sits under the
+partner, which is how a chain gets a second step. SPEC 21 says chains are what
+the game is for, so a rule that quietly suppresses them is the wrong rule even
+where it is the more literal reading. The legibility worry in the superseded
+entry stands but is smaller than it looked: the result still lands on a cell
+adjacent to where the player put the block, and it lands on the block the player
+was aiming at.
+
+**In the code:** the two orientations collapsed into one code path.
+`Resolver.merge` no longer branches on direction; the result is written to the
+partner's cell and the initiator's cell is cleared, which is now also one board
+write fewer.
+
+**Tests:** `PriorityOrderTest` is inverted. The "8 below the left 4" arrangement
+is the canonical worked example and must cascade to a 16; the "8 below the
+landing cell" arrangement is pinned as the one that must *stop* after one merge.
+Either direction of future change fails loudly and names this decision.
+
+**Determinism:** the pinned digest in `DeterminismTest` moved, because merge
+outcomes moved. `PINNED_SCORE` 942 → 862, `PINNED_BLOCKS_DROPPED` 27 → 25,
+`PINNED_DIGEST` re-derived. Level unchanged at 2. No Daily Challenge scores exist
+yet, so this was free; it will not be free again.
+
+**Also confirmed, unchanged:** Wildcard merge symmetry stays, for the reason in
+the entry two below. SPEC 5.2 now states it explicitly rather than leaving it as
+an implementation divergence.
+
 ## 2026-09-09 — The horizontal merge position contradicts the priority worked example
+
+**SUPERSEDED 2026-09-09 by the owner ruling above. Kept for the reasoning.**
 
 **Decision:** SPEC 4.3 wins. A horizontal merge puts the new block in the
 **initiating** block's cell, as 4.3 says, and the `PriorityOrderTest` worked

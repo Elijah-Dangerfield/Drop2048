@@ -29,7 +29,7 @@ class SpecialsTest {
         val merge = resolution.steps.filterIsInstance<ResolutionStep.Merge>().single()
         assertEquals(MergeKind.WILDCARD, merge.kind)
         assertEquals(tier(16), merge.result)
-        assertEquals(Cell(1, 6), merge.into)
+        assertEquals(Cell(2, 6), merge.into, "the merged block lands in the partner's cell")
     }
 
     @Test
@@ -60,7 +60,7 @@ class SpecialsTest {
         val merge = resolution.steps.filterIsInstance<ResolutionStep.Merge>().single()
         assertEquals(MergeKind.WILDCARD, merge.kind)
         assertEquals(tier(16), merge.result)
-        assertEquals(Cell(1, 6), merge.into, "the value block initiated, so it keeps its cell")
+        assertEquals(Cell(0, 6), merge.into, "the result lands on the Wildcard, the partner here")
     }
 
     @Test
@@ -93,7 +93,7 @@ class SpecialsTest {
         assertEquals(MergeKind.WILDCARD, merges[1].kind)
         assertEquals(2, merges[1].step)
         assertEquals(tier(8), merges[1].result)
-        assertEquals(tier(8), resolution.board[Cell(0, 7)]?.numberValue)
+        assertEquals(tier(8), resolution.board[Cell(1, 7)]?.numberValue)
     }
 
     @Test
