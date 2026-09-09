@@ -99,6 +99,12 @@ if (!serverOnly) {
     include(":libraries:drop2048:storage")
     include(":libraries:ui")
 
+    // The balance harness. A plain JVM module that ships nothing and exists only
+    // at build time: it plays :libraries:cascade headless under scripted policies
+    // so SPEC 5.3's spawn table is measured rather than guessed. Client-side dev
+    // tooling, so it is gated out of the server-only graph like everything else.
+    include(":tools:balance")
+
     // Custom detekt rules — a standalone JVM jar detekt loads via
     // `detektPlugins`. Dev/CI tooling only, never shipped; gated out of the
     // server-only Docker build like every other client module.

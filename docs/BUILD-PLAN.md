@@ -189,6 +189,89 @@ already fine, write that down too, with the numbers that say so.
 **Done when, part two:** the shipped spawn table is one the harness measured, not one that was
 guessed.
 
+**Outcome (2026-09-09). The table in `SPEC.md` 5.3 was measured and kept unchanged.** It is now a
+measured table rather than a guessed one, and three alternatives were measured beside it so the
+decision has something to be a decision *between*. `tools/balance:test` — 6 tests, 0 failures, 0
+skipped.
+
+All numbers below: 10,000 runs per policy, seeds 1..10000, `EngineConfig.Default` with only
+`spawnTable` varied, engine as shipped after the merge-position ruling. Reproduce any row with
+`./gradlew :tools:balance:run --args="--runs 10000 --table <name>"`. Timing on an M-series laptop:
+random 1.3s, greedy 8.6s, lookahead-1 40s, so each policy is inside the one-minute budget and all
+three together are about 50s of compute.
+
+**Baseline — `SPEC.md` 5.3 as written (`--table spec`, identical to `SpawnTable.Default`).**
+
+| Policy | level median / p90 / max | drops median | 256 | 512 | 1024 | 2048 | clutter mean / p90 |
+|---|---|---|---|---|---|---|---|
+| Random | 4 / 5 / 11 | 63 | 0.07% | — | — | — | 0.93 / 2 |
+| Greedy | 22 / 26 / 48 | 421 | 11.8% | 53.8% | 30.5% | 3.8% | 2.42 / 4 |
+| Lookahead-1 | 25 / 32 / 69 | 482 | 3.0% | 32.2% | 49.0% | 15.7% | 2.79 / 5 |
+
+Highest tier is the highest reached during the run, not what is left on the board — a 2048 bursts
+its row and would otherwise be invisible. Cause of death was `row_zero_occupied` on 30,000 of
+30,000 runs; no run hit the 3,000-drop cap, no run faulted the engine, and `SPAWN_BLOCKED` never
+fired, which is SPEC 18.1 holding over 13 million drops.
+
+Random's median level is 4 and its p90 is 5, so it does not reach level 6 and SPEC 4.4's
+too-easy tripwire is clear. Greedy has a real tail past 1024 (34.3% of runs) and bursts on 3.8%,
+which is neither of SPEC 17's two failure modes.
+
+**The three alternatives, Greedy only, same seeds.**
+
+| Table | level median | 256 | 512 | 1024 | 2048 | clutter mean |
+|---|---|---|---|---|---|---|
+| `spec` (kept) | 22 | 11.8% | 53.8% | 30.5% | 3.8% | 2.42 |
+| `slowed` | 21 | 33.8% | 55.8% | 9.3% | 0.34% | 2.34 |
+| `lowfloor` | 22 | 39.6% | 52.1% | 7.0% | 0.23% | 2.34 |
+| `steep` | 21 | 7.9% | 49.7% | 36.4% | 6.1% | 2.46 |
+
+**The spawn table sets the tier ceiling; the board geometry sets the level.** Median level moves by
+at most one across a range of tables that moves the 1024 rate by a factor of five. Softening the
+ramp buys nothing in survival and costs almost the whole tail past 1024, which is SPEC 17's
+"nobody reaching 1024 means too hard". Steepening it buys a slightly richer tail for a slightly
+shorter run and is a defensible alternative rather than an improvement. On that evidence, changing
+the table would be churn: it would move the pinned determinism digest, invalidate the SPEC 5.3
+numbers everyone has already read, and buy nothing measurable.
+
+**The interesting number: the merge-position ruling made the game harder, and not via chain
+frequency.** The pre-ruling engine (horizontal merges landing in the initiator's cell) was
+restored locally, measured, and reverted; the engine in the repo is untouched.
+
+| Policy | pre-ruling level median | post | pre 1024 | post | pre 2048 | post |
+|---|---|---|---|---|---|---|
+| Random | 5 | 4 | 0.01% | 0% | 0% | 0% |
+| Greedy | 26 | 22 | 49.5% | 30.5% | 36.7% | 3.8% |
+| Lookahead-1 | 32 | 25 | 30.6% | 49.0% | 65.1% | 15.7% |
+
+The tier buckets are exclusive, which is why Lookahead-1's pre-ruling 1024 share is the *lower*
+one: two thirds of those runs went past 1024 and are counted in the 2048 column instead.
+
+Cascade depth, Greedy, share of drops at each depth:
+
+| depth | 0 | 1 | 2 | 3 | 4 | 5 | 6+ | mean | >=2 |
+|---|---|---|---|---|---|---|---|---|---|
+| pre-ruling | 44.5% | 33.7% | 14.1% | 4.9% | 1.8% | 0.75% | 0.17% | 0.88 | 21.8% |
+| post-ruling | 43.8% | 35.4% | 13.3% | 5.1% | 1.7% | 0.56% | 0.07% | 0.87 | 20.8% |
+
+Chains are as frequent as they ever were. What changed is that a horizontal merge now moves the
+result into the partner's column, and the partner's column is by definition the one that already
+held a match, so the board gets less level with each horizontal merge instead of more. On five
+columns that is what ends runs. The single pinned-determinism data point in L17 (25 drops, down
+from 27) pointed at this and was right.
+
+**The stale board-aware cap is a non-issue.** SPEC 5.3B is evaluated at draw time, two drops
+early, so it can only ever be too loose. The harness counts drops whose block exceeds the cap the
+board would impose at landing: **0.02% of Greedy's drops, 0.04% of Lookahead-1's**. Under the
+pre-ruling engine, where chains were the thing being worried about, it was 0.09% and 0.16%. The
+compounding failure mode does not appear at either end.
+
+**What this does not measure.** The harness has no clock, so every policy places its block exactly
+where it wants at every level. These are ceilings for an unhurried player, not predictions:
+SPEC 5.5's speed curve is untested by anything here, and the real median level will be lower.
+Hold is never used by any policy and neither is soft drop. C3 is the first honest read on
+difficulty, and the two numbers to compare it against are the Greedy row above.
+
 ---
 
 ## C2 · Theme and design system

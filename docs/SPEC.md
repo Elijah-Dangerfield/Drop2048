@@ -214,8 +214,14 @@ blocks on the board with no matching partner anywhere, sampled every 10 drops). 
 original spec names clutter as the early warning for a mistuned spawn floor. Here it is measured
 before a single frame is rendered.
 
-The harness is how the spawn table in 5.3 gets its real numbers. The values below are the
-starting guess it is pointed at.
+It also counts the drops whose block exceeds the cap 5.3B would impose at *landing* time. The cap
+is read two drops early, so it can only ever be too loose, and this is the number that would show
+that compounding. It does not: 0.02% of Greedy's drops.
+
+The harness is how the spawn table in 5.3 gets its real numbers. **It has been run and the table
+below is the one it measured** — see `BUILD-PLAN.md`'s C1a outcome for the full distributions and
+the three alternatives that were rejected. The harness has no clock, so everything it reports is a
+ceiling for an unhurried player and says nothing about 5.5's speed curve.
 
 ## 5. Blocks
 
@@ -270,6 +276,12 @@ was *two drops earlier*. That is forced by 5.4: the preview shows two blocks and
 so a block has to be decided before it can be shown, and a preview that can still change is a lie
 to the player and useless to the lookahead policies in 4.4. The cost is that the cap can be one or
 two merges out of date on a fast-moving board. Take that over a preview that rewrites itself.
+
+**Measured, not guessed.** Every number here predates the 4.3 merge-position ruling, so C1a
+re-measured it against the shipped engine over 10,000 runs per policy and kept it. Greedy reaches
+a median level of 22 with 34% of runs passing 1024 and 3.8% bursting; a softer ramp costs almost
+the entire tail past 1024 and buys no survival, because the spawn table sets the tier ceiling and
+the board geometry sets the level. Numbers in `BUILD-PLAN.md` C1a.
 
 **This whole table is a remote-config key** (see 10). It will be wrong on launch day and the fix
 should not need a store release.

@@ -6,6 +6,46 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The SPEC 5.3 spawn table is kept, and the merge ruling is what made it fit
+
+**Decision:** C1a measured the spawn table in SPEC 5.3 with `tools/balance` and
+changed nothing. Three alternatives were measured beside it and all three are
+worse against the criterion `BUILD-PLAN.md` set for C1a. The numbers are in that
+file's C1a outcome; the alternatives live on in `Tables.kt` so the comparison can
+be re-run rather than re-argued.
+
+**Why it needed measuring at all:** every number in that table was written before
+the merge-position ruling, so it was a guess made under different physics.
+
+**What the measurement found.** The ruling made the game materially *harder*, and
+not by changing how often chains happen. Greedy's cascade-depth histogram is
+almost identical either side of it — mean depth 0.88 before, 0.87 after; share of
+drops reaching depth 2 or more, 21.8% before, 20.8% after. What moved was where
+the merged block ends up. A horizontal merge now migrates the result into the
+partner's column instead of leaving it in the column the player just dropped
+into, and the partner's column is by construction the one that already had a
+matching block in it. The board therefore gets *less* level with every horizontal
+merge rather than more, and an uneven board on five columns is what ends a run.
+Greedy's 2048 rate fell from 36.7% to 3.8% and Lookahead-1's from 65.1% to 15.7%
+on the same table and the same seeds.
+
+**Consequence for the ruling itself:** it stands, and it is now the reason the
+table fits. Under the old position rule that same table put a burst in the
+majority of Lookahead-1 runs, which is SPEC 17's definition of too easy. Anyone
+revisiting the merge position needs to retune the spawn table in the same change.
+
+**Consequence for SPEC 5.3B.** The board-aware cap is evaluated two drops early
+and can therefore only ever be too *loose*. The harness counts the drops where
+the block that landed exceeds the cap the board would impose at landing time:
+0.02% of Greedy's drops and 0.04% of Lookahead-1's. The staleness is real and it
+is not worth engineering around. Under the pre-ruling engine it was 0.09% and
+0.16% — still nothing, which is the answer to the worry that faster chains would
+make the cap compound.
+
+**Not measured:** the harness has no clock. Every policy hard-drops into the
+column it wants, so these are ceilings for an unhurried player and say nothing
+about SPEC 5.5's speed curve. Real medians will be below them.
+
 ## 2026-09-09 — Ruled: the merged block lands in the partner's cell, both orientations
 
 **Supersedes the entry below it.** The owner ruled on the contradiction C1 found,
