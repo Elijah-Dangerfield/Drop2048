@@ -241,8 +241,20 @@ that compounding. It does not: 0.02% of Greedy's drops.
 
 The harness is how the spawn table in 5.3 gets its real numbers. **It has been run and the table
 below is the one it measured** — see `BUILD-PLAN.md`'s C1a outcome for the full distributions and
-the three alternatives that were rejected. The harness has no clock, so everything it reports is a
-ceiling for an unhurried player and says nothing about 5.5's speed curve.
+the three alternatives that were rejected.
+
+**The clock is optional and both halves are kept.** Clock-free, every policy hard-drops into the
+column it wants at every level, and everything it reports is a ceiling for an unhurried player.
+C1c added a `PlayerProfile` — a decision time and a tap rate — and a simulation of 5.5's drop
+timer and 6's controls, so a policy that cannot reach its preferred column in the time it has
+takes the best one it can reach. Running both is what says how big the ceiling was: three levels
+of median for Greedy and Lookahead-1, and a third off the 2048 rate. Numbers in `BUILD-PLAN.md`
+C1c.
+
+The clocked half also reports, per level, the share of drops the lock delay placed rather than a
+drop input, the share where the policy did not get the column it asked for, and the **slack** —
+how long the policy sat with nothing to do while the block kept falling. The last of those is the
+only one that is not near zero in the opening, and it is what 5.5's early band was retuned on.
 
 ## 5. Blocks
 
@@ -304,6 +316,11 @@ a median level of 22 with 34% of runs passing 1024 and 3.8% bursting; a softer r
 the entire tail past 1024 and buys no survival, because the spawn table sets the tier ceiling and
 the board geometry sets the level. Numbers in `BUILD-PLAN.md` C1a.
 
+Those are the clock-free numbers and they are ceilings. With C1c's clock in the loop the same
+table gives Greedy a median level of **19** with 26% of runs passing 1024 and 2.2% bursting, which
+is still inside both of 17's failure modes. The table was re-read against the clocked numbers and
+kept again.
+
 **This whole table is a remote-config key** (see 10). It will be wrong on launch day and the fix
 should not need a store release.
 
@@ -323,9 +340,9 @@ score scales superlinearly with skill and would punish good players with runaway
 
 | Level | ms per row |
 |---|---|
-| 1 | 700 |
-| 2-4 | 620, 550, 490 |
-| 5-8 | 430, 380, 340, 300 |
+| 1 | 500 |
+| 2-4 | 470, 440, 410 |
+| 5-8 | 380, 350, 325, 300 |
 | 9-12 | 270, 245, 220, 200 |
 | 13-16 | 185, 170, 158, 148 |
 | 17-20 | 140, 133, 127, 122 |
@@ -336,8 +353,31 @@ level 20 speed stops being the pressure and the rising spawn floor carries the d
 Without the floor this stops being a puzzle and becomes a reflex test, which is a different and
 worse game.
 
-Three layered pressures: time (L1-8), space (L9-18), obstacles (L19+, where Stones appear and
-the burst becomes the only way to survive).
+**Levels 1-8 were re-cut in C1c and the rest of the curve is untouched.** They were
+`700, 620, 550, 490, 430, 380, 340, 300`. C3 played the shipped screen and reported the opening as
+slack; the clocked harness in 4.4 then measured it, and the diagnosis and the fix came apart:
+
+- The timer never took a block off the player in the opening. Over 200,000 level-1 drops, the
+  share placed against the policy's choice was **0.00%**, at every level of the first sixty drops
+  and for every policy.
+- The experience behind the complaint is real and is **dead time**, not pressure. Having decided
+  where the block goes, the policy then waited **4.8s** at level 1, 3.9s at level 2 and 3.3s at
+  level 3 for it to arrive. A 500ms opening cuts that to 3.5 / 3.0 / 2.7s.
+- Everything else was **identical to the digit** across the old curve, a 600ms one and this one:
+  median and p90 level, drops, the whole tier distribution, cause of death, cascade depth and
+  clutter. The early curve is a pacing dial, not a difficulty dial.
+
+So this change is a feel change made on a measurement that says its risk is zero, and it is not
+claimed to make the game harder. **The lever that would is `blocksPerLevel`**, and it was measured
+and left alone: 20 to 15 takes a hard-dropping player to level 4 in 26s instead of 34s, but it
+shortens runs by 11%, thins the tail past 1024, and — unlike the curve — it feeds level
+advancement, so it moves the pinned determinism digest and every score with it.
+
+**Three layered pressures, as amended.** Space (L1-18) and obstacles (L19+, where Stones appear
+and the burst becomes the only way to survive). Time is not one of them: on five columns with a
+centre spawn, a block is at most two columns from anywhere, which the measured player covers in
+370ms against a budget that never falls below about 780ms even at the speed floor. That is why
+6's soft drop and hard drop, not the curve, set how fast a run actually goes.
 
 ### 5.6 Undo
 

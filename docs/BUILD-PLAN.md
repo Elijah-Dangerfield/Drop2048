@@ -272,6 +272,10 @@ SPEC 5.5's speed curve is untested by anything here, and the real median level w
 Hold is never used by any policy and neither is soft drop. C3 is the first honest read on
 difficulty, and the two numbers to compare it against are the Greedy row above.
 
+**Superseded in part by C1c**, which put the clock in the loop and measured the size of the
+ceiling: three levels of median off Greedy and Lookahead-1, and about a third off the 2048 rate.
+Hold is still never used by any policy.
+
 ---
 
 ## C2 · Theme and design system
@@ -353,6 +357,147 @@ with both custom rules proven to dispatch, both platforms build.
 about ninety seconds, tier 64. The early game is not the problem; the drop speed at levels 1-3
 (700-550ms) is slack enough that the timer, not the player, places most blocks. `tools/balance`
 should be re-run with a clock before anyone tunes the curve.
+
+**Measured in C1c, and the diagnosis did not survive it.** The timer places 0.00% of the blocks in
+the opening — the policy gets the column it asks for every time. What is real is 4.8 seconds a
+drop of waiting once the steering is done. The curve was re-cut anyway, on that number rather than
+on this one. See C1c.
+
+---
+
+## C1c · `tools/balance` with a clock — **DONE** (2026-09-09)
+
+**Unblocked by** C1a and C3.
+
+**Delivered** a clock-aware harness and a ruling on the early speed curve. Every C1a number was a
+ceiling (L21): the harness had no timer, so every policy hard-dropped into the column it wanted at
+every level. `DropClock` puts SPEC 5.5's drop timer and SPEC 6's controls between the policy and
+the board — ticks at `msPerRow(level)`, a 150ms lock delay with one reset per drop, soft drop flat
+at 40ms a row, the shared tap/hold drop control, and C3's one-slot sideways buffer. A policy that
+cannot reach its preferred column in the time available takes the best one it can reach.
+
+The clock-free policies are unchanged and still runnable. `--clock off` is C1a exactly.
+
+**The player is a modelled assumption, not a measurement.** A `PlayerProfile` is a decision time
+and a tap rate; the headline numbers use `average` (250ms to read the board, 120ms between taps,
+finishes with a hard drop) and `quick` / `deliberate` bracket it. Nobody has instrumented a real
+player, and every number below moves if those two constants are wrong. `patient` never touches the
+drop control and exists only to put the other end on the wall clock.
+
+All numbers: 10,000 runs per policy, seeds 1..10000, `EngineConfig.Default`, engine as shipped.
+Reproduce with `./gradlew :tools:balance:run --args="--runs 10000 --policy greedy --clock average"`.
+`:tools:balance:test` — 13 tests, 0 failures, 0 skipped.
+
+### 1. How big the ceiling was
+
+| Policy | median level | p90 | drops | 512 | 1024 | 2048 | clutter mean |
+|---|---|---|---|---|---|---|---|
+| Random, no clock | 4 | 5 | 63 | — | — | — | 0.93 |
+| Random, clocked | **5** | 7 | 80 | 0.07% | — | — | 0.89 |
+| Greedy, no clock | 22 | 26 | 421 | 53.8% | 30.5% | 3.8% | 2.42 |
+| Greedy, clocked | **19** | 23 | 376 | 57.3% | 23.8% | 2.2% | 2.49 |
+| Lookahead-1, no clock | 25 | 32 | 482 | 32.2% | 49.0% | 15.7% | 2.79 |
+| Lookahead-1, clocked | **22** | 27 | 422 | 41.6% | 43.1% | 10.1% | 2.86 |
+
+Three levels of median off the two merge-seeking policies, about 12%, and roughly a third off the
+2048 rate. Cause of death stayed `row_zero_occupied` on 30,000 of 30,000 runs and no run hit the
+drop cap or faulted the engine. L21 was right about the direction and the size is modest.
+
+Sensitivity to the player model, Greedy: `quick` 21, `average` 19, `deliberate` 17, against a
+clock-free ceiling of 22. So the assumed hand is worth about as much as the clock is.
+
+**Random got *better* with a clock, 4 to 5, and that is not a bug.** The columns a block can still
+be steered into are partly the columns with room in them, because a tall column on the way blocks
+the path. A random player forced to re-pick among reachable columns is a slightly less random
+player. It is the only policy with that back door, and it is worth knowing before anyone reads a
+clocked Random number as the floor SPEC 4.4 describes.
+
+### 2. The early curve: C3's read was half right, and the half it got wrong is the diagnosis
+
+C3 reported that at levels 1-3 "the timer, not the player, places most blocks". Measured, per
+level, over the first 60 drops of every run:
+
+| Level | drops | placed by the timer | off preferred column | slack | wall clock per drop |
+|---|---|---|---|---|---|
+| 1 | 200,000 | 0.00% | 0.00% | 4,808ms | 569ms |
+| 2 | 200,000 | 0.00% | 0.00% | 3,916ms | 577ms |
+| 3 | 200,000 | 0.00% | 0.00% | 3,302ms | 584ms |
+
+(Greedy, `average`, the 700ms curve. Lookahead-1 is the same to two decimal places; Random differs
+only because it aims at far columns, and even it is 0.03% at level 1.)
+
+**Not one block in 600,000 was placed against the policy's choice in the opening.** Over a whole
+run it is 0.0% timer-placed and 2.2% off-preferred, and what causes even that is a tall column
+blocking the path rather than the timer being fast. The reason is structural: five columns with a
+centre spawn puts every cell at most two columns away, which the modelled player covers in 370ms
+against a budget that never falls below about 780ms even at the level-35 speed floor.
+
+**What is real is the dead time.** `slack` is the wait between the policy finishing its steering
+and the block arriving: 4.8 seconds a drop at level 1. That is C3's cutscene, and it is the number
+the complaint was actually about.
+
+Three curves, Greedy, `average`, same seeds. Levels 9+ identical in all three:
+
+| Curve (levels 1-8) | median level | drops | 1024 | 2048 | clutter | L1 slack | to level 4 |
+|---|---|---|---|---|---|---|---|
+| `700, 620, 550, 490, 430, 380, 340, 300` | 19 | 376 | 23.78% | 2.24% | 2.49 | 4,808ms | 34.4s |
+| `600, 560, 520, 480, 430, 380, 340, 300` | 19 | 376 | 23.78% | 2.24% | 2.49 | 4,142ms | 34.4s |
+| `500, 470, 440, 410, 380, 350, 325, 300` | 19 | 376 | 23.78% | 2.24% | 2.49 | 3,477ms | 34.4s |
+
+Every outcome column is identical to the digit. The early curve moves nothing except how long the
+player waits, and it cannot move that very far: even at 500ms the level-1 wait is 3.5 seconds,
+because seven rows of fall is seven rows of fall.
+
+For a player who never touches the drop control the curve is the whole pacing story — level 4 at
+289s, 261s and 223s under the three curves. For one who hard-drops it is 34.4s under all three.
+
+### 3. What changed
+
+**SPEC 5.5's levels 1-8, from `700, 620, 550, 490, 430, 380, 340, 300` to
+`500, 470, 440, 410, 380, 350, 325, 300`.** Level 9 on is untouched, and the floor, the tail step
+and soft drop are untouched.
+
+This is a **feel change made on a measurement that says its risk is zero**, not a difficulty fix,
+and it is written down that way so nobody later reads it as one. It cuts the measured dead time in
+the opening by 28% and changes no other number in the report.
+
+**`blocksPerLevel` was measured and left at 20.** It is the only lever that changes the opening's
+pace for a player who does use the drop control, and it costs more than it is worth:
+
+| blocksPerLevel | median level | drops | score | 1024 | 2048 | to level 4 (hard-dropping) |
+|---|---|---|---|---|---|---|
+| 20 | 19 | 376 | 88,872 | 23.78% | 2.24% | 34.4s |
+| 15 | 23 | 333 | 95,476 | 22.97% | 2.06% | 25.7s |
+| 12 | 26 | 310 | 105,902 | 19.82% | 1.66% | 20.6s |
+
+Runs get 11% and 18% shorter, the tail past 1024 thins, and the rising median level is the counter
+moving faster rather than the player doing better. It also **moves the pinned determinism digest**,
+because the engine reads it to advance the level — verified by setting it to 15 and watching
+`DeterminismTest` fail on the score (862 to 912). A first-band-only `blocksPerLevel` would need a
+schedule instead of an int, which is an engine change to level advancement, so it is not a free
+experiment either.
+
+**The spawn table was re-read against the clocked numbers and kept.** Greedy at a clocked median
+of 19 with 26% of runs past 1024 and 2.2% bursting is inside both of SPEC 17's failure modes, so
+L19 survives the clock: the table sets the tier ceiling, the board sets the level.
+
+### 4. The digest did not move, and that was checked rather than assumed
+
+Changing the curve does not touch `DeterminismTest`'s pin. The engine never reads the curve — it
+stores the level and the ViewModel asks how long a row takes — and `EngineConfig` is serialized
+with defaults omitted, so a run played under the default curve encodes no curve at all. Confirmed
+by making the change and running `:libraries:cascade:jvmTest`, not by reasoning about it. The
+contrast with `blocksPerLevel` above is the point: two knobs in the same SPEC section, one free and
+one not.
+
+**Not verified.** The player model is the whole soft underbelly: 250ms and 120ms are assumptions,
+the sideways buffer is modelled at its optimistic end (one free column toward the target whenever
+the previous resolution ran longer than the decision time), and a tie between a player input and a
+lock is resolved in the player's favour because on a device that ordering is genuinely undefined.
+No policy uses hold, so SPEC 5.4's stash is still unmeasured. Nothing here was played on a device;
+the wall-clock figures are the model's, and C3's ninety seconds to level 3 sits between the
+hard-dropping player's 23s and the patient player's 208s, which is the closest thing to a
+validation this has.
 
 ---
 

@@ -18,7 +18,20 @@ sealed interface Policy {
 
     val name: String
 
-    fun column(state: GameState, random: kotlin.random.Random, config: EngineConfig): Int
+    /**
+     * The column this policy wants, restricted to the ones [allowed] admits.
+     *
+     * The filter is what a clock costs a policy. Unclocked, every column is
+     * allowed and the answer is the ceiling C1a measured; with [DropClock] in the
+     * loop the filter is "columns the thumb can still reach", and the policy
+     * takes the best of what is left rather than the best there is.
+     */
+    fun column(
+        state: GameState,
+        random: kotlin.random.Random,
+        config: EngineConfig,
+        allowed: (Int) -> Boolean = { true },
+    ): Int
 
     companion object {
         val All: List<Policy> = listOf(Random, Greedy, Lookahead1)
@@ -30,16 +43,28 @@ sealed interface Policy {
     data object Random : Policy {
         override val name = "random"
 
-        override fun column(state: GameState, random: kotlin.random.Random, config: EngineConfig): Int =
-            random.nextInt(config.cols)
+        override fun column(
+            state: GameState,
+            random: kotlin.random.Random,
+            config: EngineConfig,
+            allowed: (Int) -> Boolean,
+        ): Int {
+            val columns = (0 until config.cols).filter(allowed)
+            if (columns.isEmpty()) return state.falling?.cell?.col ?: config.spawnColumn
+            return columns[random.nextInt(columns.size)]
+        }
     }
 
     /** Takes the immediate merge if one exists, else the emptiest column. */
     data object Greedy : Policy {
         override val name = "greedy"
 
-        override fun column(state: GameState, random: kotlin.random.Random, config: EngineConfig): Int =
-            pick(state, random, config) { Harness.drop(state, it).transcript.merges.size }
+        override fun column(
+            state: GameState,
+            random: kotlin.random.Random,
+            config: EngineConfig,
+            allowed: (Int) -> Boolean,
+        ): Int = pick(state, random, config, allowed) { Harness.drop(state, it).transcript.merges.size }
     }
 
     /**
@@ -55,8 +80,12 @@ sealed interface Policy {
     data object Lookahead1 : Policy {
         override val name = "lookahead1"
 
-        override fun column(state: GameState, random: kotlin.random.Random, config: EngineConfig): Int =
-            pick(state, random, config) { col ->
+        override fun column(
+            state: GameState,
+            random: kotlin.random.Random,
+            config: EngineConfig,
+            allowed: (Int) -> Boolean,
+        ): Int = pick(state, random, config, allowed) { col ->
                 val after = Harness.drop(state, col)
                 val next = after.state
                 val followUp = if (next.isOver || next.falling == null) {
@@ -81,13 +110,15 @@ private inline fun pick(
     state: GameState,
     random: kotlin.random.Random,
     config: EngineConfig,
+    allowed: (Int) -> Boolean,
     merges: (Int) -> Int,
 ): Int {
     var bestMerges = -1
     var bestRoom = -1
-    var chosen = 0
+    var chosen = state.falling?.cell?.col ?: config.spawnColumn
     var ties = 0
     for (col in 0 until config.cols) {
+        if (!allowed(col)) continue
         val count = merges(col)
         val room = state.board.landingRow(col)
         when {

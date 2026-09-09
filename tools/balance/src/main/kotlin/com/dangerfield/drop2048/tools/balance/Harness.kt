@@ -38,23 +38,65 @@ class RunOutcome(
     val depths: IntArray,
     val clutter: IntArray,
     val staleCapDrops: Int,
+    val clock: ClockStats? = null,
 )
 
 /**
- * Plays whole runs of the shipped engine with no renderer and no clock.
+ * What the clock saw, for a run played with [DropClock] in the loop.
  *
- * Every policy hard-drops. Soft drop and lock delay are the ViewModel's, and a
- * scripted player that used them would be measuring the drop timer rather than
- * the spawn table.
+ * The per-level arrays cover only the first [Harness.EARLY_DROPS] drops, because
+ * the question they exist to answer is about the opening of a run and averaging
+ * them over a whole run would bury it: a level-1 drop and a level-25 drop are
+ * different games and the mean of the two describes neither.
+ */
+class ClockStats(
+    val elapsedMillis: Long,
+    val timerPlaced: Int,
+    val offTarget: Int,
+    val compromised: Int,
+    val slackMillis: Long,
+    val earlyDrops: IntArray,
+    val earlyTimerPlaced: IntArray,
+    val earlyOffTarget: IntArray,
+    val earlySlackMillis: LongArray,
+    val earlyElapsedMillis: LongArray,
+    val reachedLevelAtMillis: LongArray,
+)
+
+/**
+ * Plays whole runs of the shipped engine with no renderer, and with or without
+ * a clock.
+ *
+ * Clock-free, every policy hard-drops into the column it wants at every level,
+ * which is the right instrument for the spawn table and the wrong one for
+ * difficulty: it reports what an unhurried player would manage. Hand it a
+ * [PlayerProfile] and [DropClock] puts SPEC 5.5's timer and SPEC 6's controls
+ * between the policy and the board, and the same policy has to earn its column.
+ *
+ * Both are kept because the gap between them is the measurement.
  */
 object Harness {
 
     const val MAX_DROPS = 3_000
     const val CLUTTER_SAMPLE_EVERY = 10
 
+    /** SPEC 5.5 puts four levels inside these, which is the stretch C3 played and called a cutscene. */
+    const val EARLY_DROPS = 60
+
+    const val LEVEL_BUCKETS = 32
+
     private const val DEPTH_BUCKETS = 16
 
-    fun play(seed: Long, policy: Policy, config: EngineConfig): RunOutcome {
+    /**
+     * Plays a whole run, with [profile] deciding whether the clock is in the loop.
+     *
+     * A null [profile] is C1a's harness unchanged, kept because the comparison
+     * between the two is the finding: everything C1a reported is an upper bound
+     * for a player who is never hurried, and the only way to say how big that
+     * bound is is to run both.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
+    fun play(seed: Long, policy: Policy, config: EngineConfig, profile: PlayerProfile? = null): RunOutcome {
         val random = Random(seed)
         var state = Cascade.newGame(seed, config)
         var highest: BlockValue? = null
@@ -64,9 +106,47 @@ object Harness {
         val clutter = IntArray(config.cols * config.rows + 1)
         var staleCapDrops = 0
 
+        var elapsed = 0L
+        var timerPlaced = 0
+        var offTarget = 0
+        var compromised = 0
+        var slack = 0L
+        val earlyDrops = IntArray(LEVEL_BUCKETS)
+        val earlyTimer = IntArray(LEVEL_BUCKETS)
+        val earlyOff = IntArray(LEVEL_BUCKETS)
+        val earlySlack = LongArray(LEVEL_BUCKETS)
+        val earlyElapsed = LongArray(LEVEL_BUCKETS)
+        val reachedAt = LongArray(LEVEL_BUCKETS) { -1L }
+        var buffered = false
+
         while (state.blocksDropped < MAX_DROPS) {
             if (exceedsLandingTimeCap(state, config)) staleCapDrops++
-            val transition = drop(state, policy.column(state, random, config))
+            val level = state.level
+            val bucket = minOf(level, LEVEL_BUCKETS - 1)
+            if (profile != null && reachedAt[bucket] < 0) reachedAt[bucket] = elapsed
+            val early = state.blocksDropped < EARLY_DROPS
+
+            val transition = if (profile == null) {
+                drop(state, policy.column(state, random, config))
+            } else {
+                val played = DropClock.play(state, policy, random, buffered, profile)
+                val resolution = DropClock.resolutionMillis(played.transition.transcript)
+                val cost = played.elapsedMillis + resolution
+                elapsed += cost
+                slack += played.slackMillis
+                buffered = resolution >= profile.decisionMillis
+                if (played.placement == Placement.TIMER) timerPlaced++
+                if (!played.onTarget) offTarget++
+                if (played.compromised) compromised++
+                if (early) {
+                    earlyDrops[bucket]++
+                    earlySlack[bucket] += played.slackMillis
+                    earlyElapsed[bucket] += cost
+                    if (played.placement == Placement.TIMER) earlyTimer[bucket]++
+                    if (!played.onTarget) earlyOff[bucket]++
+                }
+                played.transition
+            }
             val transcript = transition.transcript
             depths[minOf(transcript.depth, DEPTH_BUCKETS - 1)]++
             bursts += transcript.bursts.size
@@ -99,6 +179,21 @@ object Harness {
             depths = depths,
             clutter = clutter,
             staleCapDrops = staleCapDrops,
+            clock = profile?.let {
+                ClockStats(
+                    elapsedMillis = elapsed,
+                    timerPlaced = timerPlaced,
+                    offTarget = offTarget,
+                    compromised = compromised,
+                    slackMillis = slack,
+                    earlyDrops = earlyDrops,
+                    earlyTimerPlaced = earlyTimer,
+                    earlyOffTarget = earlyOff,
+                    earlySlackMillis = earlySlack,
+                    earlyElapsedMillis = earlyElapsed,
+                    reachedLevelAtMillis = reachedAt,
+                )
+            },
         )
     }
 

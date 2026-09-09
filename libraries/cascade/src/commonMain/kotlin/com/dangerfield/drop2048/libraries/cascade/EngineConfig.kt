@@ -141,6 +141,14 @@ data class SpecialRate(
  * The [floorMs] is load-bearing: past roughly level 20 speed stops being the
  * pressure and the rising spawn floor carries the difficulty. Without the floor
  * the game becomes a reflex test, which is a different and worse game.
+ *
+ * Levels 1-8 were re-cut in C1c, from `700, 620, 550, 490, 430, 380, 340, 300`.
+ * The curve is a pacing dial, not a difficulty one: with the drop clock in the
+ * balance harness the opening band never once placed a block the player had not
+ * chosen, and every outcome distribution is identical across the old curve and
+ * this one. What moved is the dead time — a player who does not use the drop
+ * control waited 4.8s a drop at level 1 and now waits 3.5s. Everything from
+ * level 9 on is untouched, because the complaint was about the opening.
  */
 @Serializable
 data class SpeedCurve(
@@ -163,9 +171,9 @@ data class SpeedCurve(
 
     companion object {
         val DEFAULT_MS_PER_ROW = listOf(
-            700,
-            620, 550, 490,
-            430, 380, 340, 300,
+            500,
+            470, 440, 410,
+            380, 350, 325, 300,
             270, 245, 220, 200,
             185, 170, 158, 148,
             140, 133, 127, 122,

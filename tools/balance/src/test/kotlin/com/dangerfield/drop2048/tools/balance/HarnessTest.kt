@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.tools.balance
 
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
+import com.dangerfield.drop2048.libraries.cascade.SpeedCurve
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,6 +94,104 @@ class HarnessTest {
         assertTrue(outcome.clutter.indexOfLast { it > 0 } <= config.cols * config.rows)
     }
 
+    /**
+     * [Policy.Random] is deliberately not in here. Measured, it plays *better*
+     * with a clock in the loop, because "columns the block can still be steered
+     * into" is partly "columns with room in them" — a tall column on the way
+     * blocks the path. A random player that re-picks among reachable columns is
+     * therefore a slightly less random player. The two policies that were already
+     * aiming at something have no such back door.
+     */
+    @Test
+    fun theClockCostsTheMergeSeekingPoliciesSomething() {
+        listOf(Policy.Greedy, Policy.Lookahead1).forEach { policy ->
+            val ceiling = (1L..40L).map { Harness.play(it, policy, config).level }.average()
+            val clocked = (1L..40L).map { Harness.play(it, policy, config, PlayerProfile.Average).level }.average()
+
+            assertTrue(
+                clocked <= ceiling,
+                "${policy.name} played better with a clock in the loop ($clocked) than without one ($ceiling)",
+            )
+        }
+    }
+
+    @Test
+    fun theTimerCanActuallyBeatAPlayerToTheLock() {
+        val outcomes = (1L..30L).map { Harness.play(it, Policy.Greedy, config, PlayerProfile.Deliberate) }
+        val beaten = outcomes.sumOf { it.clock?.timerPlaced ?: 0 }
+
+        assertTrue(beaten > 0, "no drop in 30 runs ever locked before the player got where it was going")
+    }
+
+    @Test
+    fun aSlowerPlayerReachesItsPreferredColumnLessOften() {
+        val quick = offTargetShare(PlayerProfile.Quick)
+        val deliberate = offTargetShare(PlayerProfile.Deliberate)
+
+        assertTrue(
+            deliberate >= quick,
+            "a 400ms/180ms player missed its column less often ($deliberate) than a 150ms/70ms one ($quick)",
+        )
+    }
+
+    @Test
+    fun theClockedRunAccountsForEveryDropInWallTime() {
+        val outcome = Harness.play(11, Policy.Greedy, config, PlayerProfile.Average)
+        val clock = requireNotNull(outcome.clock)
+
+        assertTrue(clock.elapsedMillis > 0, "a clocked run took no time at all")
+        assertTrue(
+            clock.elapsedMillis / outcome.blocksDropped in MIN_DROP_MILLIS..MAX_DROP_MILLIS,
+            "mean drop took ${clock.elapsedMillis / outcome.blocksDropped}ms",
+        )
+        assertEquals(
+            minOf(outcome.blocksDropped, Harness.EARLY_DROPS),
+            clock.earlyDrops.sum(),
+            "the per-level early histogram lost drops",
+        )
+    }
+
+    @Test
+    fun aClockFreeRunCarriesNoClockStatsAtAll() {
+        assertEquals(null, Harness.play(5, Policy.Greedy, config).clock)
+    }
+
+    @Test
+    fun theOpeningLevelsStillLeaveThePlayerWaiting() {
+        val outcome = Harness.play(9, Policy.Greedy, config, PlayerProfile.Average)
+        val clock = requireNotNull(outcome.clock)
+        val slackAtLevelOne = clock.earlySlackMillis[1] / clock.earlyDrops[1]
+
+        assertTrue(slackAtLevelOne > MIN_LEVEL_ONE_SLACK_MILLIS, "level 1 slack was only ${slackAtLevelOne}ms")
+    }
+
+    @Test
+    fun aFasterOpeningCurveCutsThatWait() {
+        val before = levelOneSlack(Curves.Original)
+        val after = levelOneSlack(Curves.Fast500)
+
+        assertTrue(after < before, "the 500ms curve left as much slack ($after) as the 700ms one ($before)")
+    }
+
+    private fun levelOneSlack(curve: SpeedCurve): Long {
+        val clocks = (1L..20L).mapNotNull {
+            Harness.play(it, Policy.Greedy, config.copy(speed = curve), PlayerProfile.Average).clock
+        }
+        return clocks.sumOf { it.earlySlackMillis[1] } / clocks.sumOf { it.earlyDrops[1] }
+    }
+
+    private fun offTargetShare(profile: PlayerProfile): Double {
+        val outcomes = (1L..30L).map { Harness.play(it, Policy.Greedy, config, profile) }
+        val off = outcomes.sumOf { it.clock?.offTarget ?: 0 }.toDouble()
+        return off / outcomes.sumOf { it.blocksDropped }
+    }
+
     private fun median(policy: Policy): Int =
         (1L..60L).map { Harness.play(it, policy, config).level }.sorted()[30]
+
+    private companion object {
+        const val MIN_DROP_MILLIS = 200L
+        const val MAX_DROP_MILLIS = 5_000L
+        const val MIN_LEVEL_ONE_SLACK_MILLIS = 1_000L
+    }
 }

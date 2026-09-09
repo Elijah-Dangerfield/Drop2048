@@ -10,6 +10,13 @@ import kotlin.test.assertTrue
  * is one copy of them, and the floor is asserted because SPEC 5.5 calls it
  * load-bearing: without it the game stops being a puzzle and becomes a reflex
  * test.
+ *
+ * Levels 1-8 were re-cut once, in C1c, on the balance harness's clocked
+ * measurement of the opening. Because the curve lives here and not in the run,
+ * that change did **not** move `DeterminismTest`'s pin — confirmed by making it
+ * and re-running the suite, not by assuming. `blocksPerLevel` is the other half
+ * of SPEC 5.5 and does not have that property: it feeds level advancement, so
+ * moving it moves the digest and every recorded score with it.
  */
 class SpeedCurveTest {
 
@@ -17,9 +24,9 @@ class SpeedCurveTest {
 
     @Test
     fun theTableMatchesTheSpec() {
-        assertEquals(700, curve.msPerRow(1))
-        assertEquals(listOf(620, 550, 490), (2..4).map(curve::msPerRow))
-        assertEquals(listOf(430, 380, 340, 300), (5..8).map(curve::msPerRow))
+        assertEquals(500, curve.msPerRow(1))
+        assertEquals(listOf(470, 440, 410), (2..4).map(curve::msPerRow))
+        assertEquals(listOf(380, 350, 325, 300), (5..8).map(curve::msPerRow))
         assertEquals(listOf(270, 245, 220, 200), (9..12).map(curve::msPerRow))
         assertEquals(listOf(185, 170, 158, 148), (13..16).map(curve::msPerRow))
         assertEquals(listOf(140, 133, 127, 122), (17..20).map(curve::msPerRow))

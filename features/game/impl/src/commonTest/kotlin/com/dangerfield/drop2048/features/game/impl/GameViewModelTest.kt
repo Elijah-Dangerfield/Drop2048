@@ -222,6 +222,9 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Past it from any point inside the window. */
         const val PAST_LOCK_DELAY = 160L
+
+        /** Far enough to prove the fall accelerated, far short of the block landing. */
+        const val SoftDropRows = 3
     }
 
     @Test
@@ -261,13 +264,25 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * Advances three soft-drop rows, not one drop tick.
+     *
+     * A whole tick is twelve soft-drop rows at level 1, which is the block
+     * landing, locking, resolving and the *next* one falling — the assertion then
+     * passes for a reason that has nothing to do with soft drop, and breaks the
+     * moment the level-1 interval moves. It did, in C1c.
+     */
     @Test
     fun softDrop_shortensTheInterval() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
+            val softDropMillis = EngineConfig.Default.speed.softDropMsPerRow.toLong()
             act(GameAction.SoftDropStart)
-            tick()
+            advance(softDropMillis * SoftDropRows + 1)
 
-            assertTrue(state.falling!!.cell.row > 1, "soft drop did not accelerate the fall")
+            assertTrue(
+                state.falling!!.cell.row >= SoftDropRows,
+                "soft drop did not accelerate the fall",
+            )
         }
     }
 

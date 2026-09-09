@@ -13,7 +13,11 @@ import com.dangerfield.drop2048.libraries.cascade.BlockValue
  */
 object Report {
 
-    fun render(policy: String, table: String, runs: List<RunOutcome>, millis: Long): String {
+    fun render(policy: String, table: String, runs: List<RunOutcome>, millis: Long): String =
+        render(policy, table, clock = "off", runs = runs, millis = millis)
+
+    @Suppress("LongMethod")
+    fun render(policy: String, table: String, clock: String, runs: List<RunOutcome>, millis: Long): String {
         val levels = runs.map { it.level }.sorted()
         val drops = runs.map { it.blocksDropped }.sorted()
         val scores = runs.map { it.score }.sorted()
@@ -21,7 +25,7 @@ object Report {
         val clutter = sum(runs.map { it.clutter })
 
         return buildString {
-            appendLine("policy=$policy  table=$table  runs=${runs.size}  ${millis}ms")
+            appendLine("policy=$policy  table=$table  clock=$clock  runs=${runs.size}  ${millis}ms")
             appendLine(
                 "  level      median=${levels.median()}  p90=${levels.p90()}  max=${levels.last()}"
             )
@@ -44,8 +48,70 @@ object Report {
             appendLine(depthRows(depths))
             append("  clutter (sampled every ${Harness.CLUTTER_SAMPLE_EVERY} drops)")
             appendLine(clutterLine(clutter))
+            val clocks = runs.mapNotNull { it.clock }
+            if (clocks.isNotEmpty()) append(clockSection(runs, clocks))
         }
     }
+
+    /**
+     * The part of the report that only exists with a clock in the loop.
+     *
+     * Three numbers, and they have to be read together. `timer-placed` is the
+     * share of blocks the lock delay put down rather than a drop input.
+     * `off preferred column` is the share where the policy did not get the column
+     * it asked for, which is the only one of the three that means pressure.
+     * `slack` is the time the policy spent with nothing left to do while the
+     * block kept falling, which is the one that means theatre.
+     */
+    private fun clockSection(runs: List<RunOutcome>, clocks: List<ClockStats>): String {
+        val drops = runs.sumOf { it.blocksDropped.toLong() }
+        return buildString {
+            appendLine("  wall clock  median run=${format(median(clocks.map { it.elapsedMillis }) / 1000.0)}s" +
+                "  mean per drop=${format(clocks.sumOf { it.elapsedMillis }.toDouble() / drops)}ms")
+            appendLine("  timer-placed drops (whole run)=${share(clocks.sumOf { it.timerPlaced.toLong() }, drops)}" +
+                "  off preferred column=${share(clocks.sumOf { it.offTarget.toLong() }, drops)}" +
+                "  preferred unreachable=${share(clocks.sumOf { it.compromised.toLong() }, drops)}")
+            appendLine("  first ${Harness.EARLY_DROPS} drops, per level")
+            appendLine(earlyRows(clocks))
+            append(levelClockLine(clocks))
+        }
+    }
+
+    private fun earlyRows(clocks: List<ClockStats>): String {
+        val drops = sum(clocks.map { it.earlyDrops })
+        val timer = sum(clocks.map { it.earlyTimerPlaced })
+        val off = sum(clocks.map { it.earlyOffTarget })
+        val slack = total(clocks.map { it.earlySlackMillis })
+        val elapsed = total(clocks.map { it.earlyElapsedMillis })
+        return drops.indices.mapNotNull { level ->
+            val count = drops[level]
+            if (count == 0L) return@mapNotNull null
+            "    level ${level.toString().padStart(2)}  drops=${count.toString().padStart(7)}" +
+                "  timer-placed=${share(timer[level], count).padStart(7)}" +
+                "  off preferred=${share(off[level], count).padStart(7)}" +
+                "  slack=${format(slack[level].toDouble() / count).padStart(7)}ms" +
+                "  per drop=${format(elapsed[level].toDouble() / count).padStart(7)}ms"
+        }.joinToString("\n").ifEmpty { "    none" }
+    }
+
+    private fun levelClockLine(clocks: List<ClockStats>): String {
+        val reached = (1 until Harness.LEVEL_BUCKETS).mapNotNull { level ->
+            val times = clocks.mapNotNull { it.reachedLevelAtMillis[level].takeIf { at -> at >= 0 } }
+            if (times.size * 2 < clocks.size) return@mapNotNull null
+            "    level $level at ${format(median(times) / 1000.0)}s (${share(times.size, clocks.size)} of runs)"
+        }.take(TIME_TO_LEVEL_ROWS)
+        return "  median time to reach\n" + reached.joinToString("\n") + "\n"
+    }
+
+    private fun total(arrays: List<LongArray>): LongArray {
+        val out = LongArray(arrays.first().size)
+        arrays.forEach { array -> array.indices.forEach { out[it] += array[it] } }
+        return out
+    }
+
+    private fun median(values: List<Long>): Long = values.sorted()[values.size / 2]
+
+    private const val TIME_TO_LEVEL_ROWS = 8
 
     private fun tierRows(runs: List<RunOutcome>): String {
         val counts = runs.groupingBy { it.highestTier }.eachCount()
