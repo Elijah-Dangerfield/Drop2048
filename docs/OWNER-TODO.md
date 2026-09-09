@@ -150,6 +150,19 @@ amplitude-control fallback, the pre-Oreo path, and the whole iOS Core Haptics pa
 **The burst envelope and the stacked-out double are guesses.** SPEC 21 puts the burst at half of
 what makes this game feel good, so these need hands on hardware, not a code review.
 
+### Write the policy for changing `PINNED_DIGEST`, before C6 not after
+
+The engine pins a determinism digest that proves a seed replays identically on every platform. It
+was re-pinned once already, when the merge-position ruling changed outcomes, and that was free
+**because no scores exist yet**.
+
+The moment Daily Challenge ships (C6), it stops being free: changing the digest silently
+invalidates every posted score, because players were competing on a different sequence. There
+should be a written rule before that, and the obvious one is *the digest is versioned alongside
+the leaderboard, and changing it retires the old board.*
+
+Cheap to decide now. Expensive to decide after the first player complains.
+
 ## Decisions I need from you
 
 ### Kids theming / age rating

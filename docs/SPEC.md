@@ -15,9 +15,15 @@ against real play data. None of them are truths.**
 
 ## 0. Status
 
-Nothing is built. The repo is the unmodified KMP template: `:features:home`,
-`:features:onboarding`, Supabase identity, a Ktor + Postgres server, and a Compose-for-web admin
-console. See `BUILD-PLAN.md` for the order of operations.
+C0, C1 and most of C2 are done. The Supabase identity stack is gone; the Ktor + Postgres server
+and the Compose-for-web admin console remain, for remote config only (see 10).
+
+`:libraries:cascade` is the engine and is complete and tested, including on Kotlin/Native.
+`:libraries:ui` has the five block palettes, the cue pairing and the board geometry; the four HUD
+primitives are outstanding.
+
+Nothing is playable yet. That is C3. See `BUILD-PLAN.md` for the order and `ORCHESTRATION.md` for
+where each chunk stands.
 
 ## 1. Pitch
 
@@ -126,7 +132,9 @@ numbers on screen could drift away from. Anything that awards points goes down t
 
 ### 4.3 Merge rules
 
-Unchanged from the original spec, and they are not negotiable once shipped.
+The priority order and the initiation rule are unchanged from the original spec. The merge
+*position* rule was changed once, in the ruling recorded below, because the original contradicted
+itself. **All of it is now fixed and not negotiable once shipped.**
 
 **Priority order**, first match only, never up:
 

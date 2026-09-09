@@ -13,11 +13,12 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | Chunk | State | Notes |
 |---|---|---|
 | C0 · Template trim | **DONE** | `04803ff`. Identity + auth + server trim |
-| C1 · `:libraries:cascade` | **DONE**, ruling landing | `96e6b92`. 89 engine tests, green on JVM + Native |
-| C1b · Merge-position ruling | **IN PROGRESS** | Partner's cell (D6), wildcard symmetry confirmed |
-| C1a · `tools/balance` | not started | Unblocked once C1b lands |
-| C2 · Theme + design system | **MOSTLY DONE** | `e6e95b3`. Steps 1-8 done; step 9 HUD primitives outstanding, see `todos.md` |
-| C3 · `:features:game` | not started | Blocked on C1b + the C2 remainder |
+| C1 · `:libraries:cascade` | **DONE** | `96e6b92`. 89 engine tests, green on JVM + Native |
+| C1b · Merge-position ruling | **DONE** | `3b14046`. Partner's cell (D6), one code path, digest re-pinned |
+| C1a · `tools/balance` | **IN PROGRESS** | Spawn table is now untuned against the new merge rule |
+| C2 · Theme + design system | **MOSTLY DONE** | `e6e95b3`. Steps 1-8 done |
+| C2b · HUD primitives | **IN PROGRESS** | C2's step 9 remainder |
+| C3 · `:features:game` | not started | Blocked on C1a + C2b |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
 | C5 · Tutorial | not started | |
@@ -230,6 +231,24 @@ does nothing.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L17 · A pinned digest gets re-derived, never copied from the failure message
+
+The merge-position ruling changed `PINNED_DIGEST`, `PINNED_SCORE` (942 → 862) and
+`PINNED_BLOCKS_DROPPED` (27 → 25). It was the **only** failing test in the module afterwards,
+which is itself the signal that the change was narrow.
+
+C1b re-derived the new pin by running the engine rather than pasting the "actual" value out of the
+assertion failure. Those look identical in the diff and are not: pasting the actual makes the test
+agree with whatever the code now does, which is the same as deleting it.
+
+It also added a paragraph to `DeterminismTest`'s KDoc recording that the pin was changed once, on
+what date, for what reason, and that no scores existed yet. The next person who wants to change it
+now inherits a precedent that demands a written reason.
+
+**The digest got shorter, not longer** (25 drops, not 27), which is the opposite of what "more
+cascades" naively predicts. One seed with a scripted random player is not balance data, but it is
+a warning against assuming the ruling made the game easier. C1a measures it.
 
 ### L14 · Two agents compiling the same shared target will report each other's half-written files as failures
 

@@ -21,6 +21,15 @@ Every chunk closes the same way, and none of it is optional.
    :apps:compose:compileKotlinIosSimulatorArm64 detekt` all green. Run on a real device whenever
    the chunk changed anything visible. A simulator does not tell you whether a 148ms drop tick
    feels fair.
+
+   **Any chunk touching `:libraries:cascade` also runs `:libraries:cascade:iosSimulatorArm64Test`.**
+   `compileKotlinIosSimulatorArm64` compiles and runs zero tests, so the standard command cannot
+   tell you whether the determinism digest still holds on Kotlin/Native, and that digest is what
+   protects Daily Challenge and every seed-attached bug report.
+
+   Count skipped tests explicitly. With Docker down, exactly one skip is expected
+   (`:apps:integration` `HarnessSmokeTest`); anything else skipping is a finding, because a
+   skipped test is indistinguishable from a passing one in the summary.
 2. **Update the docs in the same change.** `SPEC.md` when behaviour or a number changed, this
    file with the chunk's outcome and anything it discovered, `decisions.md` for any non-obvious
    call, `docs/practices/app-events.md` for any new event.
