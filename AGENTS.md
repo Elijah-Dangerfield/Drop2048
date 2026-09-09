@@ -93,31 +93,37 @@ The `Set<AutoInit>` is resolved at app start (`Application.onCreate` on Android,
 
 **Opt in** when there's first-touch latency the user notices, an `init {}` that registers a listener, or a cache that needs its observer running before the user can navigate. **Skip** for debug-only / QA-menu singletons and anything whose `init {}` is empty. Forgetting the marker is a perf regression, not a correctness one — the class still works lazily — so the bigger risk is overuse making boot slow.
 
-## Auth model (`:libraries:identity`)
+## No accounts
 
-Anonymous-first Supabase auth. Sessions are never minted implicitly: onboarding drives guest creation (`GuestAccountCreator`), the sign-in flows mint claimed ones, and `GuestSessionHealer` recovers a stranded onboarded device.
+Drop 2048 has **no auth, no accounts, and no user-scoped server state** (`SPEC.md` 20). The
+template's `:libraries:identity`, its Supabase auth screens, the session-expired recovery route,
+and the `UserScopedSyncer` / `UserScopedDataReset` machinery were all deleted in C0 — see
+`docs/decisions.md`. Don't reintroduce them.
 
-- **`AuthState` is sealed with no in-flight sentinel** — `Authenticated(userId, isAnonymous, email)` or `Unauthenticated(cause, reason, wasAnonymous)`. `current()` suspends until the answer is real; `observe()` emits only resolved values. UI renders a spinner while awaiting its first emission, never off a `Loading` enum.
-- **Per-operation sealed outcomes** (`SignInOutcome`, `SignUpOutcome`, …) instead of thrown exceptions — screens render specific messages for invalid-credentials vs offline vs already-registered.
-- **`Unauthenticated.reason` drives app routing**: `SessionExpired` pushes the blocking recovery screen (sign-in-again for claimed, start-fresh for guests); `SignedOut` marks a deliberate exit this run so self-heal never resurrects a signed-out user; `None` is the ordinary no-session state.
-- **User-change choke point**: every transition flows through the auth orchestrator, which runs the `UserScopedDataReset` dump (Room tables via `ClearableDao` multibinding, profile caches, account-scoped `AppData` fields) *before* the new `AuthState` is emitted — a reactive loader can't race the wipe. `AppEvent.UserChanged(previous, current)` is the after-the-fact announcement for side effects that hold no user-scoped storage.
-- **Tokens**: the network layer only sees `AuthTokenProvider` (`awaitReady()` then `accessToken()`); a server-confirmed 401-after-refresh routes through `SessionRejectionBus` (no 401 loops), a 403 ban envelope through `AccessDeniedBus`.
-- **Session persistence is OS-encrypted** (Keychain on iOS via the Swift `IOSSecureSessionStorage`, `EncryptedSharedPreferences` on Android) with a file mirror for anonymous sessions so a TestFlight Keychain wipe can't strand a guest.
-- The browser-OAuth redirect is `drop2048://login-callback` (the scheme renames with the project); `App.kt` hands it to `completeOAuthRedirect`, never the nav graph.
+What survives, and why:
 
-## Triggered sync (`UserScopedSyncer`)
-
-Repositories that mirror server state don't invent their own refresh timing. Implement one idempotent `sync(): Result<Unit>`, contribute to the `UserScopedSyncer` multibinding (see `ExampleUserScopedSyncer` for the two-line registration recipe), and `UserScopedSyncCoordinator` runs it on every edge that matters: account became active (sign-in, cold-boot resolve, switch, claim), warm foreground, and connectivity regained — with exponential retry that parks as success while offline (re-armed by the reconnect edge). The level-keyed `runWhen` core means a subscriber can't miss an edge that fired before it attached. For offline *writes*, use the outbox pattern instead — `docs/practices/outbox.md`.
+- **`AuthGate`** still has its seam in `:libraries:core`, bound to `AlwaysReadyAuthGate` in
+  `:libraries:networking` (next to `NoOpAuthTokenProvider`, and in the api module for the same
+  boundary reason). Every call and route is ungated.
+- **`SyncTriggers`** (`:libraries:drop2048:impl`) keeps `warmForeground` / `cameOnline` /
+  `isOffline`. There is no `activeAccount` level any more. Use these edges for anything
+  network-touching (remote config refresh, ad preloading); read `isOffline` before starting work
+  that should defer.
+- **`AccessDeniedBus`** still routes a `403` locked envelope to a blocking screen.
+  `SessionRejectionBus` exists but nothing can trigger it.
+- **`ClearableDao`** survives without its auth-driven cleaner. Settings' "reset progress" (C11)
+  is the intended consumer: inject `Set<ClearableDao>` and every table comes for free.
+- **Progress is device-local.** It does not survive a reinstall.
 
 ## Server (`:apps:server`)
 
-A Ktor + Postgres backend with Supabase JWT auth. It reuses the client's conventions—kotlin-inject + anvil DI (`ServerScope` / `ServerComponent`), the `domain/` interface + `data/` impl split, one `fun Route.xRoutes(deps)` per resource—and degrades gracefully (boots with no DB / no Supabase). It's a plain JVM module, so it applies plugins directly rather than via a convention plugin.
+A Ktor + Postgres backend. Its whole public surface is remote config (`/v1/config`), the token-gated config admin API, and `/_health` — there is no user-facing authenticated route. It reuses the client's conventions—kotlin-inject + anvil DI (`ServerScope` / `ServerComponent`), the `domain/` interface + `data/` impl split, one `fun Route.xRoutes(deps)` per resource—and degrades gracefully (boots with no DB). It's a plain JVM module, so it applies plugins directly rather than via a convention plugin.
 
-The full reference—how to add a route, repository, migration, or config value, plus the auth, persistence, and testing patterns—lives in [`apps/server/README.md`](apps/server/README.md). Read it before touching the server.
+The full reference—how to add a route, repository, migration, or config value, plus the persistence and testing patterns—lives in [`apps/server/README.md`](apps/server/README.md). Read it before touching the server.
 
 ## Testing
 
-Conventions (hand-rolled fakes only, dispatcher choice, which layer catches which bug) live in [`docs/practices/testing.md`](docs/practices/testing.md) — read it before adding tests. The end-to-end tier is `:apps:integration`: an Android-library module whose tests run on the host JVM (`./gradlew :apps:integration:testDebugUnitTest`, needs Docker) and drive the real client stack — real `HomeViewModel`, real repositories, real HTTP client — over real TCP against a real in-process Ktor server on a Testcontainers Postgres. `HarnessSmokeTest` is the worked example; `commonMain` stays empty so iOS never links the JVM-only server.
+Conventions (hand-rolled fakes only, dispatcher choice, which layer catches which bug) live in [`docs/practices/testing.md`](docs/practices/testing.md) — read it before adding tests. The end-to-end tier is `:apps:integration`: an Android-library module whose tests run on the host JVM (`./gradlew :apps:integration:testDebugUnitTest`, needs Docker) and drive the real client stack — real repositories, real HTTP client — over real TCP against a real in-process Ktor server on a Testcontainers Postgres. `HarnessSmokeTest` is the worked example; `commonMain` stays empty so iOS never links the JVM-only server.
 
 ## SEAViewModel Pattern
 
@@ -248,7 +254,6 @@ Each of these cost a downstream app real time. They are cheap to avoid and expen
 
 | Purpose | Path |
 |---------|------|
-| User model | `libraries/drop2048/src/.../User.kt` |
 | SEAViewModel | `libraries/flowroutines/src/.../SEAViewModel.kt` |
 | App DI | `apps/compose/src/.../AppComponent.kt` |
 | iOS entry | `apps/ios/iosApp/iOSApp.swift` |

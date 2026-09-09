@@ -100,7 +100,6 @@ class AppEventDispatcher(
                     is AppEvent.WarmBoot -> listener.onWarmBoot(event)
                     is AppEvent.OnForeground -> listener.onForeground(event)
                     is AppEvent.OnBackground -> listener.onBackground(event)
-                    is AppEvent.UserChanged -> listener.onUserChanged(event)
                     is AppEvent.ConnectivityRegained -> listener.onConnectivityRegained(event)
                 }
             }.onFailure { throwable ->

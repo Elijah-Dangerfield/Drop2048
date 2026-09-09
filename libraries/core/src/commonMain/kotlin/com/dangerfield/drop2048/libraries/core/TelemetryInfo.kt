@@ -3,8 +3,7 @@ package com.dangerfield.drop2048.libraries.core
 import com.dangerfield.drop2048.buildinfo.Drop2048BuildConfig
 
 /**
- * Build-time-injected telemetry credentials, mirroring [SupabaseInfo]'s
- * pattern: CI reads repo secrets, local builds read `local.properties`
+ * Build-time-injected telemetry credentials: CI reads repo secrets, local builds read `local.properties`
  * (`sentry.dsn`, `grafana.*` keys — see `loadTelemetryMetadata` in
  * build-logic). Blank values mean the corresponding pipe stays dormant —
  * telemetry no-ops rather than failing, so a fresh clone builds and runs

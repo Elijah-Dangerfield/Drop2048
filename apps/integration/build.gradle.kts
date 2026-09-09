@@ -8,9 +8,8 @@ android {
 
 // End-to-end integration harness. The tests run as Android unit tests on the
 // host JVM (`testDebugUnitTest`) — the same path the feature view models already
-// compile through — so they can drive the REAL client stack (and the real
-// HomeViewModel) against a REAL in-process Ktor server over a REAL Postgres
-// (Testcontainers). Everything lives in the `androidUnitTest` source set;
+// compile through — so they can drive the REAL client stack against a REAL
+// in-process Ktor server over a REAL Postgres (Testcontainers). Everything lives in the `androidUnitTest` source set;
 // commonMain stays empty (nothing ships here, and the iOS target must not try
 // to link the JVM-only server).
 //
@@ -21,29 +20,24 @@ android {
 kotlin {
     sourceSets {
         androidUnitTest.dependencies {
-            // Real server: installApp, ServerComponent, Database.connect, the
-            // JwtVerification.Static seam.
+            // Real server: installApp, ServerComponent, Database.connect.
             implementation(projects.apps.server)
 
-            // Real client view models + the stack beneath them.
-            implementation(projects.features.home)
-            implementation(projects.features.home.impl)
-            implementation(projects.libraries.identity)
-            implementation(projects.libraries.identity.impl)
+            // Real client stack beneath the view models.
             implementation(projects.libraries.networking)
             implementation(projects.libraries.networking.impl)
+            implementation(projects.libraries.config)
+            implementation(projects.libraries.config.impl)
             implementation(projects.libraries.storage)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.core)
 
-            // Boot a real server on an ephemeral port + verify HS256 test JWTs.
-            // Declared here because :apps:server's dependencies are
+            // Boot a real server on an ephemeral port. Declared here because
+            // :apps:server's dependencies are
             // `implementation`-scoped and don't leak to consumers' compile
             // classpaths.
             implementation(libs.ktor.serverCore)
             implementation(libs.ktor.serverNetty)
-            implementation(libs.ktor.serverAuthJwt)
-            implementation(libs.auth0.jwt)
             // The client's HttpClient {} resolves its engine per platform;
             // supply the Android/JVM one explicitly so engine discovery is
             // deterministic on the host JVM.

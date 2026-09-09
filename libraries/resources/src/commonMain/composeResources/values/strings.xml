@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Drop 2048</string>
+
+    <string name="onboarding_tagline">A block falls. Steer it onto its match and the two double. Chains trigger chains. Fill the grid and you\'re stacked out.</string>
+    <string name="onboarding_start">Play</string>
+</resources>

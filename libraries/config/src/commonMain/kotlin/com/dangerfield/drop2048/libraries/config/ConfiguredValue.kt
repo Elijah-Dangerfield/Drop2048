@@ -14,9 +14,9 @@ package com.dangerfield.drop2048.libraries.config
  * @Inject
  * @SingleIn(AppScope::class)
  * @ContributesBinding(AppScope::class, ConfiguredValue::class, multibinding = true)
- * class GoogleSignInEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
- *     override val name = "Google sign-in enabled"
- *     override val path = "identity.googleSignInEnabled"
+ * class DailyChallengeEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+ *     override val name = "Daily challenge enabled"
+ *     override val path = "daily.enabled"
  *     override val default = false
  * }
  *

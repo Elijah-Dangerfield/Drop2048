@@ -4,8 +4,6 @@ import com.dangerfield.drop2048.libraries.core.ShakeDetector
 import com.dangerfield.drop2048.libraries.core.ShakeEvent
 import com.dangerfield.drop2048.libraries.core.ShakeMessageContext
 import com.dangerfield.drop2048.libraries.core.ShakeMessageProvider
-import com.dangerfield.drop2048.libraries.identity.profile.ProfileRepository
-import com.dangerfield.drop2048.libraries.identity.profile.displayNameOrNull
 import com.dangerfield.drop2048.libraries.navigation.Router
 import com.dangerfield.drop2048.libraries.navigation.ShakeDialogRoute
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +19,6 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 class ShakeHandler(
     private val shakeDetector: ShakeDetector,
     private val shakeMessageProvider: ShakeMessageProvider,
-    private val profileRepository: ProfileRepository,
     private val router: Router,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -49,14 +46,12 @@ class ShakeHandler(
     private suspend fun handleShake(event: ShakeEvent) {
         if (isShowingDialog) return
         
-        val profile = profileRepository.current()
-
         val context = ShakeMessageContext(
             shakeCount = shakeCount,
             intensity = event.intensity,
             isLateNight = false,
             isFirstSession = false,
-            userName = profile.displayNameOrNull,
+            userName = null,
         )
         
         val message = shakeMessageProvider.getMessage(context)

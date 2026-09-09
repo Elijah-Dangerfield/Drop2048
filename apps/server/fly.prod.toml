@@ -2,7 +2,7 @@
 #
 # Mirror of fly.toml (the dev server) — same Dockerfile, region, and
 # always-warm machine — diverging only in the app name, VM size, and the
-# Supabase project it points at (set via secrets, never in this file).
+# database it points at (set via secrets, never in this file).
 #
 # Cheatsheet:
 #   - Deploy:    fly deploy --config apps/server/fly.prod.toml
@@ -12,8 +12,7 @@
 #   - Status:    fly status -a drop2048-server-prod
 #
 # Required secrets (set separately, see apps/server/DEPLOY.md):
-#   DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and optionally
-#   SENTRY_DSN. The `-prod` suffix on the app name is load-bearing: the server
+#   DATABASE_URL, ADMIN_API_TOKEN, and optionally SENTRY_DSN. The `-prod` suffix on the app name is load-bearing: the server
 #   derives environment=prod from FLY_APP_NAME (see ServerConfig).
 #
 # Rename `app` to your own Fly app before the first deploy.

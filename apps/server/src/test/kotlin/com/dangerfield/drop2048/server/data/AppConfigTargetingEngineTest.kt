@@ -2,7 +2,6 @@ package com.dangerfield.drop2048.server.data
 
 import com.dangerfield.drop2048.server.domain.RuleConditions
 import com.dangerfield.drop2048.server.domain.TargetingRule
-import com.dangerfield.drop2048.server.domain.UserId
 import com.dangerfield.drop2048.server.http.ClientContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -56,8 +55,7 @@ class AppConfigTargetingEngineTest {
     private fun resolve(
         rules: List<TargetingRule>,
         context: ClientContext = ctx(),
-        userId: UserId? = null,
-    ) = engine.resolve(rules, base, context, userId, "feature.flag")
+    ) = engine.resolve(rules, base, context, "feature.flag")
 
     @Test
     fun noRules_returnsBase() {
@@ -66,7 +64,7 @@ class AppConfigTargetingEngineTest {
 
     @Test
     fun noRules_noBase_returnsNull() {
-        assertNull(engine.resolve(emptyList(), base = null, ctx(), userId = null, "feature.flag"))
+        assertNull(engine.resolve(emptyList(), base = null, ctx(), "feature.flag"))
     }
 
     @Test
@@ -149,24 +147,27 @@ class AppConfigTargetingEngineTest {
     }
 
     @Test
-    fun userAllow_requiresKnownUserInSet() {
-        val target = UserId(UUID.randomUUID())
-        val other = UserId(UUID.randomUUID())
-        val rules = listOf(rule(RuleConditions(userAllow = setOf(target.value.toString()))))
-        assertEquals(JsonPrimitive("on"), resolve(rules, userId = target))
-        assertEquals(base, resolve(rules, userId = other))
-        // Anonymous caller can never satisfy an allow-list.
-        assertEquals(base, resolve(rules, userId = null))
+    fun userAllow_requiresKnownInstallInSet() {
+        val target = UUID.randomUUID().toString()
+        val other = UUID.randomUUID().toString()
+        val rules = listOf(rule(RuleConditions(userAllow = setOf(target))))
+        assertEquals(JsonPrimitive("on"), resolve(rules, ctx(installId = target)))
+        assertEquals(base, resolve(rules, ctx(installId = other)))
+        // A client too old to send an install id can never satisfy an allow-list.
+        assertEquals(base, resolve(rules, ctx(installId = null)))
     }
 
     @Test
     fun userDeny_vetoesOtherwiseMatchingRule() {
-        val denied = UserId(UUID.randomUUID())
+        val denied = UUID.randomUUID().toString()
         val rules = listOf(
-            rule(RuleConditions(platforms = setOf("android"), userDeny = setOf(denied.value.toString()))),
+            rule(RuleConditions(platforms = setOf("android"), userDeny = setOf(denied))),
         )
-        assertEquals(base, resolve(rules, userId = denied))
-        assertEquals(JsonPrimitive("on"), resolve(rules, userId = UserId(UUID.randomUUID())))
+        assertEquals(base, resolve(rules, ctx(installId = denied)))
+        assertEquals(
+            JsonPrimitive("on"),
+            resolve(rules, ctx(installId = UUID.randomUUID().toString())),
+        )
     }
 
     @Test

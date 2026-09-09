@@ -14,7 +14,6 @@ import com.dangerfield.drop2048.server.domain.ManifestEntry
 import com.dangerfield.drop2048.server.domain.ManifestVersion
 import com.dangerfield.drop2048.server.domain.RuleConditions
 import com.dangerfield.drop2048.server.domain.TargetingRule
-import com.dangerfield.drop2048.server.domain.UserId
 import com.dangerfield.drop2048.server.http.ClientContext
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -222,9 +221,6 @@ private suspend fun resolveFlags(
         countryCode = request.countryCode?.takeUnless { it.isBlank() }?.uppercase(),
         installId = request.installId?.takeUnless { it.isBlank() },
     )
-    val userId = request.userId?.takeUnless { it.isBlank() }
-        ?.let { runCatching { UserId(UUID.fromString(it)) }.getOrNull() }
-
     val dbByPath = repository.listFlags().associateBy { it.path }
     val manifestByPath = manifestRepository.getManifest(request.buildNumber).associateBy { it.path }
 
@@ -233,7 +229,7 @@ private suspend fun resolveFlags(
         val flag = dbByPath[path]
         val entry = manifestByPath[path]
         val rules = flag?.rules.orEmpty()
-        val match = engine.firstMatchingRule(rules, context, userId, path)
+        val match = engine.firstMatchingRule(rules, context, path)
         val base = flag?.value
         ResolvedFlagDto(
             path = path,

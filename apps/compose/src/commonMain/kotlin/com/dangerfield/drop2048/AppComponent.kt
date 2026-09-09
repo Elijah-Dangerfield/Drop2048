@@ -2,7 +2,6 @@ package com.dangerfield.drop2048
 
 import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.core.AutoInit
-import com.dangerfield.drop2048.libraries.identity.auth.AuthRepository
 import com.dangerfield.drop2048.libraries.navigation.DeepLinkBridge
 import com.dangerfield.drop2048.libraries.navigation.impl.DelegatingRouter
 import com.dangerfield.drop2048.libraries.telemetry.impl.JankMonitor
@@ -45,9 +44,6 @@ interface AppComponent {
      */
     val appState: AppState
 
-    /** Auth surface for App.kt's deep-link OAuth completion + routing collectors. */
-    val authRepository: AuthRepository
-    
     /**
      * Singletons that need to construct at app boot rather than lazily
      * on first injection. Anvil populates this set via the

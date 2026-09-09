@@ -5,7 +5,7 @@ import com.dangerfield.drop2048.libraries.navigation.Route
 import kotlinx.serialization.Serializable
 
 /**
- * First-launch landing + identity bootstrap. Only the start destination on
+ * First-launch landing. Only the start destination on
  * first install — once the user finishes the flow we set `hasUserOnboarded`,
  * navigate to Home, and never return here unless onboarding is reset.
  *

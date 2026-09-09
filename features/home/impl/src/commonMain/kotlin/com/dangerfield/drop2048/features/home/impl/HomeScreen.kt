@@ -45,15 +45,6 @@ fun HomeScreen(
 
             VerticalSpacerD800()
 
-            if (state.userName != null) {
-                Text(
-                    text = "Hello, ${state.userName}!",
-                    typography = AppTheme.typography.Body.B600,
-                    color = AppTheme.colors.textSecondary,
-                )
-                VerticalSpacerD500()
-            }
-
             Text(
                 text = "This is your starting point.\nBuild something amazing!",
                 typography = AppTheme.typography.Body.B500,

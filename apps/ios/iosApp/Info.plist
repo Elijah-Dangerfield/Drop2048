@@ -23,9 +23,9 @@
 		<string>processing</string>
 	</array>
 	<!--
-	  Custom-scheme deep links. `drop2048://login-callback` is the browser
-	  OAuth return trip and `drop2048://auth/confirmed` the verify-email
-	  redirect — .onOpenURL in iOSApp.swift forwards both to DeepLinkBridge.
+	  Custom-scheme deep links (`drop2048://…`), forwarded by .onOpenURL in
+	  iOSApp.swift to DeepLinkBridge. No consumers yet — the template's were
+	  all auth redirects, deleted with the identity stack.
 
 	  Universal Links (https://...) require an `Associated Domains`
 	  entitlement (`applinks:example.com`) plus an

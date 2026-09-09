@@ -34,11 +34,10 @@
             </intent-filter>
 
             <!--
-              Custom-scheme deep links. Consumers:
-              - `drop2048://auth/confirmed` — Supabase verify-email redirect.
-              - `drop2048://login-callback` — browser OAuth return trip;
-                NOT a nav route. MainActivity forwards it to the DeepLinkBridge
-                so supabase-kt can capture the session (see App.kt).
+              Custom-scheme deep links (`drop2048://…`). There are no consumers
+              yet — the template's were all auth redirects, deleted with the
+              identity stack. The filter stays so a route can claim a path
+              without an AndroidManifest change.
               Per-route mapping happens via the `deepLinks` parameter on
               `screen<Route>` in the relevant FeatureEntryPoint; Compose
               NavHost reads `Activity.intent.data` automatically when a

@@ -16,22 +16,6 @@ data class BlockingErrorRoute(
 ), NavigableWhileBlocked
 
 /**
- * Blocking screen shown when the auth server rejected the device's session
- * mid-run (token refresh failed, or the client declared the session
- * unrecoverable). Kept on top of the stack — the screen owns the exit paths:
- * "sign in again" for a claimed account, "start fresh" (mint a new guest
- * session) for an anonymous one. [wasAnonymous] picks between those copies.
- */
-@Serializable
-data class SessionExpiredRoute(
-    val wasAnonymous: Boolean = false,
-) : Route(
-    enter = AnimationType.FadeIn,
-    exit = AnimationType.FadeOut,
-    popExit = AnimationType.FadeOut,
-), NavigableWhileBlocked
-
-/**
  * Blocking screen shown when the server returned the locked `403`
  * access-denied envelope (banned / suspended). Distinct from [BlockingErrorRoute]
  * because the copy is keyed off a machine-readable [reason] (the client

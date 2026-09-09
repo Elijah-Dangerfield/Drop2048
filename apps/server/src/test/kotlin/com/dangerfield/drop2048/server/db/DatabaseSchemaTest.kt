@@ -7,16 +7,16 @@ import kotlin.test.assertTrue
 
 /**
  * Schema smoke test: proves Flyway created the table *and* that the Exposed
- * [ProfilesTable] projection matches the real columns (the `selectAll()`
+ * [AppConfigValuesTable] projection matches the real columns (the `selectAll()`
  * references every declared column, so a drifted column name fails here). Add a
  * line per new table.
  */
 class DatabaseSchemaTest : DatabaseTest() {
 
     @Test
-    fun migrationsCreateProfilesTable() = runTest {
+    fun migrationsCreateAppConfigTable() = runTest {
         val rows = database.transaction {
-            ProfilesTable.selectAll().toList()
+            AppConfigValuesTable.selectAll().toList()
         }
         assertTrue(rows.isEmpty())
     }

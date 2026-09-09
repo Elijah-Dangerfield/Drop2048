@@ -1,7 +1,5 @@
 package com.dangerfield.drop2048
 
-import com.dangerfield.drop2048.libraries.identity.auth.AppleSignInCoordinator
-import com.dangerfield.drop2048.libraries.identity.auth.SecureSessionStorage
 import com.dangerfield.drop2048.libraries.drop2048.PermissionManager
 import com.dangerfield.drop2048.libraries.review.ReviewLauncher
 import com.dangerfield.drop2048.libraries.ui.nativeviews.NativeViewFactory
@@ -15,13 +13,6 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 abstract class IosAppComponent(
     private val permissionManager: PermissionManager,
     private val reviewLauncher: ReviewLauncher,
-    // The Swift `IOSAppleSignInCoordinator` (ASAuthorizationController flow),
-    // passed in from `iOSApp.swift`. Android binds its own no-op via anvil.
-    private val appleSignInCoordinator: AppleSignInCoordinator,
-    // The Swift `IOSSecureSessionStorage` (Keychain-backed Supabase session
-    // store), passed in from `iOSApp.swift`. Android binds
-    // EncryptedSessionStorage via anvil.
-    private val secureSessionStorage: SecureSessionStorage,
     val nativeViewFactory: NativeViewFactory
 ) : AppComponent {
 
@@ -30,12 +21,6 @@ abstract class IosAppComponent(
 
     @Provides
     fun provideReviewLauncher(): ReviewLauncher = reviewLauncher
-
-    @Provides
-    fun provideAppleSignInCoordinator(): AppleSignInCoordinator = appleSignInCoordinator
-
-    @Provides
-    fun provideSecureSessionStorage(): SecureSessionStorage = secureSessionStorage
 }
 
 
@@ -43,7 +28,5 @@ abstract class IosAppComponent(
 expect fun create(
     permissionManager: PermissionManager,
     reviewLauncher: ReviewLauncher,
-    appleSignInCoordinator: AppleSignInCoordinator,
-    secureSessionStorage: SecureSessionStorage,
     nativeViewFactory: NativeViewFactory
 ): IosAppComponent

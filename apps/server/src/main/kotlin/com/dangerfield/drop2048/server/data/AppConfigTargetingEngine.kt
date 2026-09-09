@@ -2,7 +2,6 @@ package com.dangerfield.drop2048.server.data
 
 import com.dangerfield.drop2048.server.domain.RuleConditions
 import com.dangerfield.drop2048.server.domain.TargetingRule
-import com.dangerfield.drop2048.server.domain.UserId
 import com.dangerfield.drop2048.server.http.ClientContext
 import kotlinx.serialization.json.JsonElement
 
@@ -23,9 +22,8 @@ class AppConfigTargetingEngine {
         rules: List<TargetingRule>,
         base: JsonElement?,
         context: ClientContext,
-        userId: UserId?,
         flagPath: String,
-    ): JsonElement? = firstMatchingRule(rules, context, userId, flagPath)?.value ?: base
+    ): JsonElement? = firstMatchingRule(rules, context, flagPath)?.value ?: base
 
     /**
      * The enabled rule that wins for this caller (lowest priority whose
@@ -35,18 +33,16 @@ class AppConfigTargetingEngine {
     fun firstMatchingRule(
         rules: List<TargetingRule>,
         context: ClientContext,
-        userId: UserId?,
         flagPath: String,
     ): TargetingRule? = rules
         .asSequence()
         .filter { it.enabled }
         .sortedBy { it.priority }
-        .firstOrNull { matches(it.conditions, context, userId, flagPath) }
+        .firstOrNull { matches(it.conditions, context, flagPath) }
 
     private fun matches(
         conditions: RuleConditions,
         context: ClientContext,
-        userId: UserId?,
         flagPath: String,
     ): Boolean {
         conditions.platforms?.let { allowed ->
@@ -80,26 +76,26 @@ class AppConfigTargetingEngine {
             if (have.none { it in wanted }) return false
         }
 
-        val uid = userId?.value?.toString()
-        if (uid != null && conditions.userDeny?.contains(uid) == true) return false
+        val installId = context.installId
+        if (installId != null && conditions.userDeny?.contains(installId) == true) return false
         conditions.userAllow?.let { allowed ->
-            if (uid == null || uid !in allowed) return false
+            if (installId == null || installId !in allowed) return false
         }
 
         conditions.rolloutPercent?.let { percent ->
-            val bucket = rolloutBucket(bucketKey(userId, context), flagPath)
+            val bucket = rolloutBucket(bucketKey(context), flagPath)
             if (bucket >= percent.coerceIn(0, 100)) return false
         }
         return true
     }
 
     /**
-     * Stable rollout identity: the signed-in user when we have one, else the
-     * install id (so an anonymous, pre-auth client still buckets consistently),
-     * else a constant (everyone shares one bucket — degrades to "global %").
+     * Stable rollout identity. Drop 2048 has no accounts, so the install id is
+     * the only durable per-device handle; a client too old to send one falls
+     * back to a constant (everyone shares one bucket — degrades to "global %").
      */
-    private fun bucketKey(userId: UserId?, context: ClientContext): String =
-        userId?.value?.toString() ?: context.installId ?: ANON_BUCKET_KEY
+    private fun bucketKey(context: ClientContext): String =
+        context.installId ?: ANON_BUCKET_KEY
 
     /** 0–99 bucket, deterministic per (key, flag). */
     private fun rolloutBucket(key: String, flagPath: String): Int =

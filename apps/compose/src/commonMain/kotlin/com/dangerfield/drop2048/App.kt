@@ -31,7 +31,6 @@ import com.dangerfield.drop2048.libraries.navigation.AnimationType
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.NavigationOptions
 import com.dangerfield.drop2048.libraries.navigation.Route
-import com.dangerfield.drop2048.libraries.navigation.SessionExpiredRoute
 import com.dangerfield.drop2048.libraries.navigation.floatingwindow.FloatingWindowHost
 import com.dangerfield.drop2048.libraries.navigation.floatingwindow.FloatingWindowNavigator
 import com.dangerfield.drop2048.libraries.navigation.impl.DelegatingRouter
@@ -84,24 +83,12 @@ fun App(appComponent: AppComponent) {
         }
     }
 
-    val authRepository = remember { appComponent.authRepository }
-
     LaunchedEffect(navController, deepLinkBridge) {
         deepLinkBridge.urls.collect { url ->
-            // The browser OAuth return trip (`…://login-callback#...`) carries
-            // a Supabase session in its fragment, not a navigable destination —
-            // hand it to supabase-kt to import instead of the nav graph. Every
-            // other link routes as before. The repo emits the new AuthState on
-            // success, which the app's auth collectors react to.
-            if (authRepository.isOAuthRedirect(url)) {
-                Catching { authRepository.completeOAuthRedirect(url) }
-                    .logOnFailure { "Failed to complete OAuth redirect" }
-            } else {
-                Catching {
-                    val request = NavDeepLinkRequest.Builder.fromUri(NavUri(url)).build()
-                    navController.handleDeepLink(request)
-                }.logOnFailure { "Failed to handle deep link: $url" }
-            }
+            Catching {
+                val request = NavDeepLinkRequest.Builder.fromUri(NavUri(url)).build()
+                navController.handleDeepLink(request)
+            }.logOnFailure { "Failed to handle deep link: $url" }
         }
     }
 
@@ -144,8 +131,8 @@ fun App(appComponent: AppComponent) {
                 // Stage 1: null until the async AppData read resolves — the
                 // platform splash (keyed on appViewModel.isReady) covers the
                 // gap. Stage 2: the Compose boot gate holds a loading screen
-                // until the remaining boot work (config + profile resolve)
-                // lands, so the first real frame renders authoritative data.
+                // until app-config resolves, so the first real frame renders
+                // authoritative config values.
                 val bootComplete by appViewModel.isBootComplete.collectAsState()
                 val startDestination by appViewModel.startDestination.collectAsState()
                 val route = startDestination
@@ -165,25 +152,11 @@ fun App(appComponent: AppComponent) {
 
                 SplashGate()
 
-                // The auth server rejected our session mid-run: push a blocking
-                // SessionExpired screen (kept on top, stack intact) that owns
-                // "sign in again" (claimed) vs "start fresh" (guest). An ambient
-                // network event can't present this from a feature screen, so it
-                // routes here. The screen picks its copy off wasAnonymous.
-                LaunchedEffect(Unit) {
-                    appViewModel.sessionExpired.collect { event ->
-                        router.navigate(
-                            SessionExpiredRoute(wasAnonymous = event.wasAnonymous),
-                            NavigationOptions(launchSingleTop = true),
-                        )
-                    }
-                }
-
                 // Server returned the locked `403` access-denied envelope: push
-                // the blocking AccessDenied screen. Same launchSingleTop pattern
-                // as SessionExpired — a burst of denied calls collapses to one
-                // screen on top. The screen keys title/body off `reason` and
-                // surfaces the optional lift date + appeal link.
+                // the blocking AccessDenied screen. launchSingleTop so a burst
+                // of denied calls collapses to one screen on top. The screen
+                // keys title/body off `reason` and surfaces the optional lift
+                // date + appeal link.
                 LaunchedEffect(Unit) {
                     appViewModel.accessDenied.collect { denial ->
                         router.navigate(

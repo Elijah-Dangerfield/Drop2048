@@ -7,10 +7,13 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
  * Default [AuthTokenProvider] binding so an app without auth works out of the
- * box (every request goes out unauthenticated). It lives in this api module —
- * not `:impl` — so an auth library can reference it in
+ * box (every request goes out unauthenticated). Drop 2048 has no accounts, so
+ * this is the only binding.
+ *
+ * It lives in this api module — not `:impl` — so a future auth library could
+ * reference it in
  * `@ContributesBinding(AppScope::class, replaces = [NoOpAuthTokenProvider::class])`
- * without crossing the impl-module boundary. See `:libraries:identity:impl`.
+ * without crossing the impl-module boundary.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)

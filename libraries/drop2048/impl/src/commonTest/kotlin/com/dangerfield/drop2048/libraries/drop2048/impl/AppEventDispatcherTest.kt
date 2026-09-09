@@ -10,8 +10,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Pins the contract every cleanup listener relies on:
- *  - dispatch(UserChanged) fans out to every listener's onUserChanged.
+ * Pins the contract every explicit-event listener relies on:
+ *  - dispatch(ConnectivityRegained) fans out to every listener's
+ *    onConnectivityRegained.
  *  - Listener exceptions don't poison subsequent listeners — the
  *    dispatcher's Catching{} wrap keeps the loop going.
  *  - dispatch is synchronous on the calling thread (we don't post to
@@ -20,13 +21,13 @@ import kotlin.test.assertEquals
  *
  * Lifecycle (foreground/cold-boot dispatch) isn't tested here because
  * it's driven via the AppLifecycle observer and the test would just
- * mirror that wiring. UserChanged is the path we explicitly call via
- * AppEventBus, so that's what's worth pinning.
+ * mirror that wiring. ConnectivityRegained is the path we explicitly call
+ * via AppEventBus, so that's what's worth pinning.
  */
 class AppEventDispatcherTest : CoroutineTest() {
 
     @Test
-    fun userChanged_fansOutToEveryListener() {
+    fun connectivityRegained_fansOutToEveryListener() {
         val a = Recording()
         val b = Recording()
         val dispatcher = AppEventDispatcher(
@@ -34,10 +35,10 @@ class AppEventDispatcherTest : CoroutineTest() {
             appLifecycle = NoopLifecycle,
         )
 
-        dispatcher.dispatch(AppEvent.UserChanged(previous = "old", current = null))
+        dispatcher.dispatch(AppEvent.ConnectivityRegained)
 
-        assertEquals(listOf("userChanged"), a.calls)
-        assertEquals(listOf("userChanged"), b.calls)
+        assertEquals(listOf("connectivityRegained"), a.calls)
+        assertEquals(listOf("connectivityRegained"), b.calls)
     }
 
     @Test
@@ -49,12 +50,12 @@ class AppEventDispatcherTest : CoroutineTest() {
             appLifecycle = NoopLifecycle,
         )
 
-        dispatcher.dispatch(AppEvent.UserChanged(previous = "old", current = "new"))
+        dispatcher.dispatch(AppEvent.ConnectivityRegained)
 
         // The healthy listener still ran — exact ordering across the
         // set isn't part of the contract (Set is unordered), but
         // "every non-throwing listener fires" is.
-        assertEquals(listOf("userChanged"), healthy.calls)
+        assertEquals(listOf("connectivityRegained"), healthy.calls)
     }
 
     @Test
@@ -63,12 +64,12 @@ class AppEventDispatcherTest : CoroutineTest() {
         val seen = mutableListOf<AppEvent>()
         backgroundScope.launch { dispatcher.eventStream().collect { seen += it } }
 
-        dispatcher.dispatch(AppEvent.UserChanged(previous = "a", current = "b"))
+        dispatcher.dispatch(AppEvent.ConnectivityRegained)
         dispatcher.dispatch(AppEvent.OnForeground(isColdBoot = false))
 
         assertEquals(
             listOf(
-                AppEvent.UserChanged(previous = "a", current = "b"),
+                AppEvent.ConnectivityRegained,
                 AppEvent.OnForeground(isColdBoot = false),
             ),
             seen,
@@ -82,10 +83,10 @@ class AppEventDispatcherTest : CoroutineTest() {
         val seen = mutableListOf<AppEvent>()
         backgroundScope.launch { dispatcher.eventStream().collect { seen += it } }
 
-        dispatcher.dispatch(AppEvent.UserChanged(previous = null, current = "u"))
+        dispatcher.dispatch(AppEvent.ConnectivityRegained)
 
-        assertEquals(listOf("userChanged"), listener.calls)
-        assertEquals(listOf<AppEvent>(AppEvent.UserChanged(previous = null, current = "u")), seen)
+        assertEquals(listOf("connectivityRegained"), listener.calls)
+        assertEquals(listOf<AppEvent>(AppEvent.ConnectivityRegained), seen)
     }
 
     private class Recording : AppEventListener {
@@ -94,12 +95,14 @@ class AppEventDispatcherTest : CoroutineTest() {
         override fun onWarmBoot(event: AppEvent.WarmBoot) { calls += "warmBoot" }
         override fun onForeground(event: AppEvent.OnForeground) { calls += "foreground" }
         override fun onBackground(event: AppEvent.OnBackground) { calls += "background" }
-        override fun onUserChanged(event: AppEvent.UserChanged) { calls += "userChanged" }
+        override fun onConnectivityRegained(event: AppEvent.ConnectivityRegained) {
+            calls += "connectivityRegained"
+        }
     }
 
     private class Throwing : AppEventListener {
-        override fun onUserChanged(event: AppEvent.UserChanged) {
-            throw IllegalStateException("simulated cleanup failure")
+        override fun onConnectivityRegained(event: AppEvent.ConnectivityRegained) {
+            throw IllegalStateException("simulated listener failure")
         }
     }
 

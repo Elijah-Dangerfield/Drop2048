@@ -67,9 +67,10 @@ sealed interface AuthVerdict {
 }
 
 /**
- * The single authority on auth-readiness. One implementation (contributed from
- * identity) caches auth, guest-creation, and connectivity state; the navigation
- * gate and the authed call boundary both consult it, so they can never disagree.
+ * The single authority on auth-readiness. The navigation gate and the authed
+ * call boundary both consult it, so they can never disagree. Drop 2048 has no
+ * accounts, so the only binding is `AlwaysReadyAuthGate` in
+ * `:libraries:networking` and every requirement resolves to Ready.
  *
  * [verdict] is a synchronous peek over cached state — safe on the router's
  * non-suspending navigate path — and fails closed while auth is still

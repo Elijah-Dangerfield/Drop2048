@@ -7,13 +7,11 @@ import com.dangerfield.drop2048.util.configureKotlinMultiplatform
 import com.dangerfield.drop2048.util.configureKotlinInject
 import com.dangerfield.drop2048.util.enforceModuleBoundaries
 import com.dangerfield.drop2048.util.libs
-import com.dangerfield.drop2048.util.loadSupabaseMetadata
 import com.dangerfield.drop2048.util.loadTelemetryMetadata
 import com.dangerfield.drop2048.util.loadVersionMetadata
 import com.dangerfield.drop2048.util.optInKotlinMarkers
 import com.dangerfield.drop2048.util.VersionMetadata
 import com.dangerfield.drop2048.util.writeCommonMetadata
-import com.dangerfield.drop2048.util.writeSupabaseMetadata
 import com.dangerfield.drop2048.util.writeTelemetryMetadata
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import org.gradle.api.Plugin
@@ -81,7 +79,6 @@ class KotlinMultiplatformConventionPlugin : Plugin<Project> {
     }
 
     private fun Project.configureSharedBuildConfig(metadata: VersionMetadata) {
-        val supabaseMetadata = loadSupabaseMetadata()
         extensions.configure(BuildConfigExtension::class.java) {
             packageName("com.dangerfield.drop2048.buildinfo")
             className("Drop2048BuildConfig")
@@ -89,7 +86,6 @@ class KotlinMultiplatformConventionPlugin : Plugin<Project> {
                 internalVisibility = false
             }
             writeCommonMetadata(metadata)
-            writeSupabaseMetadata(supabaseMetadata)
             writeTelemetryMetadata(loadTelemetryMetadata())
         }
     }

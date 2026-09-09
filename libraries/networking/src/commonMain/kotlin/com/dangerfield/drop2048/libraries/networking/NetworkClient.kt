@@ -48,7 +48,7 @@ interface NetworkClient {
     /**
      * Auth-readiness verdict for [requirement], brokered from the shared
      * [com.dangerfield.drop2048.libraries.core.AuthGate] (this module can't depend
-     * on identity — same seam as [AuthTokenProvider]). [authedCall] consults it
+     * on an auth library — same seam as [AuthTokenProvider]). [authedCall] consults it
      * before firing so a doomed request (no session, offline, …) short-circuits
      * to a typed [com.dangerfield.drop2048.libraries.core.AuthUnready] failure
      * instead of hitting the wire as a phantom 401. Suspends until auth has

@@ -1,9 +1,10 @@
 package com.dangerfield.drop2048.libraries.networking
 
 /**
- * Narrow contract the network layer needs from auth. Defined here (not in
- * `:libraries:identity`) so the networking layer doesn't transitively depend
- * on the auth state machine.
+ * Narrow contract the network layer needs from auth. Defined here rather than
+ * in an auth library so the networking layer doesn't transitively depend on an
+ * auth state machine. Drop 2048 has no accounts; [NoOpAuthTokenProvider] is the
+ * only binding, and this interface survives as the seam.
  *
  * Two responsibilities, deliberately split:
  *
@@ -31,7 +32,7 @@ interface AuthTokenProvider {
     suspend fun awaitReady()
 
     /**
-     * Current Supabase access token. Doesn't wait — call [awaitReady]
+     * Current access token. Doesn't wait — call [awaitReady]
      * first if the result needs to reflect a resolved session. Null means
      * there's no session (anon sign-in disabled, offline before first
      * auth, post-signOut). The networking layer attaches no bearer and

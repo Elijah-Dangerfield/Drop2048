@@ -1,15 +1,10 @@
 package com.dangerfield.drop2048.server.di
 
-import com.dangerfield.drop2048.server.config.SupabaseConfig
 import com.dangerfield.drop2048.server.db.Database
 import com.dangerfield.drop2048.server.domain.AppConfigAdminRepository
 import com.dangerfield.drop2048.server.domain.AppConfigManifestRepository
 import com.dangerfield.drop2048.server.domain.AppConfigSource
 import com.dangerfield.drop2048.server.domain.ExampleSource
-import com.dangerfield.drop2048.server.domain.ModerationRepository
-import com.dangerfield.drop2048.server.domain.PlayerReportRepository
-import com.dangerfield.drop2048.server.domain.ProfileRepository
-import com.dangerfield.drop2048.server.domain.SupabaseAdminClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,7 +23,7 @@ import kotlin.time.ExperimentalTime
  *
  * ```
  * val component = ServerComponent::class.create(database)
- * routing { meRoutes(component.profileRepository) }
+ * routing { appConfigRoutes(component.appConfigSource) }
  * ```
  *
  * Add a new service: annotate its impl with `@ContributesBinding(ServerScope::class)`,
@@ -43,17 +38,8 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 abstract class ServerComponent(
     @get:Provides val database: Database,
-    /**
-     * Null when Supabase isn't configured — consumers degrade (the admin
-     * client answers NotConfigured) instead of failing at construction.
-     */
-    @get:Provides val supabaseConfig: SupabaseConfig? = null,
 ) {
     abstract val exampleSource: ExampleSource
-    abstract val profileRepository: ProfileRepository
-    abstract val moderationRepository: ModerationRepository
-    abstract val playerReportRepository: PlayerReportRepository
-    abstract val supabaseAdminClient: SupabaseAdminClient
     abstract val appConfigSource: AppConfigSource
     abstract val appConfigAdminRepository: AppConfigAdminRepository
     abstract val appConfigManifestRepository: AppConfigManifestRepository
@@ -70,13 +56,6 @@ abstract class ServerComponent(
      * fire-and-forget config-change webhook). SupervisorJob so one failure
      * doesn't cascade. Singleton — the process owns exactly one and never
      * cancels it (it dies with the process).
-     *
-     * **If you trace work launched here, root a new trace for it.** A coroutine
-     * that finishes with an OTel context installed can leave it on the pool
-     * thread, and the next unrelated job scheduled there inherits it as parent.
-     * `withSpan` parents to whatever is current, so the result is unrelated
-     * background work stitched into someone else's trace, unbounded. See the
-     * KDoc on `withSpan` in `plugins/Tracing.kt` for the full failure mode.
      */
     @Provides
     @SingleIn(ServerScope::class)

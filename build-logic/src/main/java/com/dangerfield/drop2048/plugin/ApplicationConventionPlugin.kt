@@ -10,13 +10,11 @@ import com.dangerfield.drop2048.util.configureKotlinMultiplatform
 import com.dangerfield.drop2048.util.configureReleaseSigning
 import com.dangerfield.drop2048.util.enforceModuleBoundaries
 import com.dangerfield.drop2048.util.libs
-import com.dangerfield.drop2048.util.loadSupabaseMetadata
 import com.dangerfield.drop2048.util.verifyGitHooksInstalled
 import com.dangerfield.drop2048.util.loadVersionMetadata
 import com.dangerfield.drop2048.util.optInKotlinMarkers
 import com.dangerfield.drop2048.util.VersionMetadata
 import com.dangerfield.drop2048.util.writeCommonMetadata
-import com.dangerfield.drop2048.util.writeSupabaseMetadata
 import com.github.gmazzo.buildconfig.BuildConfigExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -127,7 +125,6 @@ class ApplicationConventionPlugin : Plugin<Project> {
     }
 
     private fun Project.configureAppBuildConfig(metadata: VersionMetadata) {
-        val supabaseMetadata = loadSupabaseMetadata()
         extensions.configure(BuildConfigExtension::class.java) {
             packageName("${metadata.applicationId}.appconfig")
             className("AppBuildConfig")
@@ -135,7 +132,6 @@ class ApplicationConventionPlugin : Plugin<Project> {
                 internalVisibility = false
             }
             writeCommonMetadata(metadata)
-            writeSupabaseMetadata(supabaseMetadata)
         }
     }
 }

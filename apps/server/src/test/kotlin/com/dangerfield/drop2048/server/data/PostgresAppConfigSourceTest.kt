@@ -53,7 +53,7 @@ class PostgresAppConfigSourceTest : DatabaseTest() {
     fun read_assemblesSeededTree_nestedByPath() = runTest {
         val source = PostgresAppConfigSource(database, Clock.System)
 
-        val tree = source.read(context, userId = null)
+        val tree = source.read(context)
 
         val upgrade = tree.getValue("upgrade").jsonObject
         assertEquals(1, upgrade.getValue("minSupportedVersionCode").jsonPrimitive.content.toInt())
@@ -99,12 +99,12 @@ class PostgresAppConfigSourceTest : DatabaseTest() {
                 conditionsJson = """{"platforms":["ios"]}""",
             )
 
-            val androidValue = source.read(androidContext, userId = null)
+            val androidValue = source.read(androidContext)
                 .getValue("qa").jsonObject.getValue(leaf).jsonPrimitive.content
             assertEquals("base", androidValue, "android caller doesn't match the iOS rule → base value")
 
             val iosValue = PostgresAppConfigSource(database, Clock.System)
-                .read(iosContext, userId = null)
+                .read(iosContext)
                 .getValue("qa").jsonObject.getValue(leaf).jsonPrimitive.content
             assertEquals("ios-only", iosValue, "iOS caller matches the rule → rule value")
         } finally {
@@ -113,7 +113,7 @@ class PostgresAppConfigSourceTest : DatabaseTest() {
     }
 
     private suspend fun PostgresAppConfigSource.flag(leaf: String): Boolean =
-        read(context, null).getValue("qa").jsonObject.getValue(leaf).jsonPrimitive.content.toBoolean()
+        read(context).getValue("qa").jsonObject.getValue(leaf).jsonPrimitive.content.toBoolean()
 
     private suspend fun upsert(path: String, valueJson: String) = database.transaction {
         AppConfigValuesTable.insert {

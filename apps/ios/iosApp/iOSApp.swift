@@ -7,8 +7,6 @@ struct iOSApp: App {
     
     let permissionManager = IOSPermissionManager()
     let reviewLauncher = IOSReviewLauncher()
-    let appleSignInCoordinator = IOSAppleSignInCoordinator()
-    let secureSessionStorage = IOSSecureSessionStorage()
     private let nativeViewFactory = IOSNativeViewFactory.shared
     private let iOSAppComponent: IosAppComponent
 
@@ -16,8 +14,6 @@ struct iOSApp: App {
         self.iOSAppComponent = create(
             permissionManager: permissionManager,
             reviewLauncher: reviewLauncher,
-            appleSignInCoordinator: appleSignInCoordinator,
-            secureSessionStorage: secureSessionStorage,
             nativeViewFactory: nativeViewFactory
         )
         iOSAppComponent.telemetry.initialize()

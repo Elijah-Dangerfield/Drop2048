@@ -66,20 +66,3 @@ class AppCacheImpl(
         defaultValue = { AppData() },
     )
 )
-/**
- * Reset the **account-scoped** fields back to defaults while preserving every
- * device-scoped setting (install id, screen visits, feedback counters…). Used
- * whenever the active user changes (account switch or sign-out / delete) so
- * the next account doesn't inherit the previous one's state.
- *
- * This is one `UserScopedClearer` in the dump the auth layer runs on a user
- * change: DB tables are wiped by `UserScopedDaoCleaner`, the profile caches by
- * `UserScopedProfileCacheCleaner`, and this covers the account-scoped fields
- * that live in [AppData]. Add any new account-scoped field here.
- */
-fun AppData.resetAccountScoped(): AppData = copy(
-    // A full sign-out → continue-as-guest is a deliberate fresh start, so the
-    // next identity is re-offered onboarding rather than inheriting the
-    // previous user's completion.
-    hasUserOnboarded = false,
-)

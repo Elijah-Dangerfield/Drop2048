@@ -9,9 +9,9 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
  * The pattern for exposing a DAO to the DI graph: delegate to the database
- * provider AND contribute the DAO into the [ClearableDao] multibinding set so
- * `UserScopedDaoCleaner` wipes it on user change. Copy this pair of
- * annotations for every user-scoped DAO you add.
+ * provider AND contribute the DAO into the [ClearableDao] multibinding set, so
+ * a bulk wipe (Settings' "reset progress") can empty every table without
+ * knowing what they are. Copy this pair of annotations for every DAO you add.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = ExampleUserDataDao::class)

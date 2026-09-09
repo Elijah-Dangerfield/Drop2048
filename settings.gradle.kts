@@ -82,8 +82,6 @@ if (!serverOnly) {
     include(":libraries:navigation:impl")
     include(":libraries:networking")
     include(":libraries:networking:impl")
-    include(":libraries:identity")
-    include(":libraries:identity:impl")
     include(":libraries:resources")
     include(":libraries:review")
     include(":libraries:review:impl")

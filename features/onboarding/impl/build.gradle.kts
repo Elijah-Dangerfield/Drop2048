@@ -16,8 +16,8 @@ kotlin {
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
+            implementation(projects.libraries.resources)
             implementation(projects.libraries.drop2048)
-            implementation(projects.libraries.identity)
 
             // Compose dependencies (navigation and lifecycle provided by drop2048.feature plugin)
             implementation(compose.runtime)
@@ -32,7 +32,6 @@ kotlin {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.features.onboarding)
             implementation(projects.libraries.core)
-            implementation(projects.libraries.identity)
             implementation(projects.libraries.drop2048)
             implementation(libs.turbine)
         }

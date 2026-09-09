@@ -7,7 +7,6 @@ import com.dangerfield.drop2048.server.di.ServerScope
 import com.dangerfield.drop2048.server.domain.AppConfigSource
 import com.dangerfield.drop2048.server.domain.RuleConditions
 import com.dangerfield.drop2048.server.domain.TargetingRule
-import com.dangerfield.drop2048.server.domain.UserId
 import com.dangerfield.drop2048.server.http.ClientContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,7 +30,7 @@ import kotlin.time.Instant
  * [AppConfigTargetingEngine]), and assembles the nested override tree the
  * client merges over its defaults.
  *
- * Editing a row (Supabase table editor, or the local admin UI) flips the flag
+ * Editing a row (the admin console, or any Postgres client) flips the flag
  * with **no redeploy** — live on the next client config refresh, throttled only
  * by the short in-process [cacheTtl] below.
  *
@@ -56,7 +55,7 @@ class PostgresAppConfigSource(
     private val cacheMutex = Mutex()
     private var cache: Snapshot? = null
 
-    override suspend fun read(context: ClientContext, userId: UserId?): JsonObject {
+    override suspend fun read(context: ClientContext): JsonObject {
         val snapshot = snapshot()
         // Resolve every flag that has a base value OR at least one rule. A
         // path with only rules (no base) resolves to null when nothing matches
@@ -68,7 +67,6 @@ class PostgresAppConfigSource(
                     rules = snapshot.rulesByPath[path].orEmpty(),
                     base = snapshot.baseValues[path],
                     context = context,
-                    userId = userId,
                     flagPath = path,
                 )
                 if (value != null) put(path, value)

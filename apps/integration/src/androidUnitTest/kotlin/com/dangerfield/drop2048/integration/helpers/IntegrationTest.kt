@@ -57,18 +57,9 @@ class Harness(val server: InProcessServer) {
 
     private val clients = mutableListOf<TestClient>()
 
-    /**
-     * A real client for [userId]. Seeds the stub `auth.users` row by default —
-     * the precondition a real Supabase sign-up establishes and the JWT implies;
-     * pass `seedAuthUser = false` to exercise the unknown-user path.
-     */
-    fun client(
-        userId: String = randomUserId(),
-        seedAuthUser: Boolean = true,
-    ): TestClient {
-        if (seedAuthUser) server.seedAuthUser(userId)
-        return TestClient(serverUrl = server.baseUrl, userId = userId).also { clients += it }
-    }
+    /** A real client, optionally pinned to a known [installId] for rollout targeting. */
+    fun client(installId: String = randomInstallId()): TestClient =
+        TestClient(serverUrl = server.baseUrl, installId = installId).also { clients += it }
 
     internal fun close() {
         clients.forEach { it.close() }

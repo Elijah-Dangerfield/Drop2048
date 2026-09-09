@@ -24,26 +24,6 @@ data class VersionMetadata(
 }
 
 /**
- * Placeholders used when no Supabase project is configured. They are deliberately
- * self-describing: supabase-kt refuses to build a client from blank values, so
- * something has to be there, and whatever is there ends up quoted verbatim in the
- * runtime failure ("Unable to resolve host
- * set-supabase-projectId-in-local-properties.supabase.co"). A value that names the
- * fix beats a value that looks like real config.
- */
-const val UNCONFIGURED_SUPABASE_PROJECT_ID = "set-supabase-projectId-in-local-properties"
-const val UNCONFIGURED_SUPABASE_ANON_KEY = "set-supabase-anonKey-in-local-properties"
-
-data class SupabaseMetadata(
-    val projectId: String,
-    val anonKey: String
-) {
-    val url: String = projectId.takeIf { it.isNotBlank() }
-        ?.let { "https://$it.supabase.co" }
-        ?: ""
-}
-
-/**
  * Resolves the app's version/build metadata with this precedence:
  *  1. **CI env overrides** — `VERSION_NAME_OVERRIDE`, `VERSION_CODE_OVERRIDE`,
  *     `BUILD_NUMBER_OVERRIDE`, `RELEASE_CHANNEL_OVERRIDE` (set by
@@ -131,55 +111,6 @@ fun BuildConfigExtension.writeCommonMetadata(metadata: VersionMetadata) {
     buildConfigField("Int", "BUILD_NUMBER", metadata.buildNumber.toString())
     buildConfigField("String", "COMMIT_SHA", "\"${metadata.commitSha}\"")
     buildConfigField("String", "COMMIT_BRANCH", "\"${metadata.commitBranch}\"")
-}
-
-/**
- * Supabase client config: `local.properties` (`supabase.projectId` /
- * `supabase.anonKey`) → CI env (`SUPABASE_PROJECT_ID` / `SUPABASE_ANON_KEY`) →
- * a placeholder that names itself.
- *
- * The build stays green with nothing configured, so a fresh clone compiles and
- * runs, but the placeholder cannot pass for working config: it is not a real
- * project ref, and the first auth call fails with the property name to set in
- * the message. A warning goes out at configuration time too, because the old
- * behaviour's worst part was silence — the build said nothing about Supabase at
- * all.
- */
-fun Project.loadSupabaseMetadata(): SupabaseMetadata {
-    val properties = Properties()
-    val localProperties = rootProject.file("local.properties")
-    if (localProperties.exists()) {
-        FileInputStream(localProperties).use(properties::load)
-    }
-
-    fun env(key: String): String? = System.getenv(key)?.takeIf { it.isNotBlank() }
-
-    val projectId = properties.stringOrNull("supabase.projectId")
-        ?: env("SUPABASE_PROJECT_ID")
-        ?: UNCONFIGURED_SUPABASE_PROJECT_ID
-    val anonKey = properties.stringOrNull("supabase.anonKey")
-        ?: env("SUPABASE_ANON_KEY")
-        ?: UNCONFIGURED_SUPABASE_ANON_KEY
-
-    if (projectId == UNCONFIGURED_SUPABASE_PROJECT_ID || anonKey == UNCONFIGURED_SUPABASE_ANON_KEY) {
-        logger.warn(
-            "Supabase is not configured — auth will fail at runtime. Set " +
-                "supabase.projectId and supabase.anonKey in local.properties " +
-                "(or SUPABASE_PROJECT_ID / SUPABASE_ANON_KEY in the environment). " +
-                "See template/SETUP.md."
-        )
-    }
-
-    return SupabaseMetadata(
-        projectId = projectId,
-        anonKey = anonKey
-    )
-}
-
-fun BuildConfigExtension.writeSupabaseMetadata(metadata: SupabaseMetadata) {
-    buildConfigField("String", "SUPABASE_PROJECT_ID", "\"${metadata.projectId}\"")
-    buildConfigField("String", "SUPABASE_URL", "\"${metadata.url}\"")
-    buildConfigField("String", "SUPABASE_ANON_KEY", "\"${metadata.anonKey}\"")
 }
 
 data class TelemetryMetadata(

@@ -1,11 +1,13 @@
 package com.dangerfield.drop2048.libraries.drop2048.storage.db
 
 /**
- * Every user-scoped `@Dao` implements this and is multibound into the set
- * `UserScopedDaoCleaner` consumes — adding a new DAO is a compile-time
- * wire-up, not a list edit. On user change (sign-out / account switch) the
- * cleaner calls [deleteAll] on each so the departing user's rows never leak
- * into the next session.
+ * Every `@Dao` holding wipeable data implements this and is multibound into an
+ * `AppScope` set — adding a new DAO is a compile-time wire-up, not a list edit.
+ *
+ * The template consumed the set from an auth-driven cleaner, which went with
+ * the identity stack. Nothing consumes it yet; Settings' "reset progress"
+ * (C11) is the intended consumer, and it gets every table for free by
+ * injecting `Set<ClearableDao>`.
  */
 interface ClearableDao {
     suspend fun deleteAll()

@@ -1,19 +1,20 @@
 # Drop 2048
 
-A Kotlin Multiplatform template with the production systems already wired — not a hello-world scaffold. It carries the hardened patterns of a shipped KMP app (Compose Multiplatform client, Ktor server on Fly.io, Supabase auth) so a new project starts at "day 30", not day 0.
+A block falls into a narrow grid. You steer it. When it lands on a matching number the two combine and double. Chains trigger chains. Tetris skeleton, 2048 brain. See [docs/SPEC.md](docs/SPEC.md).
+
+Built on a Kotlin Multiplatform template that ships the production systems already wired — Compose Multiplatform client, Ktor server on Fly.io — so the game started at "day 30", not day 0. The template's account stack was deleted in C0: Drop 2048 is local-first with no accounts, no login and no cloud save.
 
 ## What you get, working, on day one
 
 **Client (Android + iOS from one codebase)**
-- Anonymous-first **Supabase auth**: guest creation in onboarding, email/password + Sign in with Apple + browser OAuth, encrypted session storage (Keychain / EncryptedSharedPreferences), session self-heal, blocking screens for expired sessions and banned accounts
 - **Offline detection that tells the truth** — OS connectivity combined with witnessed request reachability, driving an offline banner and a `ConnectivityRegained` event
-- **Triggered sync**: implement one idempotent `sync()`, register it, and it runs on sign-in, foreground, and reconnect with retry — plus an offline-write outbox pattern with a shipped reference
+- **Sync triggers**: `warmForeground` / `cameOnline` / `isOffline` edges so network-touching work hangs off one shared vocabulary, plus an offline-write outbox pattern
 - **Remote config end-to-end**: typed `ConfiguredValue`s, offline-first fetch with kill-switch flags (`upgrade.maintenanceMode`, forced-upgrade), QA overrides, and a hosted **admin console** (Kotlin/JS) with targeting rules, audit log, and prod confirm-by-typing
 - **Telemetry that answers pages**: one `session_id` pivots Sentry issues, Grafana Loki logs, and Tempo traces; structured `logEvent`s ship over OTLP with disk-buffered durability; MetricKit exit reports on iOS
 - **Dev tooling**: shake for the QA dialog, on-device Wiretap network inspector (debug-only, noop artifact in store builds), a living design-system catalog, in-app review prompting with sane eligibility gates
 
 **Server (Ktor + Postgres, deploys to Fly.io)**
-- Supabase JWT verification, ban gate (403 envelope the client understands), player reports (Google Play UGC compliance), account deletion (`DELETE /v1/me`), remote-config source + admin API, session-correlated tracing/logging
+- Remote-config source + token-gated admin API, session-correlated tracing/logging. No authenticated user routes — there are no accounts
 - Boots gracefully with zero config (limited mode) and ships a docker-compose local stack
 - Two environments: dev auto-deploys on merge, prod behind an approval gate
 
@@ -46,7 +47,7 @@ docker compose -f apps/server/docker-compose.yml up -d
 
 ### First-time setup
 
-See **[SETUP.md](SETUP.md)** for the hour-1/day-1 runbook — Supabase project + auth providers, Fly dev/prod apps, GitHub secrets, Sentry/Grafana keys, store listings, and the first-release manual-promotion gotcha. Each step has the command and the expected output.
+See **[SETUP.md](SETUP.md)** for the hour-1/day-1 runbook — Supabase Postgres, Fly dev/prod apps, GitHub secrets, Sentry/Grafana keys, store listings, and the first-release manual-promotion gotcha. Each step has the command and the expected output.
 
 Before your first commit:
 
@@ -75,7 +76,7 @@ Architecture rules (enforced at Gradle configuration time), the ViewModel/DI/nav
 | Doc | What it covers |
 |---|---|
 | [SETUP.md](SETUP.md) | Init → running app → first release, step by step |
-| [AGENTS.md](AGENTS.md) | Architecture, conventions, auth model, sync, testing rules |
+| [AGENTS.md](AGENTS.md) | Architecture, conventions, sync triggers, testing rules |
 | [docs/practices/testing.md](docs/practices/testing.md) | Which layer catches which bug; fakes; the integration harness |
 | [docs/practices/observability.md](docs/practices/observability.md) | The session_id pivot; finding one session across Sentry/Loki/Tempo |
 | [docs/practices/app-events.md](docs/practices/app-events.md) | The structured-event registry + `logEvent` discipline |

@@ -1,10 +1,8 @@
 package com.dangerfield.drop2048.libraries.drop2048.impl
 
+import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.drop2048.AppEvent
 import com.dangerfield.drop2048.libraries.drop2048.AppEvents
-import com.dangerfield.drop2048.libraries.core.AppState
-import com.dangerfield.drop2048.libraries.identity.auth.AuthRepository
-import com.dangerfield.drop2048.libraries.identity.auth.AuthState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,25 +18,16 @@ import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
- * The account whose user-scoped data is live on this device. Data-class
- * equality IS the refire contract for `runWhen` keys built on [activeAccount]:
- * a claim (same id, `isAnonymous` flips) is a key change and refires, while a
- * re-emission of the same session is not.
- */
-data class ActiveAccount(val userId: String, val isAnonymous: Boolean)
-
-/**
- * The app-state levels and edges that data-freshness work hangs off, derived
- * once so every consumer agrees on the semantics:
+ * The app-state edges that background refresh work hangs off, derived once so
+ * every consumer agrees on the semantics.
  *
- * - [activeAccount] — level; from [AuthRepository.observe], which replays the
- *   resolved state to late subscribers (no boot race) and emits only *after*
- *   the departing user's local data is cleared (a new user's sync can never
- *   race the old user's wipe).
- * - [warmForeground] — edge; app resumed with a session already live. Reads
- *   the replay-free stream so a stale pre-subscribe foreground can't
- *   double-fire at activation. Cold-boot foregrounds are excluded: boot syncs
- *   belong to [activeAccount] firing when auth resolves.
+ * Drop 2048 has no accounts and no user-scoped server state, so there is no
+ * "active account" level here. What remains is the pair of edges that anything
+ * network-touching (remote config refresh, ad preloading) wants:
+ *
+ * - [warmForeground] — edge; app resumed. Reads the replay-free stream so a
+ *   stale pre-subscribe foreground can't double-fire at activation. Cold-boot
+ *   foregrounds are excluded: boot work belongs to the caller's own init.
  * - [cameOnline] — edge; connectivity regained, derived from the
  *   [AppState.isOffline] level (not the replayed [AppEvent.ConnectivityRegained]
  *   edge, which could spuriously refire at boot from the bus's replay slot).
@@ -47,24 +36,15 @@ data class ActiveAccount(val userId: String, val isAnonymous: Boolean)
 @SingleIn(AppScope::class)
 @Inject
 class SyncTriggers(
-    authRepositoryProvider: () -> AuthRepository,
     appEventsProvider: () -> AppEvents,
     private val appState: AppState,
 ) {
 
     // Deferred: SyncTriggers is constructed by AppEventListeners inside the
-    // event dispatcher's own construction, and auth depends on the dispatcher
-    // too. Nothing here is touched until a trigger flow is collected, which
-    // only happens from post-construction coroutines.
-    private val authRepository by lazy { authRepositoryProvider() }
+    // event dispatcher's own construction. Nothing here is touched until a
+    // trigger flow is collected, which only happens from post-construction
+    // coroutines.
     private val appEvents by lazy { appEventsProvider() }
-
-    val activeAccount: Flow<ActiveAccount?> =
-        flow { emitAll(authRepository.observe()) }.map { state ->
-            (state as? AuthState.Authenticated)?.let {
-                ActiveAccount(userId = it.userId, isAnonymous = it.isAnonymous)
-            }
-        }
 
     val warmForeground: Flow<Unit> = flow {
         emitAll(
@@ -77,8 +57,8 @@ class SyncTriggers(
 
     /**
      * Level twin of [cameOnline] — read before starting network work that
-     * should defer while the device has no route. A cycle that parks
-     * on this level is re-armed by the [cameOnline] edge, so deferring is safe.
+     * should defer while the device has no route. A cycle that parks on this
+     * level is re-armed by the [cameOnline] edge, so deferring is safe.
      */
     val isOffline: StateFlow<Boolean> get() = appState.isOffline
 

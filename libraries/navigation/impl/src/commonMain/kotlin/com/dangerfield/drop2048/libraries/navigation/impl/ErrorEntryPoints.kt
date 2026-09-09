@@ -4,14 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.toRoute
-import com.dangerfield.drop2048.features.home.HomeRoute
-import com.dangerfield.drop2048.features.onboarding.SignInRoute
 import com.dangerfield.drop2048.features.profile.BugReportRoute
-import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.AccessDeniedRoute
 import com.dangerfield.drop2048.libraries.navigation.BlockingErrorRoute
 import com.dangerfield.drop2048.libraries.navigation.ErrorDialogAction
@@ -19,7 +14,6 @@ import com.dangerfield.drop2048.libraries.navigation.ErrorDialogRoute
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.NavigationOptions
 import com.dangerfield.drop2048.libraries.navigation.Router
-import com.dangerfield.drop2048.libraries.navigation.SessionExpiredRoute
 import com.dangerfield.drop2048.libraries.navigation.dialog
 import com.dangerfield.drop2048.libraries.navigation.screen
 import com.dangerfield.drop2048.libraries.navigation.serializableType
@@ -33,43 +27,9 @@ import kotlin.reflect.typeOf
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
-class ErrorEntryPoints(
-    private val sessionExpiredViewModelFactory: () -> SessionExpiredViewModel,
-) : FeatureEntryPoint {
+class ErrorEntryPoints : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<SessionExpiredRoute> { backStackEntry ->
-            val route = backStackEntry.toRoute<SessionExpiredRoute>()
-            val viewModel: SessionExpiredViewModel = viewModel { sessionExpiredViewModelFactory() }
-            val state by viewModel.stateFlow.collectAsStateWithLifecycle()
-
-            viewModel.ObserveEvents { event ->
-                when (event) {
-                    // Claimed account: tear down happened in the VM — land on
-                    // sign-in with a clean stack (Back must not resurrect the
-                    // dead session's screens).
-                    SessionExpiredViewModel.Event.NavigateToSignIn -> router.navigate(
-                        SignInRoute(),
-                        NavigationOptions(launchSingleTop = true, clearBackStack = true),
-                    )
-                    // Guest: a fresh anonymous session is live — the old stack
-                    // belonged to the dead account, so restart at Home.
-                    SessionExpiredViewModel.Event.StartedFresh -> router.navigate(
-                        HomeRoute(),
-                        NavigationOptions(launchSingleTop = true, clearBackStack = true),
-                    )
-                }
-            }
-
-            SessionExpiredScreen(
-                wasAnonymous = route.wasAnonymous,
-                working = state.working,
-                startFreshFailed = state.startFreshFailed,
-                onSignInAgain = { viewModel.takeAction(SessionExpiredViewModel.Action.SignInAgain) },
-                onStartFresh = { viewModel.takeAction(SessionExpiredViewModel.Action.StartFresh) },
-            )
-        }
-
         screen<AccessDeniedRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<AccessDeniedRoute>()
             AccessDeniedScreen(

@@ -16,7 +16,6 @@ kotlin {
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
             implementation(projects.libraries.drop2048)
-            implementation(projects.libraries.identity)
 
             // Compose dependencies (navigation and lifecycle provided by drop2048.feature plugin)
             implementation(compose.runtime)
@@ -29,7 +28,6 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
-            implementation(projects.libraries.identity)
         }
     }
 }
