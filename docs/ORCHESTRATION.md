@@ -20,10 +20,10 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C3 · `:features:game` | **DONE** | `f34279c`. Playable on device. 5x8 and the HUD settled (L25) |
 | C1c · Balance with a clock | **DONE** | `321070a`. 500ms opening (D9). See L27-L31 |
 | C4 · Persistence + stats | **DONE** | `run_record`, resume incl. mid-cascade, stats screen |
-| C2c · Design language + screenshot harness | **IN PROGRESS** | The handoff (D10) |
+| C2c · Design language + screenshot harness | **DONE** | `0f843f2`. 15 goldens. See D14, D15, L38-L39 |
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
-| C1e · Re-measure pacing without hard drop | **IN PROGRESS** | Every clocked number assumed hard drop existed |
-| C3b · Game screen to handoff fidelity | queued | Blocked on C2c |
+| C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
+| C3b · Game screen to handoff fidelity | **IN PROGRESS** | Restyle + D15 + C2c's visual deltas |
 | C3a · Feel | not started | Needs audio assets from the owner |
 | C5 · Tutorial | not started | |
 | C6 · Daily Challenge | not started | |
@@ -251,6 +251,43 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D14 · The design ramp ships as drawn, and its three failed floors are accepted
+
+Owner ruling. The handoff's tile ramp fails three colour floors the authored ramp held: adjacent
+tiers at ΔE 22.62 (worst pair 16/32), any-pair at **14.64 (2 against 2048)**, and a luminance span
+of 0.187 against a 0.45 floor. Under simulated deuteranopia the closest pair collapses to **ΔE
+0.67** (128/256).
+
+The root cause is structural: `L` is constant across the ramp by design, so **lightness carries
+nothing**, and lightness is the axis that survives every colour-vision deficiency.
+
+**Accepted, for three reasons that are real rather than convenient:** every tile carries its
+number and that cannot be turned off; a 2048 bursts its row on creation so it and a 2 are rarely
+co-present; and the four accessibility palettes still hold every floor unchanged for players who
+need them.
+
+**The test was not loosened.** The four accessibility ramps still assert every floor. The default
+is excluded from those three assertions and **pinned two-sided instead**, so a retune in either
+direction fails loudly and lands back here.
+
+If this is ever revisited, the highest-value single change is letting `L` climb with tier.
+
+### D15 · The score renders in fixed-width digit slots
+
+Owner ruling. Fredoka has **no `tnum` feature at all** and eight distinct digit advance widths; at
+weight 700 its `1` is 379 units against the `2`'s 566, a 49% spread. A score ticking through a
+cascade would visibly change width several times a second.
+
+Each digit gets a slot as wide as the widest numeral. Fredoka stays everywhere the design asks for
+it, the level number is fixed for free, and the cost is slightly looser letterfit than the
+design's natural spacing.
+
+Tiles were never affected — a tile draws one value, centred, and never animates between two.
+
+Rejected: Nunito ExtraBold for the score (tabular in effect, but costs the most prominent number in
+the game its Fredoka character), and a `tnum`-patched Fredoka (correct, but a font build pipeline
+for one number).
+
 ### D13 · The ▼ nudge pays no score
 
 SPEC 7's hard drop bonus is struck rather than transferred. C1d's argument, and it is a good one:
@@ -331,6 +368,20 @@ Owner ruling. The handoff says all three "were tried and cut. Don't reintroduce 
    **289 seconds** patient (L29). Removing it makes *everyone* the patient player, and the nudge
    is only a partial substitute. **The opening pacing must be re-measured**, and D9's 500ms curve
    was tuned in a world where hard drop existed.
+
+**Measured in C1e, and the ruling holds comfortably.** The nudge recovers **88%** of the
+wall-clock gap: level 1 goes 4.15s per drop patient, **0.96s nudging**, 0.54s under the old hard
+drop; level 4 arrives at 223s / **56s** / 33s. C1d predicted 1.5-2.5s and was out by a factor of
+two, because its arithmetic omitted that gravity keeps running underneath the taps rather than
+pausing for them.
+
+**Correction to consequence 1:** `nudgeRows` does **not** move the determinism digest. Measured,
+not assumed — C1e set it to 3 and all five `DeterminismTest` cases passed, because kotlinx omits
+values equal to their declared default and `Nudge` is behaviourally inert in a pinned script whose
+every drop ends in `Lock`. It is a free live knob, unlike `blocksPerLevel`.
+
+L29 transfers intact: 223s versus 56s makes **teaching ▼ a C5 tutorial problem**, exactly as it was
+for hard drop.
 
 ### D9 · The opening drop speed is 500ms, and `blocksPerLevel` stays 20
 
@@ -434,6 +485,53 @@ that *something* was wrong with the blob, not that the version check is what cau
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
 
+### L40 · Vertical position is not an input to the engine, so every drop control is pure pacing
+
+`Input.Lock` places at the block's **landing** cell, so how high the block was when the player
+committed is not an input to anything. C1e measured the consequence: `patient`, `softie`, `average`
+and a restored hard-drop finish produce **outcome columns identical to the digit** — same median
+level, same tier distribution, same clutter, same cascade depth.
+
+A drop control decides *when* a block locks and never *where*. It is a wall-clock dial and nothing
+else. Pinned as `theDropControlChangesTheWallClockAndNothingElse`.
+
+Two things follow. `nudgeRows` is **digest-free** (see the D11 correction below), so it is a
+genuinely free live knob. And no future control scheme can be argued to change difficulty without
+first changing what `Lock` does.
+
+### L41 · `decisionMillis` is the difficulty dial, and it is an unmeasured guess
+
+C1e swept the modelled player's decision time across a plausible range:
+
+| ms | median level | 1024 rate | to level 4 |
+|---|---|---|---|
+| 150 | 21 | 28.5% | 49.5s |
+| 250 (shipped) | 19 | 24.2% | 55.8s |
+| 350 | 17 | 18.3% | 61.1s |
+| 500 | 16 | 10.8% | 70.9s |
+
+**Five levels of median and a 3x swing in the 1024 rate.** For scale: the drop clock itself was
+worth three levels (L30) and the entire spawn table is worth one (L19).
+
+Every clocked number in this project is conditional on a constant nobody has measured. C1e left it
+at 250 deliberately — the two arguments for moving it (less to read without a preview / more of the
+choice now comes from the board) point opposite ways and neither has evidence, so picking would
+replace an honest assumption with a dressed-up one.
+
+**This is the top telemetry priority for C8.**
+
+### L42 · A `get() = false` on a sealed interface is a JVM default method, and it can half-build a companion
+
+C1e declared `cheats` on the sealed `Policy` interface with a default getter. That made it a JVM
+default method, so initialising `Policy.Random` initialised `Policy`, which built the companion and
+evaluated `Policy.All` **while that object was still half-built**. `All` held a null. Two tests died
+on a non-null parameter check. No compiler warning.
+
+It is abstract now, with a KDoc saying why it must stay abstract.
+
+Same family as L22 (declaration-order initialisation) and worth the same suspicion: **anywhere a
+companion holds a list of its own enclosing type's objects.**
+
 ### L36 · Removing hard drop cost the engine no code path
 
 `Input.Lock` already locked at the block's **landing** cell rather than its current one, so
@@ -441,8 +539,14 @@ you think, by changing only that thing and watching it pass.
 `Input.Lock` with zero behavioural change.
 
 Worth noticing as a design signal: when deleting a feature turns out to be free, the feature was
-probably a thin policy over a primitive that was already right. The engine's clock-free numbers
-survive C1d unchanged for the same reason — **placement is identical**, only the wall clock moved.
+probably a thin policy over a primitive that was already right.
+
+**Amended by C1e: right in substance, wrong as stated.** Placement *is* identical, but C1d also
+moved the board-aware cap to spawn time, which changes the drawn block on the 0.02-0.04% of drops
+L20 measured. Over ~400 drops that reseeds roughly one run in twelve.
+
+So every C1a and C1c number is good to about **0.5pp, not to the digit.** Nothing in the
+conclusions moves; quote them with that precision.
 
 ### L37 · `Lookahead-1` now cheats, and that may be fine
 
