@@ -67,7 +67,57 @@ interface BlockPalette {
      */
     operator fun get(value: Int): BlockStyle =
         styles[TIER_VALUES.indexOf(value).takeIf { it >= 0 } ?: styles.lastIndex]
+
+    /**
+     * The three specials (SPEC 5.2), which are the same three colours in every
+     * palette.
+     *
+     * Shared rather than authored five times, and that is a design decision
+     * rather than a shortcut. A special is not a tier: it has no value, it is
+     * not part of the ramp, and it is identified by its mark rather than by
+     * where it sits between two other colours. Giving each palette its own
+     * Stone would mean fifteen more hexes to hold against fifteen more floors,
+     * to express a difference no player can act on.
+     *
+     * What they still have to clear is asserted by `BlockPaletteTest`: each
+     * reads its own mark, and none of the three collides with any of the
+     * fifty-five tier faces. [BlockSpecial.Stone] carries the strictest version
+     * of that, because "not a number" is the entire content of a Stone.
+     */
+    val specials: Map<BlockSpecial, BlockStyle> get() = SPECIAL_STYLES
+
+    /** The style for a [special]. */
+    operator fun get(special: BlockSpecial): BlockStyle = specials.getValue(special)
 }
+
+/**
+ * The blocks that arrive in place of a value block (SPEC 5.2).
+ *
+ * [mark] is what the face draws instead of a numeral, and it is on the enum
+ * rather than on the drawing code because it is the same class of decision as
+ * the colour: what a Bomb looks like is a design-system answer, and a feature
+ * that could pick its own would eventually pick two.
+ */
+enum class BlockSpecial(val mark: BlockMark) {
+
+    /** Takes a neighbour's value doubled. Marked with a star: it can become anything. */
+    Wildcard(BlockMark.Star),
+
+    /** Destroys itself and its four orthogonal neighbours. Marked with a fused charge. */
+    Bomb(BlockMark.Fuse),
+
+    /**
+     * An obstacle with no value at all.
+     *
+     * The only block on the board that draws **nothing** on its face, which is
+     * the point: a Stone is defined by the absence of a number, and giving it a
+     * mark would make it look like a special that does something.
+     */
+    Stone(BlockMark.None),
+}
+
+/** What a special draws on its face. Geometry, not a glyph — see `BlockFace`. */
+enum class BlockMark { Star, Fuse, None }
 
 /** The values a block can hold, low to high. Powers of two, 2 through 2048 (SPEC 5.1). */
 val TIER_VALUES: List<Int> = listOf(2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
@@ -205,6 +255,39 @@ internal val DARK_INK = Color(0xFF151024)
 
 /** For faces dark enough that a light numeral reads better. Warm rather than pure white. */
 internal val LIGHT_INK = Color(0xFFFFF7EA)
+
+/**
+ * The three specials, shared by every palette. See [BlockPalette.specials].
+ *
+ * Each hue was picked for the region no ramp reaches rather than for a mood, and
+ * every number below is measured by `BlockPaletteTest` rather than asserted here:
+ *
+ * - **Wildcard** is an electric violet no ramp gets near — the closest any of the
+ *   fifty-five tier faces comes is ΔE 36 (the default ramp's 128).
+ * - **Bomb** is a near-black with a plum cast, and it is the easiest of the three:
+ *   nothing in any ramp is remotely this dark, so its worst case is ΔE 42.
+ * - **Stone** is the only achromatic block in the game, which is exactly how it
+ *   reads as "not a number" without drawing one. Its worst case is ΔE 26, against
+ *   the tritanopia ramp's 2.
+ *
+ * The specials are not put through the dichromat simulation as strictly as the
+ * three colour-vision ramps are, and that is argued rather than overlooked. A
+ * ramp asks a player to order eleven colours; a special asks only "is this one of
+ * them", and the mark on the face answers that before the colour does.
+ *
+ * **This has to stay below [DARK_INK] and [LIGHT_INK].** Top-level properties in
+ * a file initialise in declaration order, so declared above them it runs while
+ * both are still zeroed and every special ends up with a fully transparent ink —
+ * silently, at class-init time, with no warning anywhere. It was written that way
+ * first, and the only reason it did not ship is that
+ * `everySpecialMarkClearsTheReadabilityFloor` measured the ink rather than
+ * trusting the derivation.
+ */
+val SPECIAL_STYLES: Map<BlockSpecial, BlockStyle> = mapOf(
+    BlockSpecial.Wildcard to blockStyle(Color(0xFFA800FC)),
+    BlockSpecial.Bomb to blockStyle(Color(0xFF241A26)),
+    BlockSpecial.Stone to blockStyle(Color(0xFF686B76)),
+)
 
 private fun paletteOf(vararg faces: Long): BlockPalette {
     require(faces.size == TIER_VALUES.size) {

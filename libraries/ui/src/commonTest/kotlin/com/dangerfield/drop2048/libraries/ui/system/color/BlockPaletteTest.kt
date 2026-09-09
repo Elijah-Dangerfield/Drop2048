@@ -167,6 +167,125 @@ class BlockPaletteTest {
         }
     }
 
+    @Test
+    fun everySpecialHasAStyle() {
+        BlockPalettes.all.forEach { (choice, palette) ->
+            BlockSpecial.entries.forEach { special ->
+                assertEquals(
+                    SPECIAL_STYLES.getValue(special),
+                    palette[special],
+                    "$choice does not paint $special the shared way",
+                )
+            }
+        }
+    }
+
+    /**
+     * A special carries a mark rather than a numeral, and a mark that cannot be
+     * read against its own face is a special the player has to guess at.
+     */
+    @Test
+    fun everySpecialMarkClearsTheReadabilityFloor() {
+        BlockSpecial.entries.forEach { special ->
+            val style = SPECIAL_STYLES.getValue(special)
+            val ratio = contrastRatio(style.ink, style.face)
+            assertTrue(
+                ratio >= InkContrastFloor,
+                "$special draws its mark at $ratio:1, under $InkContrastFloor",
+            )
+        }
+    }
+
+    /**
+     * The one that matters, and the reason the specials are one shared set rather
+     * than five.
+     *
+     * A special is never a tier. Reading one as a numeric block is a worse mistake
+     * than confusing two tiers, because the player does not merely misjudge a
+     * merge — they plan a merge that cannot happen. So all three are held to the
+     * *neighbour* floor against **every** tier face in **all five** palettes, not
+     * the looser any-pair floor the ramps use among themselves.
+     *
+     * [BlockSpecial.Stone] is the tight one, and deliberately so: it is the only
+     * block on the board that draws nothing at all, so its face is the entire
+     * signal. It is achromatic for exactly that reason.
+     */
+    @Test
+    fun noSpecialCollidesWithAnyTierInAnyPalette() {
+        BlockSpecial.entries.forEach { special ->
+            val face = SPECIAL_STYLES.getValue(special).face
+            BlockPalettes.all.forEach { (choice, palette) ->
+                palette.styles.forEachIndexed { tier, style ->
+                    val distance = perceptualDistance(face, style.face)
+                    assertTrue(
+                        distance >= NeighbourSeparationFloor,
+                        "$special sits $distance from $choice's ${TIER_VALUES[tier]}, under the " +
+                            "floor of $NeighbourSeparationFloor",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun theThreeSpecialsAreObviouslyDifferentFromEachOther() {
+        val faces = BlockSpecial.entries.map { it to SPECIAL_STYLES.getValue(it).face }
+        faces.forEachIndexed { i, (a, faceA) ->
+            faces.drop(i + 1).forEach { (b, faceB) ->
+                val distance = perceptualDistance(faceA, faceB)
+                assertTrue(
+                    distance >= NeighbourSeparationFloor,
+                    "$a and $b are only $distance apart, under $NeighbourSeparationFloor",
+                )
+            }
+        }
+    }
+
+    /**
+     * The specials shared across all five palettes have to survive the three
+     * deficiencies too, but against a lower floor than [SimulatedCollisionFloor]
+     * would suggest and lower than the ramps are held to.
+     *
+     * That is argued rather than conceded. A ramp asks the player to *order*
+     * eleven colours, which is a job colour alone has to do. A special asks only
+     * "is this one of them", and the mark on the face — or, for a Stone, the
+     * conspicuous absence of one — answers that before the colour is consulted.
+     * The floor here is what stops a special becoming genuinely indistinguishable
+     * from a tier, not what makes it the primary signal.
+     */
+    @Test
+    fun theSpecialsSurviveEachDeficiency() {
+        mapOf(
+            BlockPaletteChoice.Deuteranopia to ColorVision.Deuteranopia,
+            BlockPaletteChoice.Protanopia to ColorVision.Protanopia,
+            BlockPaletteChoice.Tritanopia to ColorVision.Tritanopia,
+        ).forEach { (choice, vision) ->
+            val tiers = BlockPalettes[choice].styles.map { it.face.asSeenBy(vision) }
+            val specials = BlockSpecial.entries.map { it to SPECIAL_STYLES.getValue(it).face.asSeenBy(vision) }
+
+            specials.forEach { (special, face) ->
+                tiers.forEachIndexed { tier, seen ->
+                    val distance = perceptualDistance(face, seen)
+                    assertTrue(
+                        distance >= SpecialSimulatedFloor,
+                        "under $vision, $special and $choice's ${TIER_VALUES[tier]} collapse to " +
+                            "$distance, under $SpecialSimulatedFloor",
+                    )
+                }
+            }
+
+            specials.forEachIndexed { i, (a, faceA) ->
+                specials.drop(i + 1).forEach { (b, faceB) ->
+                    val distance = perceptualDistance(faceA, faceB)
+                    assertTrue(
+                        distance >= SpecialSimulatedFloor,
+                        "under $vision, $a and $b collapse to $distance, under $SpecialSimulatedFloor",
+                    )
+                }
+            }
+        }
+    }
+
     private fun forEachTier(assertion: (BlockPaletteChoice, Int, BlockStyle) -> Unit) {
         BlockPalettes.all.forEach { (choice, palette) ->
             palette.styles.forEachIndexed { tier, style -> assertion(choice, TIER_VALUES[tier], style) }
@@ -214,5 +333,12 @@ class BlockPaletteTest {
         const val SimulatedCollisionFloor = 16f
 
         const val LuminanceSpanFloor = 0.45f
+
+        /**
+         * Below [NeighbourSeparationFloor] on purpose — see
+         * [theSpecialsSurviveEachDeficiency] for why a special is allowed to be
+         * closer than a tier is once the mark is doing the work.
+         */
+        const val SpecialSimulatedFloor = 20f
     }
 }

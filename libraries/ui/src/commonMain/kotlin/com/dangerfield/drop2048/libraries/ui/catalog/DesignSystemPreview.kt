@@ -28,6 +28,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  *   • [ColorPrimaryPreview] — surfaces + text | accents.
  *   • [ColorSupportPreview] — status + borders.
  *   • [BlockTierPreview]    — the eleven block tiers × all five palettes, with measured ΔE.
+ *   • [BlockSpecialPreview] — Wildcard / Bomb / Stone, and how far each sits from the ramps.
+ *   • [HudPreview]          — score, level bar, chain callout, danger ring.
  *   • [TypographyPreview]   — Display + Brand + Heading | Body + Label + Caption.
  *
  * Components don't have a combined preview on purpose — each one (Button, forms, …) has its own
@@ -73,6 +75,30 @@ private fun BlockTierPreview() {
             "Two tiers colliding shows up here as two neighbouring cells in one column.",
     ) {
         BlockTierMatrix()
+    }
+}
+
+@Preview(widthDp = 1600, heightDp = 900)
+@Composable
+private fun BlockSpecialPreview() {
+    CatalogScaffold(
+        title = "Blocks · the three specials",
+        subtitle = "Wildcard, Bomb and Stone. One set for all five palettes, with the measured " +
+            "distance from each to the nearest numeric tier in every one of them.",
+    ) {
+        SpecialBlocks()
+    }
+}
+
+@Preview(widthDp = 1600, heightDp = 1400)
+@Composable
+private fun HudPreview() {
+    CatalogScaffold(
+        title = "HUD",
+        subtitle = "The score, the level bar, the chain callout and the danger ring. Every one of " +
+            "them is holding still here — the catalog shows what they look like, never what they do.",
+    ) {
+        HudPrimitives()
     }
 }
 

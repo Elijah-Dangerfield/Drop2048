@@ -61,6 +61,25 @@ val SansSerifFontFamily: FontFamily
 val DigitFontFamily: FontFamily
     @Composable get() = SansSerifFontFamily
 
+/**
+ * The same size, weight and rhythm as [this], drawn in [DigitFontFamily].
+ *
+ * What lets the score and the level pick a typography token like every other
+ * piece of text while still being drawn in the face numbers are drawn in. The
+ * alternative is a hand-built `TextStyle` at each call site, which is how one of
+ * them ends up in the proportional face and nobody notices until a screenshot.
+ */
+val TypographyResource.digits: TypographyResource
+    @Composable get() = TypographyResource(
+        fontFamily = DigitFontFamily,
+        fontWeight = fontWeight,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        lineBreak = lineBreak,
+        fontStyle = fontStyle,
+        identifier = "$identifier-digits",
+    )
+
 val SerifFontFamily: FontFamily
     @Composable get() = FontFamily(
         Font(
