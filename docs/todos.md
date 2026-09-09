@@ -12,24 +12,42 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
-### The specials' marks need an eyes-on pass at real cell size (C3)
+### The hard-drop block teleports
 
-`StarArmWidth`, `BombRadius`, `FuseReach` and `MarkFraction` in `BlockFace.kt` are reasoned, not
-seen. Nobody has checked whether the drawn star reads as a star or the fuse reads as a bomb at a
-real ~44dp cell. Cheap to retune: four constants in one file.
+It vanishes from its column and reappears locked. `Motion.HardDropMillis` (90ms) exists and
+**nothing uses it**. This is the most-used input in the game and the fix is cheap.
 
-### `CHAIN xN` needs a string resource, and a format decision
+### `FuseReach` could come up ~10%
 
-`ChainCallout` takes its copy as a parameter, because `:libraries:ui` holds no strings. C3 supplies
-it. Note `x2` is not a word that translates the same everywhere, so this is a format decision, not
-just a string.
+The special marks render correctly at real cell size — the star reads, the bomb fuse is legible
+but is the smallest of the three marks. One constant in `BlockFace.kt`.
+
+### Confirm `Cue.Move` does not machine-gun
+
+It fires on every column step, including when the buffered move replays. A fast left-left-left
+could stutter. Needs real audio to judge, so it belongs with C3a.
 
 ### A screenshot-test harness
 
 Everything C2b built holds still under `LocalInspectionMode` **precisely so a capture would work**,
-and no capture harness exists. This is the first chunk where the gap costs something real: the
-score roll, the chain callout, the danger pulse and the three special marks are all unobserved, and
-the catalog page shows what they look like and never what they do.
+and no capture harness exists.
+
+**Two chunks have now asked for this, and C3 quantified it:** a harness would have caught two of
+its three device bugs (the ghost that read as a Stone, the non-modal pause scrim) without a
+90-second build-and-launch cycle. That is the argument, not the coverage.
+
+### Widen `AnimatedStateReadInComposition` to raw `Animatable.value` reads
+
+The rule only catches `by animateFloatAsState`. A raw `Animatable.value` read during composition is
+the same bug with the same 60fps consequence and is not covered. C3's `BoardView` does this
+correctly (reads inside `graphicsLayer`), but the board is now the most animation-dense screen in
+the app and nothing enforces it.
+
+### `AppData.bestScore` must be deleted by C4
+
+C3 added it to get a best score on the stacked-out sheet. SPEC 11 says best score is derived from
+`run_record` and stored nowhere else. **Two numbers that can disagree about the same run is exactly
+the bug that wording guards against.** C3 marked it for deletion in its own KDoc.
 
 ### Wire the real settings into `AppThemeProvider`
 

@@ -10,6 +10,16 @@ deliberate: the loop gets built and proven before anyone has to open an account.
 
 ## Blocking soon
 
+### Xcode toolchain — confirmed needed, and the symptom is not what you would guess
+
+`xcode-select -p` already returns the right path, **but `/var/db/xcode_select_link` does not
+exist**, which is what the iOS Simulator tooling checks. It refuses with "Xcode is installed but
+not selected", so an agent cannot attach, launch, tap or screenshot. C3 fell back to `xcrun simctl`
+plus driving the Simulator window directly — it worked, and it was slow and had to target taps by
+accessibility index rather than coordinate.
+
+Running the command below creates the link. It needs your password, so it is yours.
+
 ### Xcode toolchain
 
 Sodogku hit this and could not run anything on an iOS simulator: `xcode-select` pointed somewhere
@@ -51,6 +61,22 @@ now dead and should be revoked rather than left live:
 - The same two as GitHub Actions secrets
 
 **Keep `DATABASE_URL`.** The Postgres itself is still in use by the config server.
+
+### Install an iPhone SE runtime (optional)
+
+The smallest simulator on this Mac is an iPhone 16e. The 5x8 board ruling gets *stronger* on a
+narrower phone, not weaker, so the conclusion is safe. But the smallest screen the app will ship to
+has still never been looked at.
+
+### Play the first two minutes and confirm C3's read
+
+C3 says levels 1-3 are slack: it reached level 3, ~2.3K, tier 64 in about ninety seconds **without
+ever feeling pressure**, and the timer rather than the player placed most blocks. Its words: the
+first two minutes are a cutscene.
+
+That is the opposite of the failure everyone expects from this genre, and it is a judgement about
+feel, so it wants a second pair of hands before the curve moves. The balance harness is being
+re-run with a clock now to put numbers beside it.
 
 ### Play both control schemes and pick (C3a)
 

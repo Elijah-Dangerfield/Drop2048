@@ -17,7 +17,9 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1b · Merge-position ruling | **DONE** | `3b14046`. Partner's cell (D6), one code path, digest re-pinned |
 | C1a · `tools/balance` | **DONE** | `bc0a4fe`. Table measured and kept. See L18-L21 |
 | C2 · Theme + design system | **DONE** | `e6e95b3` + `546eb04`. All 9 steps |
-| C3 · `:features:game` | **IN PROGRESS** | The "is it fun" gate |
+| C3 · `:features:game` | **DONE** | `f34279c`. Playable on device. 5x8 and the HUD settled (L25) |
+| C1c · Balance with a clock | **IN PROGRESS** | L1-3 drop speed is slack; every C1a number was a ceiling |
+| C4 · Persistence + stats | **IN PROGRESS** | Also deletes `AppData.bestScore` |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
 | C5 · Tutorial | not started | |
@@ -261,6 +263,46 @@ live numbers are directly comparable.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L24 · A failed iOS link reports `** BUILD SUCCEEDED **` and silently runs the previous framework
+
+`:apps:compose:linkDebugFrameworkIosSimulatorArm64` failed twice with a SKIE macro error in its own
+generated Swift (`SkieSwiftCoroutineDispatcher`, "expressions are not allowed at the top level").
+It looks like an Xcode 26 incompatibility and is not. `./gradlew --stop` plus
+`rm -rf apps/compose/build/skie` fixed it immediately.
+
+**The dangerous half:** the run-script phase failure does not fail the xcodebuild, so the app
+installs and runs against the *previously* linked framework. C3 nearly drew the wrong conclusion
+from a 7-row build that was still rendering 8 rows.
+
+**If an iOS behaviour change does not appear on device, check the link task by name in the build
+log before touching the code.** A green xcodebuild is not evidence your Kotlin made it into the
+app.
+
+### L25 · At five columns the board is width-bound, so more rows are nearly free
+
+The mockups drew 7 rows and the case for it was "bigger blocks on a small phone". Measured on a
+simulator: 8 rows drew a ~64pt cell, 7 rows drew ~66pt. The cell size is set by the phone's
+**width** at five columns; the extra row of height just became gutter above and below the stack.
+
+Seven rows costs a full row of danger-state reaction time and buys 3%. **Ruled 5x8**, and the
+argument gets stronger on a narrower phone, not weaker.
+
+This is exactly the class of question that cannot be settled by reasoning, which is why it was
+deferred to the chunk that could run it.
+
+### L26 · "Input during resolution is ignored" is two different games on a device
+
+SPEC 6 conflated *not reaching the engine* with *thrown away*. C3 played three move-move-drop
+sequences and all three blocks went down the middle column: **every input in the beat after a hard
+drop was eaten**, and the game read as dropping inputs rather than enforcing a rule.
+
+The last *sideways* move during a resolution is now buffered and replayed on the next block. Hard
+drop and hold are deliberately **not** buffered, because replaying either acts on a board the
+player has not looked at.
+
+The general lesson: a rule that is correct at the engine boundary can still feel broken at the
+finger. Spec language about input needs to say which of the two it means.
 
 ### L22 · Top-level `val`s initialise in declaration order, and a colour derived from one below it comes out transparent
 
