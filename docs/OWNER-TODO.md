@@ -68,15 +68,22 @@ The smallest simulator on this Mac is an iPhone 16e. The 5x8 board ruling gets *
 narrower phone, not weaker, so the conclusion is safe. But the smallest screen the app will ship to
 has still never been looked at.
 
-### Play the first two minutes and confirm C3's read
+### Play the 500ms opening and rule on the feel
 
-C3 says levels 1-3 are slack: it reached level 3, ~2.3K, tier 64 in about ninety seconds **without
-ever feeling pressure**, and the timer rather than the player placed most blocks. Its words: the
-first two minutes are a cutscene.
+C3 said the first two minutes were a cutscene. C1c measured it and found C3 was **right about the
+symptom and wrong about the cause**: not one block in 600,000 opening drops was placed by the
+timer instead of the player. The problem is dead time waiting for the block to arrive, not a lack
+of pressure.
 
-That is the opposite of the failure everyone expects from this genre, and it is a judgement about
-feel, so it wants a second pair of hands before the curve moves. The balance harness is being
-re-run with a clock now to put numbers beside it.
+The opening curve is now 500ms instead of 700ms. Three candidate curves produced **identical**
+outcomes to the digit — same median level, same tier distribution — so this is a pacing change
+whose measured risk is zero. It cuts level-1 dead time by 28%.
+
+**Nobody has felt it.** It is a feel change justified by a risk measurement, which is exactly the
+kind that needs a human before it ships.
+
+Worth knowing while you play: whether you use the drop control is worth more than every speed-curve
+change combined. Hard-dropping reaches level 4 in 34 seconds; patient play takes 289.
 
 ### Play both control schemes and pick (C3a)
 
@@ -96,6 +103,19 @@ gets more expensive to change after art is final.
 ---
 
 ## Needed before the relevant chunk
+
+### Two telemetry constants that set the size of every balance number
+
+Every clocked balance figure rests on a modelled player who takes 250ms to decide and 120ms
+between taps. **Those are assumptions, not measurements**, and they move the answer as much as the
+clock itself did: Greedy's median level is 21 / 19 / 17 across quick, average and deliberate
+players.
+
+C8 should instrument two things: time from block spawn to first sideways input, and inter-tap
+interval. That converts the whole balance model from reasoned to measured. Noted here rather than
+in the agent queue because it is a decision about what to collect from real people.
+
+**Needed by:** C8.
 
 ### Sentry DSN
 

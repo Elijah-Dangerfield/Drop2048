@@ -18,7 +18,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1a · `tools/balance` | **DONE** | `bc0a4fe`. Table measured and kept. See L18-L21 |
 | C2 · Theme + design system | **DONE** | `e6e95b3` + `546eb04`. All 9 steps |
 | C3 · `:features:game` | **DONE** | `f34279c`. Playable on device. 5x8 and the HUD settled (L25) |
-| C1c · Balance with a clock | **IN PROGRESS** | L1-3 drop speed is slack; every C1a number was a ceiling |
+| C1c · Balance with a clock | **DONE** | `321070a`. 500ms opening (D9). See L27-L31 |
 | C4 · Persistence + stats | **IN PROGRESS** | Also deletes `AppData.bestScore` |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
@@ -227,6 +227,25 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D9 · The opening drop speed is 500ms, and `blocksPerLevel` stays 20
+
+Measured in C1c. The curve for levels 1-8 moves from `700, 620, 550, 490, 430, 380, 340, 300` to
+`500, 470, 440, 410, 380, 350, 325, 300`. Floor, tail step and soft drop unchanged.
+
+**This is a pacing change, not a difficulty change, and the measurement says its risk is zero.**
+Three candidate curves produced outcome columns identical to the digit: same median level, same
+drop count, same 1024 and 2048 rates, same clutter. What it buys is a 28% cut in measured dead
+time at level 1.
+
+`blocksPerLevel` was measured and deliberately **left at 20**. Shortening it to 15 or 12 shortens
+runs and thins the tail past 1024, the rising median is the counter moving rather than the player
+improving, and it **moves the determinism digest** where the curve does not. A first-band-only
+version would need a schedule instead of an integer, which is an engine change to level
+advancement.
+
+Keep `blocksPerLevel` in reserve as the remote knob if live data says runs feel long, but it must
+not move once Daily Challenge scores exist (see the digest policy item in `OWNER-TODO.md`).
+
 ### D7 · "Highest tier" means highest tier *reached during the run*, never on-board-at-end
 
 C1a found SPEC 4.4's "distribution of highest tier at run end" is not answerable literally: **a
@@ -263,6 +282,67 @@ live numbers are directly comparable.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L27 · A player's report of what is wrong is evidence about the symptom, not the cause
+
+C3 played the game and said the early levels were slack because "the timer, not the player, places
+most blocks". C1c measured it: **not one block in 600,000 opening drops was placed against the
+policy's choice.** 0.00% timer-placed at levels 1, 2 and 3.
+
+It is structural. Five columns with a centre spawn puts every cell at most two columns away, which
+a modelled player covers in 370ms against a budget that never drops below ~780ms even at the
+level-35 speed floor. **Time is not one of SPEC 5.5's three pressures at any level.**
+
+And C3 was still right that something was wrong. After deciding, the player waits 4.8 seconds at
+level 1 for the block to arrive. That is dead time, not difficulty — the cutscene is real, the
+mechanism was not what it felt like.
+
+**The general lesson, and it will recur:** take a play report as a true statement about the
+experience and an untrusted statement about the cause. C3 was the only source that could have
+found this, and measurement was the only thing that could have explained it. Neither alone was
+enough.
+
+### L28 · The early speed curve is a pacing dial, not a difficulty dial
+
+Three curves for levels 1-8 (700-start, 600-start, 500-start), 10,000 runs each: median level,
+drop count, 1024 rate, 2048 rate and clutter came out **identical to the digit** across all three.
+
+Only the wall clock moved: level-1 slack 4,808ms → 4,142ms → 3,477ms. Even at 500ms the wait is
+3.5 seconds, because seven rows of fall is seven rows of fall.
+
+Do not reach for the opening curve to change difficulty. It cannot.
+
+### L29 · Whether the player uses hard drop is the biggest lever on the opening, by an order of magnitude
+
+Measured time to reach level 4: **34.4 seconds** for a hard-dropping player, **289 seconds** for a
+patient one, on the same curve. The drop control is worth more than every speed-curve change
+combined.
+
+That makes it a **tutorial** problem, not a tuning problem. SPEC 13's drop 2-4 already introduces
+hard drop; C5 should treat teaching it as load-bearing rather than incidental, because it is the
+difference between a 30-second and a 5-minute opening.
+
+### L30 · The clocked ceiling was real but modest, and Random got *better* with a clock
+
+C1a's unclocked numbers were ceilings (L21). Clocked: Greedy's median level 22 → 19, Lookahead-1's
+25 → 22, 2048 rate down about a third. So L21's direction was right and its size was ~12%.
+
+The surprise: **Random's median went up, 4 → 5.** Not a bug. The columns a block can still be
+steered into are partly the columns with room, because a tall column on the path blocks passage.
+A random player forced to re-pick among reachable columns is a less random player. Do not quote
+clocked Random as SPEC 4.4's floor.
+
+Sensitivity to the player model is comparable to the clock itself (Greedy 21/19/17 across quick,
+average, deliberate), which is why the model's two constants are now a telemetry item.
+
+### L31 · A test can pass by luck at one constant and NPE at another
+
+`GameViewModelTest.softDrop_shortensTheInterval` advanced a whole drop tick while soft-dropping. At
+40ms per row that is twelve rows: the block landed, locked and resolved, so the assertion was
+really about the *next* block. It passed at 700ms by coincidence and crashed at 500ms.
+
+`GameScenario.tick()` advances one drop interval, which is **not a safe unit while soft-dropping**.
+Worth scanning for other tests that advance a full tick and then assert on the falling block.
 
 ### L24 · A failed iOS link reports `** BUILD SUCCEEDED **` and silently runs the previous framework
 

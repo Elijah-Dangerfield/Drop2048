@@ -22,6 +22,27 @@ It vanishes from its column and reappears locked. `Motion.HardDropMillis` (90ms)
 The special marks render correctly at real cell size — the star reads, the bomb fuse is legible
 but is the smallest of the three marks. One constant in `BlockFace.kt`.
 
+### C5: teach hard drop as load-bearing, not incidental
+
+Measured in C1c: time to reach level 4 is **34 seconds** for a hard-dropping player and **289
+seconds** for a patient one, on the same curve. The drop control is worth more than every
+speed-curve change combined (L29).
+
+SPEC 13's drops 2-4 already introduce hard drop. C5 should treat it as the tutorial's most
+important job rather than one of three things it mentions.
+
+### Scan for other tests that advance a full tick and assert on the falling block
+
+`GameScenario.tick()` advances one drop interval, which is not a safe unit while soft-dropping — at
+40ms per row a full tick is twelve rows, so the block lands, locks and resolves. C1c found one such
+test that passed at 700ms by luck and NPE'd at 500ms (L31). There may be others.
+
+### A second metric for permanent obstructions
+
+D8 deferred this. It matters now: Stones start arriving at level 12 and clocked runs regularly
+reach 19-22, so board congestion is real and `clutter` deliberately does not see it. Not a change
+to `clutter` — a second count.
+
 ### Confirm `Cue.Move` does not machine-gun
 
 It fires on every column step, including when the buffered move replays. A fast left-left-left
@@ -88,11 +109,10 @@ final in C7. Keep only if something can actually produce the envelope.
 
 ## Soon
 
-### Re-run `:tools:balance` after C3, with a policy that respects the drop timer
+### Measure hold, which no policy has ever used
 
-Every C1a number is a **ceiling** (learning L21). The harness has no clock, so every policy
-hard-drops into the column it wants at every level, and hold and soft drop are never used. Real
-medians will be lower. The first non-ceiling estimate needs the speed curve in the loop.
+SPEC 5.4's stash is unmeasured, clocked or unclocked. Every balance number in the project assumes
+a player who never holds. It is the last unmodelled mechanic.
 
 ### Measure how often the board-aware cap actually clamps a draw
 
