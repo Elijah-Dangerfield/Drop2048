@@ -388,4 +388,114 @@ class GameViewModelTest : CoroutineTest() {
             assertEquals(Cell(2, 6), state.ghost)
         }
     }
+
+    @Test
+    fun aFreshRun_waitsOnTheStartOverlayAndDoesNotTickUnderIt() = runUnitTest {
+        playing(fallingAt = Cell(2, 0), pressPlay = false) {
+            assertPhase(GamePhase.Ready)
+            tick(times = 3)
+            assertFallingAt(col = 2, row = 0)
+
+            act(GameAction.Start)
+            assertPhase(GamePhase.Playing)
+            tick()
+            assertFallingAt(col = 2, row = 1)
+        }
+    }
+
+    /**
+     * The load-bearing half of decision D11's steering: the target column is
+     * absolute, so asking for the same column twice is idempotent and asking for
+     * the original column undoes the drag exactly.
+     */
+    @Test
+    fun steerTo_movesToTheTargetColumnAndBack() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            act(GameAction.SteerTo(0))
+            assertFallingAt(col = 0, row = 0)
+
+            act(GameAction.SteerTo(0))
+            assertFallingAt(col = 0, row = 0)
+
+            act(GameAction.SteerTo(2))
+            assertFallingAt(col = 2, row = 0)
+        }
+    }
+
+    @Test
+    fun steerTo_clampsToTheBoard() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            act(GameAction.SteerTo(99))
+            assertFallingAt(col = 4, row = 0)
+        }
+    }
+
+    /**
+     * "Blocked by a placed tile at the tile's current row" — the block parks
+     * against the obstruction rather than teleporting past it, which is the same
+     * rule the arrow buttons obey because it is the same engine call.
+     */
+    @Test
+    fun steerTo_stopsAtTheFirstBlockedColumn() = runUnitTest {
+        playing(
+            picture = """
+                .  8  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+                .  .  .  .  .
+            """,
+            fallingAt = Cell(3, 0),
+        ) {
+            act(GameAction.SteerTo(0))
+            assertFallingAt(col = 2, row = 0)
+        }
+    }
+
+    @Test
+    fun steerTo_duringAResolution_isIgnored() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            land()
+            assertPhase(GamePhase.Resolving)
+            act(GameAction.SteerTo(0))
+            assertNull(state.falling)
+        }
+    }
+
+    /**
+     * The downward flick is the ▼ control by another gesture, so it has to be
+     * the same action — the screen maps it to [GameAction.Nudge] rather than to
+     * anything of its own. Asserting that here rather than in a gesture test is
+     * deliberate: the recogniser's thresholds are the handoff's and are pinned in
+     * `GameBoard`, but "a flick advances two rows and does not lock" is a rule.
+     */
+    @Test
+    fun flick_advancesTwoRowsLikeTheNudgeControl() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            act(GameAction.Nudge)
+            assertFallingAt(col = 2, row = 2)
+            assertPhase(GamePhase.Playing)
+        }
+    }
+
+    @Test
+    fun aCascade_raisesACalloutAndBumpsItsNonce() = runUnitTest {
+        playing(
+            picture = """
+                .  .  2  .  .
+                .  .  4  .  .
+            """,
+            falling = NumberBlock(BlockValue.V2),
+            fallingAt = Cell(2, 0),
+        ) {
+            val before = state.calloutNonce
+            land()
+            waitOutResolution()
+            assertEquals(GameCallout.Chain(step = 2), state.callout)
+            assertTrue(state.calloutNonce > before, "expected the callout nonce to move")
+        }
+    }
 }

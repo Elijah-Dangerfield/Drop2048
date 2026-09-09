@@ -5,8 +5,6 @@
     <string name="onboarding_start">Play</string>
 
     <string name="game_score">Score</string>
-    <string name="game_best">Best</string>
-    <string name="game_level">Level %1$d</string>
     <string name="game_pause">Pause</string>
     <string name="game_move_left">Move left</string>
     <string name="game_move_right">Move right</string>
@@ -19,11 +17,28 @@
     <string name="game_falling_block">%1$s falling in column %2$d, landing in row %3$d</string>
 
     <!-- SPEC 8.2. "x2" is a multiplication sign in English and not in every locale,
-         so this is a whole format string rather than a prefix plus a number. -->
-    <string name="game_chain">CHAIN x%1$d</string>
+         so this is a whole format string rather than a prefix plus a number. The
+         same applies to every callout below: they are shouted, uppercase copy and
+         a translator needs the whole line, not a stem to bolt a number onto. -->
+    <string name="game_chain">CHAIN ×%1$d</string>
+    <string name="game_callout_row_bust">ROW BUST!</string>
+    <string name="game_callout_level">LEVEL %1$d</string>
+
+    <!-- SPEC 7 scores these three and the design handoff drew none of them. A
+         payout with nothing on screen to explain it is a payout the player does
+         not connect to what they did. -->
+    <string name="game_callout_detonation">BOOM!</string>
+    <string name="game_callout_wildcard">WILD!</string>
+    <string name="game_callout_board_cleared">SWEPT!</string>
+
+    <string name="game_play">Play</string>
+    <string name="game_start_body">Blocks fall on their own. Slide one under its twin and they double. Hit 2048 and the whole row bursts.</string>
+    <string name="game_tap_to_resume">tap to resume</string>
+    <string name="game_new_best">new best!</string>
+    <string name="game_best_score">best %1$s</string>
+    <string name="game_level_label">Level</string>
 
     <string name="game_paused">Paused</string>
-    <string name="game_resume">Resume</string>
     <string name="game_restart">Restart</string>
     <string name="game_quit">Quit</string>
     <string name="game_left_handed">Left-handed controls</string>

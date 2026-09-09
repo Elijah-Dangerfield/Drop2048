@@ -191,6 +191,15 @@ internal class GameScenario private constructor(
             best: Long = 0,
             config: EngineConfig = EngineConfig.Default,
             resume: SavedRun? = null,
+            /**
+             * Whether to press Play before handing over.
+             *
+             * A fresh run now waits on the start overlay ([GamePhase.Ready]), so
+             * every test about *playing* has to get past it. It is one line here
+             * rather than one line in forty tests, and it is a parameter rather
+             * than unconditional so the overlay itself can be tested.
+             */
+            pressPlay: Boolean = true,
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -213,6 +222,9 @@ internal class GameScenario private constructor(
                 clock = MutableClock(),
             )
             scenario.launch(backgroundScope)
+            if (pressPlay && scenario.state.phase == GamePhase.Ready) {
+                scenario.act(GameAction.Start)
+            }
             return scenario.body()
         }
 

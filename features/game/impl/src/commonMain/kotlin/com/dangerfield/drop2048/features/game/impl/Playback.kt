@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.features.game.impl
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.Board
 import com.dangerfield.drop2048.libraries.cascade.Cell
+import com.dangerfield.drop2048.libraries.cascade.MergeKind
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.ResolutionStep
 import com.dangerfield.drop2048.libraries.cascade.Transcript
@@ -34,7 +35,45 @@ data class PlaybackFrame(
     val chained: Boolean,
     /** The cell the chaining merge landed in, so the callout floats off it. */
     val chainAt: Cell?,
+    /** What the board shouts on this frame, if anything (SPEC 8.2). */
+    val callout: GameCallout?,
 )
+
+/**
+ * The oversized line the board throws up over itself when something worth
+ * noticing happens.
+ *
+ * The handoff draws three of these — `CHAIN ×N`, `ROW BUST!` and `LEVEL N` — and
+ * SPEC 7 scores three more events that it never got told about: a bomb
+ * detonation, a Wildcard resolving, and the board being cleared. **Every one of
+ * those pays points, and a payout with no callout is a payout the player does not
+ * connect to what they did.** The board-cleared bonus is the worst of the three:
+ * it is the rarest thing in the game and, without this, the only evidence of it
+ * is the score having moved more than expected.
+ *
+ * They are a sealed hierarchy rather than strings because `:features:game:impl`
+ * decides *when*, `:libraries:resources` decides *what it says*, and the two
+ * should not meet in a ViewModel.
+ */
+sealed interface GameCallout {
+
+    /** SPEC 8.2, from step 2 upward. Step 1 is a merge, not a chain. */
+    data class Chain(val step: Int) : GameCallout
+
+    /** A 2048 taking its row with it. Outranks everything, including its own chain. */
+    data object RowBust : GameCallout
+
+    /** A Bomb and its four neighbours. */
+    data object Detonation : GameCallout
+
+    /** A Wildcard taking a neighbour's value doubled (SPEC 5.2). */
+    data object Wildcard : GameCallout
+
+    /** The rarest frame in the game (SPEC 7). */
+    data object BoardCleared : GameCallout
+
+    data class LevelUp(val level: Int) : GameCallout
+}
 
 /**
  * The frames a [transcript] plays as, starting from the board [before] the
@@ -61,6 +100,7 @@ fun framesFor(before: Board, scoreBefore: Long, transcript: Transcript): List<Pl
             cue = step.cue(),
             chained = step is ResolutionStep.Merge && step.step >= ChainedFrom,
             chainAt = (step as? ResolutionStep.Merge)?.into?.takeIf { step.step >= ChainedFrom },
+            callout = step.callout(),
         )
     }
     return frames
@@ -103,7 +143,7 @@ private fun Board.settled(step: ResolutionStep.Gravity): Board {
 }
 
 private fun ResolutionStep.holdMillis(): Int = when (this) {
-    is ResolutionStep.Burst -> Motion.BurstMillis
+    is ResolutionStep.Burst -> Motion.RowBurstMillis
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     -> ScoreOnlyMillis
@@ -124,6 +164,35 @@ private fun ResolutionStep.cue(): Cue? = when (this) {
     is ResolutionStep.Gravity,
     is ResolutionStep.Survival,
     is ResolutionStep.BoardCleared,
+    -> null
+}
+
+/**
+ * What this step is worth saying out loud.
+ *
+ * One per frame, so the ordering question the prototype answers with an `if`
+ * chain (`ROW BUST!` beats `CHAIN ×N`) does not arise: a burst and the merge that
+ * caused it are two frames, the burst is the later one, and a later callout
+ * simply replaces the one before it. That is the same precedence the design
+ * wanted, arrived at by the structure rather than by a rule somebody has to
+ * remember to keep.
+ *
+ * A plain step-1 merge says nothing. It already has a pop, a sound and a score
+ * roll, and a callout on every single landing is a callout nobody reads.
+ */
+private fun ResolutionStep.callout(): GameCallout? = when (this) {
+    is ResolutionStep.Merge -> when {
+        kind == MergeKind.WILDCARD -> GameCallout.Wildcard
+        step >= ChainedFrom -> GameCallout.Chain(step)
+        else -> null
+    }
+
+    is ResolutionStep.Detonation -> GameCallout.Detonation
+    is ResolutionStep.Burst -> GameCallout.RowBust
+    is ResolutionStep.BoardCleared -> GameCallout.BoardCleared
+    is ResolutionStep.LevelUp -> GameCallout.LevelUp(level)
+    is ResolutionStep.Gravity,
+    is ResolutionStep.Survival,
     -> null
 }
 

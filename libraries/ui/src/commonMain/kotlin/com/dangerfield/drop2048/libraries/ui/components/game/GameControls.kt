@@ -39,6 +39,14 @@ import com.dangerfield.drop2048.system.typography.FredokaFontFamily
  * The strings are glyphs rather than copy, so they stay here rather than in
  * `:libraries:resources`. The content descriptions are not, which is why they are
  * parameters.
+ *
+ * @param mirrored swaps ◀ and ▶ for the left-handed setting. A reversal rather
+ *   than a second layout, so the two arrangements cannot drift apart and a fourth
+ *   control would only have to be added once.
+ * @param nudgeModifier hangs on the centre button alone, which is the only one
+ *   with a gesture of its own: SPEC 6 puts soft drop on a *hold* of ▼, and the
+ *   press-and-hold recogniser has to live at the call site because it needs the
+ *   feature's two actions and its own timeout.
  */
 @Composable
 fun GameControlRow(
@@ -50,14 +58,28 @@ fun GameControlRow(
     rightDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    mirrored: Boolean = false,
+    nudgeModifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth().widthIn(max = ControlRowMaxWidth),
         horizontalArrangement = Arrangement.spacedBy(ControlGap),
     ) {
-        ControlButton(LeftGlyph, leftDescription, onLeft, enabled, ControlKind.Primary)
-        ControlButton(NudgeGlyph, nudgeDescription, onNudge, enabled, ControlKind.Quiet)
-        ControlButton(RightGlyph, rightDescription, onRight, enabled, ControlKind.Primary)
+        val leading = if (mirrored) RightGlyph to rightDescription else LeftGlyph to leftDescription
+        val trailing = if (mirrored) LeftGlyph to leftDescription else RightGlyph to rightDescription
+        val onLeading = if (mirrored) onRight else onLeft
+        val onTrailing = if (mirrored) onLeft else onRight
+
+        ControlButton(leading.first, leading.second, onLeading, enabled, ControlKind.Primary)
+        ControlButton(
+            glyph = NudgeGlyph,
+            contentDescription = nudgeDescription,
+            onClick = onNudge,
+            enabled = enabled,
+            kind = ControlKind.Quiet,
+            modifier = nudgeModifier,
+        )
+        ControlButton(trailing.first, trailing.second, onTrailing, enabled, ControlKind.Primary)
     }
 }
 
@@ -78,6 +100,7 @@ fun RowScope.ControlButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
     kind: ControlKind = ControlKind.Primary,
+    modifier: Modifier = Modifier,
 ) {
     val quiet = kind == ControlKind.Quiet
     DeepSurface(
@@ -89,7 +112,7 @@ fun RowScope.ControlButton(
         pressedDepth = ControlPressedDepth,
         enabled = enabled,
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .weight(1f)
             .height(ControlHeight)
             .semantics { this.contentDescription = contentDescription },

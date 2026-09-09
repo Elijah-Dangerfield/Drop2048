@@ -17,7 +17,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -29,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.dangerfield.drop2048.libraries.ui.system.LocalLargeNumbers
 import com.dangerfield.drop2048.libraries.ui.system.Motion
 import com.dangerfield.drop2048.libraries.ui.system.chunkyFace
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockMark
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockSpecial
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockStyle
 import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
 import com.dangerfield.drop2048.system.AppTheme
@@ -106,6 +112,92 @@ fun Tile(
             ),
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * One special block (SPEC 5.2): the same face, shadow and highlight a [Tile] has,
+ * with a drawn mark where the numeral would be.
+ *
+ * The mark is **geometry rather than a glyph**, and that is the one decision here
+ * worth defending. A star or a bomb typed as a character is a bet that every font
+ * on every platform the game ships to carries that codepoint, and losing the bet
+ * puts a tofu box in the middle of the board on somebody's device with no error
+ * anywhere. Two rotated bars and a circle cannot fail to render.
+ *
+ * [BlockSpecial.Stone] draws nothing at all, which is not an omission — a Stone is
+ * defined by the absence of a number, and a mark would make it look like a
+ * special that does something.
+ *
+ * @param contentDescription what a screen reader says. Supplied by the caller for
+ *   the same reason [Tile] takes it: this module holds no copy.
+ */
+@Composable
+fun SpecialTile(
+    special: BlockSpecial,
+    modifier: Modifier = Modifier,
+    style: BlockStyle = AppTheme.blocks[special],
+    scale: BoardScale = LocalBoardScale.current,
+    pop: State<Float>? = null,
+    lifted: Boolean = false,
+    contentDescription: String? = null,
+) {
+    val shape = RoundedCornerShape(percent = TileRadiusPercent)
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(scale.cell)
+            .thenIfNotNull(contentDescription) { label ->
+                semantics { this.contentDescription = label }
+            }
+            .thenIfNotNull(pop) { popping ->
+                graphicsLayer {
+                    scaleX = popping.value
+                    scaleY = popping.value
+                }
+            }
+            .thenIf(lifted) { drawBehind { drawLift() } }
+            .background(style.edge, shape)
+            .padding(bottom = scale.tileDepth)
+            .chunkyFace(style.face, shape, GameColors.TopHighlight, scale.tileHighlight),
+    ) {
+        val mark = special.mark
+        if (mark != BlockMark.None) {
+            Box(
+                modifier = Modifier
+                    .size(scale.cell * MarkFraction)
+                    .drawBehind { drawMark(mark, style.ink) },
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawMark(mark: BlockMark, ink: Color) {
+    when (mark) {
+        BlockMark.Star -> repeat(StarArms) { arm ->
+            rotate(degrees = arm * (HalfTurn / StarArms)) {
+                drawRoundRect(
+                    color = ink,
+                    topLeft = Offset(x = (size.width - size.width * StarArmWidth) / 2f, y = 0f),
+                    size = Size(width = size.width * StarArmWidth, height = size.height),
+                    cornerRadius = CornerRadius(size.width * StarArmWidth / 2f),
+                )
+            }
+        }
+
+        BlockMark.Fuse -> {
+            drawCircle(color = ink, radius = size.minDimension * BombRadius, center = center)
+            drawLine(
+                color = ink,
+                start = center + Offset(x = size.width * FuseInset, y = -size.height * BombRadius),
+                end = center + Offset(x = size.width * FuseReach, y = -size.height / 2f),
+                strokeWidth = size.width * FuseWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+
+        BlockMark.None -> Unit
     }
 }
 
@@ -189,3 +281,16 @@ private const val LargeNumberScale = 1.22f
 private const val LiftLayers = 3
 private const val LiftSpread = 0.05f
 private const val LiftDrop = 0.10f
+
+/** How much of the face a special's mark occupies. Roughly where a two-digit numeral sits. */
+private const val MarkFraction = 0.5f
+
+/** Three bars at 60° apart make a six-pointed star, which reads at cell size. Four does not. */
+private const val StarArms = 3
+private const val HalfTurn = 180f
+private const val StarArmWidth = 0.26f
+
+private const val BombRadius = 0.34f
+private const val FuseInset = 0.16f
+private const val FuseReach = 0.34f
+private const val FuseWidth = 0.11f

@@ -14,7 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.libraries.ui.components.LevelProgressBar
-import com.dangerfield.drop2048.libraries.ui.components.board.BlockFace
+import com.dangerfield.drop2048.libraries.ui.components.game.BoardScale
+import com.dangerfield.drop2048.libraries.ui.components.game.SpecialTile
 import com.dangerfield.drop2048.libraries.ui.components.game.ChainCallout
 import com.dangerfield.drop2048.libraries.ui.components.game.ScoreCounter
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
@@ -154,7 +155,7 @@ private fun SpecialRow(special: BlockSpecial) {
             horizontalArrangement = Arrangement.spacedBy(Dimension.D400),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BlockFace(special = special, size = SwatchSize)
+            SpecialTile(special = special, scale = SwatchScale)
             Text(text = special.name, typography = AppTheme.typography.Label.L500)
         }
         val style = SPECIAL_STYLES.getValue(special)
@@ -186,7 +187,7 @@ private fun Float.oneDecimal(): String {
 
 private val SpecialColumnWidth = 180.dp
 private val MeasureColumnWidth = 110.dp
-private val SwatchSize = 56.dp
+private val SwatchScale = BoardScale(em = 16.dp, cell = 56.dp)
 private val BarWidth = 260.dp
 private val DangerWidth = 220.dp
 private val DangerHeight = 64.dp

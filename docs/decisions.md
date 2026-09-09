@@ -6,6 +6,80 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — C3b's five rulings on the parts of the game screen the handoff never drew
+
+The design handoff is a 5x7 board with no special blocks, so it has nothing to say
+about four of the states this game can actually be in. C2c found them while
+building the components and left them open. Ruled here, with the argument, because
+each one is a promise the screen makes to the player.
+
+**1. The danger ring keeps its "row 1" threshold at 5x8, unchanged.** L25 bought a
+row of warning by going from 7 rows to 8, and the tempting move was to spend it by
+arming the ring a row lower. It is not spent, and the reason is that the threshold
+is not a distance measurement. Row 0 occupied after a resolution *is* the end of
+the run (SPEC 3.1), so anything resting in row 1 means the next block that lands
+there without merging ends the game. That is the same sentence on a 7-row board
+and on a 12-row one — the threshold is defined by the death rule, not by the board
+height. The extra row is spent where it was earned: the player now gets one more
+drop's worth of reaction time *after* the ring turns red, which is the thing that
+was in short supply. It also costs nothing to leave alone: the engine already
+computes `inDanger` as `isRowOccupied(1)` and the screen only reads it.
+
+**2. A Stone's landing preview is always plain.** A Stone has no value and never
+merges. A bright ghost on a Stone would be a lie the first time a player saw one,
+and the first time is the time they are learning what a Stone is.
+
+**3. A Wildcard's bright cell is the neighbour, not the landing cell.** SPEC 5.2
+has the Wildcard take a neighbour's value doubled, so the cell that *changes* is
+the neighbour's, and the question the player is asking is which of up to four
+neighbours it will pick. Marking the landing cell answers a question nobody asked.
+The label stays `×2` because the neighbour doubles. The landing cell keeps a plain
+outline so the block's own destination is still visible.
+
+**4. A Bomb outlines all five cells and labels none of them.** The footprint is the
+message. A `×5` in the middle would read as a multiplier, which is what every
+other mark on this board means, and a bomb multiplies nothing. Only *occupied*
+neighbours are outlined: an empty cell does not visibly clear and scores nothing
+(SPEC 18.4), so outlining it promises a bang that does not happen.
+
+**5. Three callouts are added to the handoff's three.** It draws `CHAIN ×N`,
+`ROW BUST!` and `LEVEL N`. SPEC 7 also pays for bomb detonations, Wildcard
+resolutions and a cleared board, and a payout with nothing on screen to explain it
+is a payout the player does not connect to what they did. They are `BOOM!`,
+`WILD!` and `SWEPT!`. The board-cleared bonus is the strongest case of the three:
+it is the rarest frame in the game and its only other evidence is the score having
+moved more than expected.
+
+Precedence between callouts is structural rather than a rule anybody has to
+remember: one per playback frame, and a later frame's callout replaces the one
+before it. A burst is a later frame than the merge that caused it, so `ROW BUST!`
+beats `CHAIN ×N` without an `if`.
+
+---
+
+## 2026-09-09 — The board is bounded by height as well as by width
+
+The handoff hardcodes `max-width: 370px` on a board with a 5/7 aspect ratio. This
+game is 5x8 (SPEC 3, measured on a device in C3), which is a whole row taller for
+the same width, and the handoff's `flex: 1; min-height: 8px` spacer is the only
+thing absorbing the difference. On a 360x640 frame it collapses to its minimum and
+then keeps going, taking the control row off the bottom of the screen.
+
+**Decision:** the board takes the smallest of the available width, 370dp, and the
+width whose 5x8 height fits the space it was given. The flex spacer is whatever is
+left, which is the handoff's *intent* — push the controls into thumb reach —
+rather than its arithmetic.
+
+**Alternatives:** cap the board's height and letterbox it (leaves a gutter that
+looks like a layout bug), or scroll the screen (a game screen that scrolls under a
+drag gesture is unusable). Neither is better and both are more code.
+
+This is now pinned by a golden captured at 360x640 rather than at a generous
+device size, deliberately: a screenshot taken on a tall phone agrees with the
+design and disagrees with the player.
+
+---
+
 ## 2026-09-09 — The cheating policy stays, and the cheat moves onto the instrument
 
 **Decision:** `Policy.Lookahead1` keeps reading the next block it cannot see, and

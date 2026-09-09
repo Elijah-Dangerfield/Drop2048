@@ -127,24 +127,6 @@ object Motion {
 
     /** How far a pressed element scales down. Matches `bounceClick`'s default. */
     const val PressScale: Float = 0.90f
-
-    /**
-     * A tile travelling between cells under gravity, as a spring.
-     *
-     * Superseded by [StepDownMillis] and [GravitySettleMillis], which are what
-     * the design specifies and what any new code should use. It is still here
-     * because `:features:game:impl` animates the board with it and that module is
-     * being restyled in a separate chunk; deleting the token now would break a
-     * build another agent is in the middle of. Delete it when the game screen
-     * lands on the design.
-     */
-    val Fall: FiniteAnimationSpec<Float> = spring(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMedium,
-    )
-
-    /** Superseded by [RowBurstMillis]. Kept for the same reason as [Fall]. */
-    const val BurstMillis: Int = RowBurstMillis
 }
 
 /**

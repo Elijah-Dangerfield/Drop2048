@@ -10,7 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.dangerfield.drop2048.libraries.ui.components.board.BlockFace
+import com.dangerfield.drop2048.libraries.ui.components.game.BoardScale
+import com.dangerfield.drop2048.libraries.ui.components.game.Tile
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockPalette
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
@@ -84,7 +85,7 @@ private fun MatrixRow(tier: Int, value: Int) {
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.spacedBy(Dimension.D100),
             ) {
-                BlockFace(value = value, size = SwatchSize, style = palette.styles[tier])
+                Tile(value = value, style = palette.styles[tier], scale = SwatchScale)
                 MatrixLabel(palette.deltaToPrevious(tier), SwatchColumnWidth)
             }
         }
@@ -137,4 +138,4 @@ private fun Float.oneDecimal(): String {
 private val TierColumnWidth = 56.dp
 private val SwatchColumnWidth = 84.dp
 private val NumberColumnWidth = 84.dp
-private val SwatchSize = 60.dp
+private val SwatchScale = BoardScale(em = 17.dp, cell = 60.dp)

@@ -98,6 +98,16 @@ class GameViewModel(
     /** Epoch millis the current stretch of play began, null while not playing. */
     private var playingSince: Long? = null
 
+    /**
+     * The best score as it stood **before** this run, which is the only number
+     * that can answer "did they beat it".
+     *
+     * `GameUiState.best` cannot: it is `maxOf(best, score)` on every publish, so
+     * it has already absorbed the live score and is equal to it by the time the
+     * run ends. Comparing against that would light "new best!" on every run.
+     */
+    private var bestBeforeRun: Long = 0
+
     private var frames: List<PlaybackFrame> = emptyList()
     private var frameIndex: Int = 0
 
@@ -155,10 +165,12 @@ class GameViewModel(
     override suspend fun handleAction(action: GameAction) {
         when (action) {
             GameAction.Enter -> action.enter()
+            GameAction.Start -> action.start()
             GameAction.Tick -> action.tick()
             GameAction.LockNow -> action.lockNow()
             GameAction.MoveLeft -> action.move(Input.MoveLeft)
             GameAction.MoveRight -> action.move(Input.MoveRight)
+            is GameAction.SteerTo -> action.steerTo(action.col)
             GameAction.Nudge -> action.nudge()
             GameAction.SoftDropStart -> action.softDrop(on = true)
             GameAction.SoftDropEnd -> action.softDrop(on = false)
@@ -186,6 +198,7 @@ class GameViewModel(
         val cached = Catching { appCache.get() }.logOnFailure { "Could not read app data" }.getOrNull()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }.getOrNull()
         val saved = savedRunStore.load()?.takeUnless { it.state.isOver }
+        bestBeforeRun = best ?: 0
 
         if (saved != null) {
             started = StartedRun(state = saved.state, seed = saved.seed, mode = saved.mode)
@@ -205,12 +218,39 @@ class GameViewModel(
         }
 
         val resolution = saved?.resolution
-        if (resolution != null) {
-            restoreResolution(resolution)
-        } else {
-            beginPlaying()
-            if (saved == null) saveRun()
+        when {
+            resolution != null -> restoreResolution(resolution)
+
+            saved != null -> {
+                updateState { it.copy(phase = GamePhase.Playing) }
+                beginPlaying()
+            }
+
+            else -> {
+                updateState { it.copy(phase = GamePhase.Ready) }
+                saveRun()
+            }
         }
+    }
+
+    /**
+     * The Play button on the start overlay.
+     *
+     * A brand-new run waits here rather than starting under the overlay, and that
+     * is the shape L32 cost this project once already: a phase-less state copy
+     * left a real run playing, invisible, behind a scrim that is a genuine input
+     * barrier. A run that has not started has no ticker, so there is nothing to
+     * play underneath.
+     *
+     * A **resumed** run never sees this. The player already pressed Play; asking
+     * them to press it again to get back to the board they were killed out of is
+     * the app admitting it lost their place.
+     */
+    private suspend fun GameAction.start() {
+        if (state.phase != GamePhase.Ready) return
+        sendEvent(GameEffect.Play(Cue.UiTap))
+        updateState { it.copy(phase = GamePhase.Playing) }
+        beginPlaying()
     }
 
     /**
@@ -331,6 +371,51 @@ class GameViewModel(
     }
 
     /**
+     * Drag steering (decision D11): put the block in column [col] if it can get
+     * there.
+     *
+     * **Absolute, not incremental, and the difference is the whole feel.** The
+     * screen records the pointer's x and the block's column on the way down and
+     * asks for `startCol + round(dx / cellWidth)` on every move, so the block
+     * tracks the finger's *position* rather than accumulating its deltas. An
+     * incremental scheme drifts: a drag out and back leaves the block somewhere
+     * other than where it started, and the player learns not to trust it.
+     *
+     * The travel is one engine step at a time and stops at the first refusal,
+     * which is how "blocked by a placed tile at the block's current row" arrives
+     * without this class knowing what a board is. `Input.MoveLeft` already
+     * rejects a move into an occupied cell, so a drag across a column with
+     * something in it parks against it rather than teleporting past — the same
+     * rule the arrow buttons obey, because it is literally the same call.
+     *
+     * Loop-bounded by the column count rather than by `while (col != target)`: a
+     * rejection already breaks, but a bound means a future engine that rejects
+     * *and* moves cannot hang the action channel.
+     */
+    private suspend fun GameAction.steerTo(col: Int) {
+        if (state.phase != GamePhase.Playing) return
+        val target = col.coerceIn(0, engine.board.cols - 1)
+        var moved = false
+        var steps = 0
+        while (steps++ < engine.board.cols) {
+            val current = engine.falling?.cell?.col ?: break
+            if (current == target) break
+            val input = if (target > current) Input.MoveRight else Input.MoveLeft
+            val transition = Cascade.apply(engine, input)
+            if (transition.isRejected) break
+            engine = transition.state
+            moved = true
+        }
+        if (!moved) return
+        sendEvent(GameEffect.Play(Cue.Move))
+        updateState { it.published() }
+        if (lockPending && !lockResetUsed) {
+            lockResetUsed = true
+            scheduleLock()
+        }
+    }
+
+    /**
      * The ▼ control and the downward flick (decision D11).
      *
      * Two rows and no lock, so unlike the hard drop it replaced this does **not**
@@ -417,7 +502,15 @@ class GameViewModel(
         bufferedMove = null
         playingSince = null
         beginRun()
-        updateState { it.copy(phase = GamePhase.Playing).published() }
+        updateState {
+            it.copy(
+                phase = GamePhase.Playing,
+                callout = null,
+                newBest = false,
+                chainStep = 0,
+                chainCell = null,
+            ).published()
+        }
         saveRun()
         beginPlaying()
     }
@@ -440,6 +533,8 @@ class GameViewModel(
                 chainStep = if (frame.chained) frame.cascadeStep else it.chainStep,
                 chainCell = frame.chainAt ?: it.chainCell,
                 chainNonce = if (frame.chained) it.chainNonce + 1 else it.chainNonce,
+                callout = frame.callout ?: it.callout,
+                calloutNonce = if (frame.callout != null) it.calloutNonce + 1 else it.calloutNonce,
             )
         }
     }
@@ -507,8 +602,10 @@ class GameViewModel(
                 phase = GamePhase.StackedOut,
                 falling = null,
                 ghost = null,
+                newBest = score > 0 && score > bestBeforeRun,
             )
         }
+        bestBeforeRun = best
     }
 
     private suspend fun GameAction.lock() {
@@ -700,7 +797,11 @@ class GameViewModel(
     }
 }
 
-enum class GamePhase { Playing, Resolving, Paused, StackedOut }
+/**
+ * [Ready] is the handoff's start overlay, and it exists only for a run that has
+ * not begun. A resumed run skips it — see `GameViewModel.start`.
+ */
+enum class GamePhase { Ready, Playing, Resolving, Paused, StackedOut }
 
 /**
  * Everything on screen, and nothing the engine would call state.
@@ -720,7 +821,7 @@ data class GameUiState(
     val level: Int = 1,
     val levelFraction: Float = 0f,
     val inDanger: Boolean = false,
-    val phase: GamePhase = GamePhase.Playing,
+    val phase: GamePhase = GamePhase.Ready,
     /** The cascade step the last chain reached, 0 when nothing has chained. */
     val chainStep: Int = 0,
     /** Where the chaining merge landed, so the callout floats off it (SPEC 8.2). */
@@ -728,7 +829,20 @@ data class GameUiState(
 
     /** Bumped per chain so a second `CHAIN x3` in a run still animates. */
     val chainNonce: Int = 0,
+
+    /** The line the board is currently shouting over itself, if any. */
+    val callout: GameCallout? = null,
+
+    /**
+     * Bumped per callout, for the same reason [chainNonce] is: two `ROW BUST!`s
+     * in a run are the same string, and a toast keyed on its own text would play
+     * once and then go quiet for the rest of the game.
+     */
+    val calloutNonce: Int = 0,
     val biggestTier: Int = 0,
+
+    /** Whether the run that just ended beat the score it started under. */
+    val newBest: Boolean = false,
     val leftHanded: Boolean = false,
     val ghostEnabled: Boolean = true,
 )
@@ -745,10 +859,23 @@ sealed interface GameEffect {
 
 sealed interface GameAction {
     data object Enter : GameAction
+
+    /** Play, from the start overlay. Only a [GamePhase.Ready] run answers it. */
+    data object Start : GameAction
     data object Tick : GameAction
     data object LockNow : GameAction
     data object MoveLeft : GameAction
     data object MoveRight : GameAction
+
+    /**
+     * Drag steering (decision D11): the column the finger is currently over.
+     *
+     * Absolute rather than a delta, because the screen computes it as
+     * `startCol + round(dx / cellWidth)` from the grab point. Sending deltas
+     * instead would make the ViewModel accumulate rounding error the screen has
+     * already avoided.
+     */
+    data class SteerTo(val col: Int) : GameAction
 
     /** ▼, or a downward flick. Two rows of fall (decision D11). */
     data object Nudge : GameAction

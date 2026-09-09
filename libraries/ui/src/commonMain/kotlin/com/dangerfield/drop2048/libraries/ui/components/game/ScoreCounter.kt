@@ -13,8 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.text.TextStyle
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
-import com.dangerfield.drop2048.libraries.ui.components.text.Text
+import com.dangerfield.drop2048.libraries.ui.components.text.toStyle
 import com.dangerfield.drop2048.libraries.ui.system.LocalReduceMotion
 import com.dangerfield.drop2048.libraries.ui.system.color.ColorResource
 import com.dangerfield.drop2048.system.AppTheme
@@ -40,10 +41,11 @@ import kotlin.math.roundToInt
  * `ScoreCounterTest` pins the shape rather than the constants so a tuning pass
  * can move the floor and the slope without rewriting it.
  *
- * Drawn in [TypographyResource.digits] and not negotiable at the call site. Until
- * the game has a face with tabular figures the digits are different widths, so a
- * score rolling from 1111 to 2222 visibly wobbles — routing every number through
- * one token is what keeps fixing that a one-line change.
+ * Drawn in [TypographyResource.digits] and not negotiable at the call site, and
+ * laid out in [FixedWidthDigits] so the roll does not change the number's width
+ * while it runs (decision D15). Fredoka's figures are proportional and its `1` is
+ * 49% narrower than its `2`, so without the slots the most prominent number in
+ * the game visibly wobbles every time it counts.
  */
 @Composable
 fun ScoreCounter(
@@ -71,6 +73,44 @@ fun ScoreCounter(
      * *about*, so it stays exact.
      */
     abbreviated: Boolean = false,
+    grouped: Boolean = false,
+) {
+    ScoreCounter(
+        score = score,
+        style = typography.digits.toStyle(color, textDecoration = null, textAlign = null),
+        modifier = modifier,
+        countFrom = countFrom,
+        abbreviated = abbreviated,
+        grouped = grouped,
+    )
+}
+
+/**
+ * The same counter against a raw [style].
+ *
+ * The game screen's header is drawn from [com.dangerfield.drop2048.libraries.ui.system.color.GameColors]
+ * and a bundled face rather than from the template's role-based tokens, so it has
+ * a `TextStyle` and no `TypographyResource` to hand. Giving it this overload is
+ * cheaper than giving `GameColors` a parallel set of colour resources it has no
+ * other use for.
+ */
+@Composable
+fun ScoreCounter(
+    score: Int,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    countFrom: Int = score,
+    abbreviated: Boolean = false,
+    /**
+     * Thousands separators, which the handoff's header asks for.
+     *
+     * A plain `,` rather than the platform's locale separator. Kotlin common has
+     * no number formatter, and the alternatives are an `expect`/`actual` pair on
+     * every target or a dependency, both of which are a lot of machinery for a
+     * character. Written down here so the day it matters it is a known gap rather
+     * than an oversight — see `OWNER-TODO`.
+     */
+    grouped: Boolean = false,
 ) {
     val still = LocalReduceMotion.current || LocalInspectionMode.current
     var displayed by remember { mutableIntStateOf(if (still) score else countFrom) }
@@ -89,13 +129,34 @@ fun ScoreCounter(
         displayed = score
     }
 
-    Text(
-        text = if (abbreviated) abbreviateScore(displayed) else displayed.toString(),
-        typography = typography.digits,
-        color = color,
+    FixedWidthDigits(
+        text = when {
+            abbreviated -> abbreviateScore(displayed)
+            grouped -> groupThousands(displayed)
+            else -> displayed.toString()
+        },
+        style = style,
         modifier = modifier,
     )
 }
+
+/**
+ * `130450` as `130,450`.
+ *
+ * Public because the header's `best` line is a static number rather than a
+ * counter and still has to be grouped the same way. Two implementations of
+ * "put commas in a number" is how one of them ends up with a different rule.
+ */
+fun groupThousands(value: Int): String {
+    val digits = value.toString()
+    if (digits.length <= GroupSize) return digits
+    return digits.reversed()
+        .chunked(GroupSize)
+        .joinToString(",")
+        .reversed()
+}
+
+private const val GroupSize = 3
 
 /**
  * A score short enough to sit in a header: `845`, `1.2K`, `130.5K`, `1.2M`.

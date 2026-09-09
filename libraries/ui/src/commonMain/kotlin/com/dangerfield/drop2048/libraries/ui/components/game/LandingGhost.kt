@@ -41,15 +41,18 @@ import com.dangerfield.drop2048.system.typography.DigitFontFamily
  * @param willMerge which of the two states to draw.
  * @param label the mark on a will-merge ghost. Defaulted rather than hardcoded
  *   because `×2` is a symbol rather than copy — it needs no translation, but a
- *   caller that wants `×4` for a three-way touch should be able to say so
- *   without a second component.
+ *   caller that wants `×4` for a doubled Wildcard should be able to say so
+ *   without a second component. **Null draws the bright state with nothing in
+ *   it**, which is what a multi-cell preview wants: a Bomb's landing outlines
+ *   five cells, and five copies of the same mark would read as five separate
+ *   promises rather than as one footprint.
  */
 @Composable
 fun LandingGhost(
     willMerge: Boolean,
     modifier: Modifier = Modifier,
     scale: BoardScale = LocalBoardScale.current,
-    label: String = MergeLabel,
+    label: String? = MergeLabel,
 ) {
     val pulse = rememberLoopingFloat(
         initialValue = RestingOpacity,
@@ -82,7 +85,7 @@ fun LandingGhost(
                 drawDashedOutline(stroke, radius, scale.ghostStroke.toPx())
             },
     ) {
-        if (willMerge) {
+        if (willMerge && label != null) {
             BasicText(
                 text = label,
                 style = TextStyle(
