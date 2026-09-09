@@ -57,6 +57,7 @@ import drop2048.libraries.resources.generated.resources.game_restart
 import drop2048.libraries.resources.generated.resources.game_resume
 import drop2048.libraries.resources.generated.resources.game_score
 import drop2048.libraries.resources.generated.resources.game_stacked_out
+import drop2048.libraries.resources.generated.resources.game_stats
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -233,6 +234,13 @@ private fun StackedOutSheet(state: GameUiState, onAction: (GameAction) -> Unit) 
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(Res.string.game_drop_again))
+        }
+        VerticalSpacerD500()
+        ButtonGhost(
+            onClick = { onAction(GameAction.ShowStats) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(Res.string.game_stats))
         }
         VerticalSpacerD500()
         Row(horizontalArrangement = Arrangement.spacedBy(Dimension.D200)) {

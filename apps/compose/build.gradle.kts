@@ -91,6 +91,8 @@ kotlin {
             implementation(projects.libraries.config)
             implementation(projects.libraries.config.impl)
             implementation(projects.libraries.drop2048.storage)
+            implementation(projects.libraries.progress)
+            implementation(projects.libraries.progress.impl)
             implementation(projects.libraries.networking)
             implementation(projects.libraries.networking.impl)
             implementation(projects.libraries.telemetry.impl)
@@ -101,6 +103,8 @@ kotlin {
             implementation(projects.features.home.impl)
             implementation(projects.features.onboarding)
             implementation(projects.features.onboarding.impl)
+            implementation(projects.features.stats)
+            implementation(projects.features.stats.impl)
 
             implementation(libs.atomicfu)
             

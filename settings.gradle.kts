@@ -73,6 +73,8 @@ if (!serverOnly) {
     include(":features:home:impl")
     include(":features:onboarding")
     include(":features:onboarding:impl")
+    include(":features:stats")
+    include(":features:stats:impl")
 
     // Libraries
     // The game engine. Zero project dependencies on purpose (SPEC 4.1) — it is a
@@ -87,6 +89,10 @@ if (!serverOnly) {
     include(":libraries:navigation:impl")
     include(":libraries:networking")
     include(":libraries:networking:impl")
+    // One row per completed run (SPEC 11), and every stat in SPEC 15 folded out
+    // of that table. The only place a best score is allowed to come from.
+    include(":libraries:progress")
+    include(":libraries:progress:impl")
     include(":libraries:resources")
     include(":libraries:review")
     include(":libraries:review:impl")

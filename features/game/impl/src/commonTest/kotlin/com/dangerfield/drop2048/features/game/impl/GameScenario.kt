@@ -13,9 +13,18 @@ import com.dangerfield.drop2048.libraries.cascade.Special
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
 import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.drop2048.AppData
+import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
+import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
+import com.dangerfield.drop2048.libraries.progress.GameMode
+import com.dangerfield.drop2048.libraries.progress.ProgressRepository
+import com.dangerfield.drop2048.libraries.progress.RunRecord
+import com.dangerfield.drop2048.libraries.progress.RunStats
+import com.dangerfield.drop2048.libraries.progress.statsFrom
 import com.dangerfield.drop2048.libraries.ui.system.Cue
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +52,10 @@ internal class GameScenario private constructor(
     private val scope: TestScope,
     private val start: GameState,
     val cache: FakeAppCache,
+    val progress: FakeProgressRepository,
+    val savedRuns: FakeSavedRunStore,
+    val lifecycle: FakeAppLifecycle,
+    val clock: MutableClock,
 ) {
     val cues = mutableListOf<Cue>()
     val effects = mutableListOf<GameEffect>()
@@ -53,9 +66,16 @@ internal class GameScenario private constructor(
     val state: GameUiState get() = viewModel.state
 
     private fun launch(collectorScope: CoroutineScope) {
-        viewModel = GameViewModel(runFactory = object : RunFactory {
-            override fun newRun(): GameState = start
-        }, appCache = cache)
+        viewModel = GameViewModel(
+            runFactory = object : RunFactory {
+                override fun newRun() = StartedRun(state = start, seed = SCENARIO_SEED, mode = GameMode.ENDLESS)
+            },
+            appCache = cache,
+            savedRunStore = savedRuns,
+            progress = progress,
+            clock = clock,
+            appLifecycle = lifecycle,
+        )
         collectorScope.launch {
             viewModel.eventFlow.collect { effect ->
                 effects += effect
@@ -116,6 +136,12 @@ internal class GameScenario private constructor(
         assertEquals(Cell(col, row), falling.cell, "falling cell")
     }
 
+    /** Backgrounding, which SPEC 8.4 auto-pauses and SPEC 18.9 snapshots. */
+    fun background() {
+        lifecycle.background()
+        scope.runCurrent()
+    }
+
     companion object {
         const val LockDelayMillis = 150L
 
@@ -133,7 +159,7 @@ internal class GameScenario private constructor(
          * the bottom of the stack.
          */
         @Suppress("LongParameterList")
-        fun TestScope.playing(
+        fun <T> TestScope.playing(
             picture: String = "",
             falling: Block? = NumberBlock(BlockValue.V2),
             fallingAt: Cell = Cell(2, 0),
@@ -142,8 +168,9 @@ internal class GameScenario private constructor(
             blocksDropped: Int = 0,
             best: Long = 0,
             config: EngineConfig = EngineConfig.Default,
-            body: GameScenario.() -> Unit,
-        ) {
+            resume: SavedRun? = null,
+            body: GameScenario.() -> T,
+        ): T {
             val board = boardOf(picture, config.cols, config.rows)
             val start = GameState(
                 config = config,
@@ -155,12 +182,20 @@ internal class GameScenario private constructor(
                 blocksDropped = blocksDropped,
                 drawsMade = config.specialSuppressedDraws,
             )
-            val scenario = GameScenario(this, start, FakeAppCache(AppData(bestScore = best)))
+            val scenario = GameScenario(
+                scope = this,
+                start = start,
+                cache = FakeAppCache(),
+                progress = FakeProgressRepository(best = best),
+                savedRuns = FakeSavedRunStore(resume),
+                lifecycle = FakeAppLifecycle(),
+                clock = MutableClock(),
+            )
             scenario.launch(backgroundScope)
-            scenario.body()
+            return scenario.body()
         }
 
-        private const val SCENARIO_SEED = 20_480L
+        internal const val SCENARIO_SEED = 20_480L
     }
 }
 
@@ -217,7 +252,70 @@ internal class FakeAppCache(initial: AppData = AppData()) : AppCache {
     }
 }
 
-/** The best score as it was actually written to disk, read outside the test scheduler. */
-internal fun GameScenario.persistedBest(): Long = cache.bestScoreNow
+/** The run history as it stands, read outside the test scheduler. */
+internal fun GameScenario.recordedRuns(): List<RunRecord> = progress.recorded.toList()
 
-internal val FakeAppCache.bestScoreNow: Long get() = snapshot.bestScore
+/** What would be restored if the process died right now. */
+internal fun GameScenario.savedRun(): SavedRun? = savedRuns.stored
+
+internal class FakeProgressRepository(best: Long = 0) : ProgressRepository {
+    val recorded = mutableListOf<RunRecord>()
+    private val seededBest = best
+
+    override suspend fun record(run: RunRecord) {
+        recorded += run
+    }
+
+    override fun observeStats(): Flow<RunStats> = MutableStateFlow(statsFrom(recorded))
+
+    override suspend fun bestScore(): Long = maxOf(seededBest, recorded.maxOfOrNull { it.score } ?: 0)
+}
+
+/**
+ * The saved run, in memory. `stored` is read directly rather than through
+ * [load] so a test can assert what the process would have found on disk without
+ * having to be inside a coroutine.
+ */
+internal class FakeSavedRunStore(initial: SavedRun? = null) : SavedRunStore {
+    var stored: SavedRun? = initial
+        private set
+
+    override suspend fun load(): SavedRun? = stored
+
+    override suspend fun save(run: SavedRun) {
+        stored = run
+    }
+
+    override suspend fun clear() {
+        stored = null
+    }
+}
+
+internal class FakeAppLifecycle : AppLifecycle {
+    private val observers = mutableListOf<AppLifecycleObserver>()
+
+    override fun addObserver(observer: AppLifecycleObserver) {
+        observers += observer
+    }
+
+    override fun removeObserver(observer: AppLifecycleObserver) {
+        observers -= observer
+    }
+
+    fun background() = observers.toList().forEach { it.onEnterBackground() }
+}
+
+/**
+ * Wall time the test moves by hand.
+ *
+ * The virtual scheduler advances `delay`, not the clock, so a duration measured
+ * against `Clock.System` in a test would be zero. Advancing this in the same
+ * units keeps `run_record.durationMs` assertable.
+ */
+internal class MutableClock(private var millis: Long = 0) : Clock {
+    override fun now(): Instant = Instant.fromEpochMilliseconds(millis)
+
+    fun advance(by: Long) {
+        millis += by
+    }
+}

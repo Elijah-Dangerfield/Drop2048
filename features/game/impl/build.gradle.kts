@@ -10,10 +10,12 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.features.game)
+            implementation(projects.features.stats)
             implementation(projects.libraries.navigation)
 
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
+            implementation(projects.libraries.progress)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
             implementation(projects.libraries.resources)
@@ -31,6 +33,7 @@ kotlin {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
+            implementation(projects.libraries.progress)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.ui)
         }

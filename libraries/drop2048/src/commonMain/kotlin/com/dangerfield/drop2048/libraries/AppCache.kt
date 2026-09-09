@@ -41,15 +41,24 @@ data class AppData(
     val lastReviewPromptAt: Long = 0L,
 
     /**
-     * Best score across every run on this device.
+     * The run in progress, serialized (SPEC 11).
      *
-     * SPEC 11 derives this from `run_record` and calls that the one source of
-     * truth. That table arrives in C4; until it does the HUD still has to draw a
-     * BEST, and a field here is the smallest thing that works. **C4 deletes it**
-     * and reads the max from the table instead — leaving both would be two
-     * numbers that can disagree about the same run.
+     * Here rather than in Room because it is one value, it is overwritten
+     * constantly, and it is worthless the moment the run ends. Because the
+     * engine is a pure function of state and a seed (SPEC 4.1), resuming is
+     * deserializing one object.
+     *
+     * A **string**, not a typed field, for two reasons that both point the same
+     * way. The shape belongs to `:features:game:impl` — it holds a `GameState`
+     * and a playback snapshot, and typing it here would drag the engine into the
+     * app-wide cache and make this module depend on a feature's private format.
+     * More importantly it isolates the blast radius: the engine's serial shape
+     * changes every chunk, and a nested field that fails to decode takes the
+     * whole of `AppData` with it, losing the install id and the onboarding flag
+     * over an abandoned run. A string decodes on its own, and a failure is
+     * "no saved run" instead.
      */
-    val bestScore: Long = 0L,
+    val savedRun: String? = null,
 
     /** SPEC 6's left-handed mirror. Moves to the settings screen in C11. */
     val leftHandedControls: Boolean = false,

@@ -2,6 +2,7 @@ package com.dangerfield.drop2048
 
 import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.core.AutoInit
+import com.dangerfield.drop2048.libraries.drop2048.storage.db.ClearableDao
 import com.dangerfield.drop2048.libraries.navigation.DeepLinkBridge
 import com.dangerfield.drop2048.libraries.navigation.impl.DelegatingRouter
 import com.dangerfield.drop2048.libraries.telemetry.impl.JankMonitor
@@ -59,6 +60,17 @@ interface AppComponent {
      * registers its lifecycle listener at boot.
      */
     val autoInits: Set<AutoInit>
+
+    /**
+     * Every table holding wipeable data, for Settings' "reset progress" (C11).
+     *
+     * Exposed here before C11 needs it on purpose. A multibinding with no
+     * accessor anywhere is not validated by anything — it compiles whether or not
+     * a DAO remembered to contribute itself, which is precisely how this repo has
+     * shipped an empty set before. Naming it here makes the graph check it at
+     * build time, and C11 injects `Set<ClearableDao>` rather than a list.
+     */
+    val clearableDaos: Set<ClearableDao>
 
     @Provides
     fun provideClock(): Clock = Clock.System

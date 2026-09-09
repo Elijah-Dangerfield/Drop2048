@@ -17,6 +17,7 @@ kotlin {
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.drop2048.storage)
+            implementation(projects.libraries.progress)
             implementation(libs.kotlinx.serialization.json)
         }
     }

@@ -195,7 +195,7 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun stackedOut_persistsTheBestScore() = runUnitTest {
+    fun stackedOut_writesTheRunRecord() = runUnitTest {
         playing(
             picture = """
                 .  .  4  .  .
@@ -212,7 +212,10 @@ class GameViewModelTest : CoroutineTest() {
             waitOutResolution()
 
             assertEquals(GamePhase.StackedOut, state.phase)
-            assertEquals(state.score, persistedBest())
+            val recorded = recordedRuns().single()
+            assertEquals(state.score, recorded.score)
+            assertEquals(state.score, state.best)
+            assertNull(savedRun(), "a finished run must not be resumable")
         }
     }
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.game.GameRoute
+import com.dangerfield.drop2048.features.stats.StatsRoute
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.Router
@@ -37,6 +38,7 @@ class GameFeatureEntryPoint(
                 when (effect) {
                     is GameEffect.Play -> cues.play(effect.cue)
                     GameEffect.Leave -> router.goBack()
+                    GameEffect.OpenStats -> router.navigate(StatsRoute())
                 }
             }
 

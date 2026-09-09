@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.features.game.impl
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
+import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.random.Random
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -20,8 +21,25 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
  * today.
  */
 interface RunFactory {
-    fun newRun(): GameState
+    fun newRun(): StartedRun
 }
+
+/**
+ * A fresh run, and the two things about it that the [GameState] cannot be asked
+ * for afterwards.
+ *
+ * The RNG carried inside the state has already advanced past [seed] by the time
+ * the first block is drawn, so a run that does not record its seed at the start
+ * can never record it at all — and `run_record` keeps it precisely so a
+ * surprising score can be replayed (SPEC 11, SPEC 4.1). [mode] is here for the
+ * same reason: it is a property of how the run was *started*, and C6's Daily
+ * will start one from the same seam.
+ */
+data class StartedRun(
+    val state: GameState,
+    val seed: Long,
+    val mode: GameMode,
+)
 
 /**
  * Endless mode: a fresh seed every time, on the compiled-in defaults.
@@ -36,6 +54,12 @@ interface RunFactory {
 @ContributesBinding(AppScope::class)
 @Inject
 class EndlessRunFactory : RunFactory {
-    override fun newRun(): GameState =
-        Cascade.newGame(seed = Random.nextLong(), config = EngineConfig.Default)
+    override fun newRun(): StartedRun {
+        val seed = Random.nextLong()
+        return StartedRun(
+            state = Cascade.newGame(seed = seed, config = EngineConfig.Default),
+            seed = seed,
+            mode = GameMode.ENDLESS,
+        )
+    }
 }

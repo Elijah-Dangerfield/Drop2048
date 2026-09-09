@@ -29,4 +29,25 @@
     <string name="game_stacked_out">Stacked out</string>
     <string name="game_biggest">Biggest</string>
     <string name="game_drop_again">Drop again</string>
+    <string name="game_stats">Stats</string>
+
+    <string name="stats_title">Stats</string>
+    <string name="stats_empty">No runs yet. Finish one and this fills in.</string>
+    <string name="stats_best">Best</string>
+    <string name="stats_runs_played">Runs played</string>
+    <string name="stats_average">Average score</string>
+    <string name="stats_recent">Recent runs</string>
+    <string name="stats_lifetime">Lifetime</string>
+    <string name="stats_highest_tier">Highest tier</string>
+    <string name="stats_total_merges">Total merges</string>
+    <string name="stats_blocks_placed">Blocks placed</string>
+    <string name="stats_longest_cascade">Longest cascade</string>
+    <string name="stats_most_bursts">Most bursts in a run</string>
+    <string name="stats_lifetime_bursts">Lifetime bursts</string>
+    <string name="stats_playtime">Total playtime</string>
+
+    <!-- Playtime, in the largest unit that says anything. See Playtime.kt. -->
+    <string name="stats_duration_hours">%1$dh %2$dm</string>
+    <string name="stats_duration_minutes">%1$dm</string>
+    <string name="stats_duration_seconds">%1$ds</string>
 </resources>
