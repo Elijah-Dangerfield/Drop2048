@@ -27,6 +27,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  *
  *   • [ColorPrimaryPreview] — surfaces + text | accents.
  *   • [ColorSupportPreview] — status + borders.
+ *   • [BlockTierPreview]    — the eleven block tiers × all five palettes, with measured ΔE.
  *   • [TypographyPreview]   — Display + Brand + Heading | Body + Label + Caption.
  *
  * Components don't have a combined preview on purpose — each one (Button, forms, …) has its own
@@ -60,6 +61,18 @@ private fun ColorSupportPreview() {
             left = { ColorStatusBorders() },
             right = { },
         )
+    }
+}
+
+@Preview(widthDp = 1400, heightDp = 2000)
+@Composable
+private fun BlockTierPreview() {
+    CatalogScaffold(
+        title = "Blocks · the tier ramp",
+        subtitle = "The eleven values, in all five palettes, with the numbers each one is held to. " +
+            "Two tiers colliding shows up here as two neighbouring cells in one column.",
+    ) {
+        BlockTierMatrix()
     }
 }
 

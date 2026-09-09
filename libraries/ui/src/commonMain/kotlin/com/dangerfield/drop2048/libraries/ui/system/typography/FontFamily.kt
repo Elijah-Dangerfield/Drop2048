@@ -43,6 +43,24 @@ val SansSerifFontFamily: FontFamily
         )
     )
 
+/**
+ * The face every number that changes is drawn in: block values, the score, the
+ * level, the chain counter.
+ *
+ * **This is a known gap, deliberately reduced to one line.** None of these should
+ * be set in a proportional face, because proportional digits are different widths
+ * — a score ticking from 1111 to 2222 visibly jitters, and a block face redraws
+ * its numeral every merge. The fix is a font with tabular (monospaced) figures,
+ * or one with `font-feature-settings: "tnum"`. No font in this repo or in either
+ * sibling has them, and the choice is an owner decision.
+ *
+ * Until then this aliases the sans family, so every digit in the game is already
+ * reading from one token and swapping in the real face is this declaration and
+ * nothing else. Do not reach for [SansSerifFontFamily] to draw a number.
+ */
+val DigitFontFamily: FontFamily
+    @Composable get() = SansSerifFontFamily
+
 val SerifFontFamily: FontFamily
     @Composable get() = FontFamily(
         Font(

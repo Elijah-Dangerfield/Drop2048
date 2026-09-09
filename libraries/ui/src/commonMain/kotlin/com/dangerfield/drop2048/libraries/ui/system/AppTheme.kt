@@ -10,9 +10,20 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import com.dangerfield.drop2048.libraries.ui.isOsReduceMotionEnabled
+import com.dangerfield.drop2048.libraries.ui.system.HapticsSetting
 import com.dangerfield.drop2048.libraries.ui.system.LocalColors
 import com.dangerfield.drop2048.libraries.ui.system.LocalContentColor
+import com.dangerfield.drop2048.libraries.ui.system.LocalCues
+import com.dangerfield.drop2048.libraries.ui.system.LocalLargeNumbers
+import com.dangerfield.drop2048.libraries.ui.system.LocalReduceMotion
 import com.dangerfield.drop2048.libraries.ui.system.LocalTypography
+import com.dangerfield.drop2048.libraries.ui.system.SoundPlayer
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockPalette
+import com.dangerfield.drop2048.libraries.ui.system.color.LocalBlockPalette
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockPalettes
+import com.dangerfield.drop2048.libraries.ui.system.rememberCues
 import com.dangerfield.drop2048.system.color.Colors
 import com.dangerfield.drop2048.system.color.defaultColors
 import com.dangerfield.drop2048.system.typography.rememberTypography
@@ -27,10 +38,37 @@ object AppTheme {
         @ReadOnlyComposable
         @Composable
         get() = LocalTypography.current
+
+    /** The eleven block tiers, in whichever palette the player has chosen. */
+    val blocks: BlockPalette
+        @ReadOnlyComposable
+        @Composable
+        get() = LocalBlockPalette.current
 }
 
+/**
+ * The theme, and every accessibility setting that changes how the game renders.
+ *
+ * Wide on purpose. This took no parameters in all three sibling repos, and that
+ * is the structural reason Sodogku ends up providing `LocalReduceAnimations`
+ * from `App.kt` and `LocalHaptics` from two separate feature entry points — once
+ * the theme cannot carry a setting, every setting finds its own way down the
+ * tree, and they stop agreeing about where they came from.
+ *
+ * So all four arrive here and are provided here. A component reads what it needs
+ * from a CompositionLocal and takes no accessibility parameters of its own
+ * (decision D4).
+ *
+ * Every argument has a default that is right for a preview, which is what keeps
+ * `PreviewContent` a no-argument call.
+ */
 @Composable
 fun AppThemeProvider(
+    palette: BlockPaletteChoice = BlockPaletteChoice.Default,
+    reduceMotion: Boolean = false,
+    largeNumbers: Boolean = false,
+    haptics: HapticsSetting = HapticsSetting.Off,
+    sounds: SoundPlayer = SoundPlayer.Silent,
     content: @Composable () -> Unit
 ) {
 
@@ -42,6 +80,8 @@ fun AppThemeProvider(
     )
 
     val typography = rememberTypography()
+    val cues = rememberCues(setting = haptics, sounds = sounds)
+    val motionReduced = reduceMotion || isOsReduceMotionEnabled()
 
     MaterialWrapper {
         CompositionLocalProvider(
@@ -50,6 +90,10 @@ fun AppThemeProvider(
             LocalTypography provides typography,
             androidx.compose.material3.LocalContentColor provides colors.text.color,
             LocalColors provides colors,
+            LocalBlockPalette provides BlockPalettes[palette],
+            LocalReduceMotion provides motionReduced,
+            LocalLargeNumbers provides largeNumbers,
+            LocalCues provides cues,
             content = content
         )
     }
