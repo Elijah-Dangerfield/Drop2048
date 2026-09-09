@@ -315,3 +315,33 @@ that app's setup and notices the gap.
 
 **Why here rather than the port queue:** the queue is work waiting to happen, and
 these are closed questions. Keeping them there made an empty queue impossible.
+
+## 2026-09-09 — The three specials are one colour set, not five
+
+**Decision:** `Wildcard`, `Bomb` and `Stone` (SPEC 5.2) get one `BlockStyle` each,
+shared by all five palettes, rather than a per-palette entry like the eleven
+numeric tiers. Each is held to the *neighbour* floor (ΔE 24) against every tier
+face in every palette, which is stricter than the floor tiers hold against each
+other at distance, and each is marked on the face by drawn geometry rather than
+by a glyph.
+
+**Why:** a special is not a rung on the ramp. A ramp asks the player to order
+eleven colours, which is a job colour has to do alone; a special asks only "is
+this one of them", and the mark answers that before the colour is consulted.
+Authoring five Stones would be fifteen more hexes held against fifteen more
+floors to express a difference no player can act on.
+
+The mark is geometry because a star or a bomb typed as a character is a bet that
+every font on every platform has that codepoint, and losing that bet puts a tofu
+box in the middle of the board with no error anywhere.
+
+`Stone` draws **nothing at all** and is the only achromatic block in the game.
+Both follow from the same thing: a Stone is defined by the absence of a number,
+so giving it a mark would make it look like a special that does something.
+
+**Measured, on the shipped Kotlin:** the closest any of the fifty-five tier faces
+comes is Stone at ΔE 26.1 (tritanopia's 2), then Wildcard at 36.0 (default's 128)
+and Bomb at 41.8 (deuteranopia's 2). Mark contrast is 4.85:1, 15.79:1 and 4.99:1.
+Under the Viénot simulation the tightest pair is Wildcard against deuteranopia's
+8 at 21.5, which is under the 24 the ramps hold and above the 20 floor the test
+sets for specials — see `BlockPaletteTest.theSpecialsSurviveEachDeficiency`.

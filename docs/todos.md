@@ -69,7 +69,39 @@ Both survived C0 because they are structurally welded to `NetworkClientImpl`'s 4
 one today** — the server's ban gate went with the auth stack. Revisit once the server surface is
 final in C7. Keep only if something can actually produce the envelope.
 
+### Fold D7 and D8 into `SPEC.md`
+
+Both rulings live in `ORCHESTRATION.md` only, because C2b had `SPEC.md` open when they were made.
+D7 (highest tier means reached-during-run) touches SPEC 4.4, 8.4, 11 and 17, and all four must
+agree or the stats page will never show a 2048. D8 (clutter stays number-blocks-only) touches
+SPEC 17 and 4.4.
+
 ## Soon
+
+### Re-run `:tools:balance` after C3, with a policy that respects the drop timer
+
+Every C1a number is a **ceiling** (learning L21). The harness has no clock, so every policy
+hard-drops into the column it wants at every level, and hold and soft drop are never used. Real
+medians will be lower. The first non-ceiling estimate needs the speed curve in the loop.
+
+### Measure how often the board-aware cap actually clamps a draw
+
+C1a measured the *staleness* of SPEC 5.3's constraint B and found it a non-issue (L20), but not how
+often it fires at all. It is almost certainly inert once a 1024 is on the board, since the ceiling
+then exceeds the table's maximum of 64, making it an early-game valve only. Needs a small hook in
+`Spawn` exposing the pre-cap value on `Draw`.
+
+Worth knowing before C7 makes `spawn.cap.divisor` a remote key nobody can reason about.
+
+### Add `--csv` output to the balance harness
+
+The text report is right for a one-off read and wrong for trends. Worth doing at the second
+measurement, not the first.
+
+### `:tools:balance:test` is not in the standard verification gate
+
+It runs under `check` but not under `testDebugUnitTest`, so the harness's own six guard tests do
+not run in the normal loop. Either add it to the working agreement or accept it is CI-only.
 
 ### Stop the convention plugin injecting coroutines into every KMP module
 

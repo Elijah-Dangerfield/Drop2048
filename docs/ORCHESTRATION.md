@@ -226,11 +226,99 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D7 · "Highest tier" means highest tier *reached during the run*, never on-board-at-end
+
+C1a found SPEC 4.4's "distribution of highest tier at run end" is not answerable literally: **a
+2048 bursts its row, so it is never on the board at the end.** Read literally, the metric reports
+0% for the game's defining moment.
+
+Ruled: highest tier means the maximum over merge results and board contents across the whole run.
+This applies to all three places that ask the question, and they must agree:
+
+- `run_record.highest_tier` (SPEC 11)
+- "BIGGEST" on the stacked-out sheet (SPEC 8.4, and the mockups draw it)
+- the weekly-watched highest-tier distribution (SPEC 17)
+
+Folded into `SPEC.md` once C2b lands and the file is free.
+
+### D8 · Clutter counts number blocks only; obstruction is a separate count
+
+C1a found `clutter` ignores Stones and inert Wildcards, which understates board congestion exactly
+after level 12 when Stones start arriving.
+
+Ruled: **leave clutter as number-blocks-only.** SPEC 17 defines it as the early warning for a
+mistuned *spawn floor*, and Stones arrive from the special rate, not the spawn table. Folding them
+in would blur two causes into one number and make it useless for the job it exists to do.
+
+If board congestion needs measuring, that is a **second** count of permanent obstructions, not a
+change to this one. Two metrics measuring two things beats one measuring neither.
+
+The binding constraint either way: the harness and SPEC 17's live telemetry must compute this from
+**the same function in `:libraries:cascade`**. The entire value of the metric is that offline and
+live numbers are directly comparable.
+
 ---
 
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L18 · The merge ruling made the game harder, and it is what makes the spawn table fit
+
+C1a restored the pre-ruling merge position locally, measured, and reverted. Greedy over 10,000
+seeds:
+
+| Policy | median level pre → post | 2048 rate pre → post |
+|---|---|---|
+| Random | 5 → 4 | 0% → 0% |
+| Greedy | 26 → 22 | 36.7% → 3.8% |
+| Lookahead-1 | 32 → 25 | 65.1% → 15.7% |
+
+**Not via chain frequency.** Cascade depth is essentially unchanged (mean 0.88 → 0.87, share of
+drops chaining ≥2 steps 21.8% → 20.8%). The mechanism is positional: a horizontal merge migrates
+the result into the *partner's* column, and the partner's column is by construction the one that
+already held a match. The board gets less level with every horizontal merge instead of more, and
+on five columns that is what ends runs.
+
+L17's single counterintuitive data point pointed straight at this and was right.
+
+**The consequence that matters: the ruling and the spawn table are now coupled.** Under the old
+position rule, the SPEC 5.3 table put a 2048 burst in 65% of Lookahead-1 runs, which is SPEC 17's
+own definition of too easy. Anyone who revisits the merge position must retune the spawn table in
+the same change.
+
+### L19 · The spawn table sets the tier ceiling; the board geometry sets the level reached
+
+C1a measured three alternative ramps against the shipped one. Median level moves by **at most one**
+across tables that move the 1024 rate by 5x. Softening the ramp buys no survival and costs nearly
+the whole tail past 1024.
+
+This inverts the intuition in SPEC 5.3 that the table is the difficulty dial. It is the *tier*
+dial. If runs need to last longer or shorter, the lever is the board, the speed curve or the
+specials, not the spawn weights.
+
+The table was therefore **kept unchanged**, and that is a measured decision rather than an
+untested default. Changing it would also move the pinned determinism digest, for nothing
+observable.
+
+### L20 · The board-aware cap's staleness is a non-issue, measured
+
+SPEC 5.3 notes the cap is evaluated at draw time, two drops before landing, forced by the
+non-optional preview. The worry was that faster chains would compound it.
+
+Drops whose block exceeds the cap the board would impose at landing time: **0.02%** (Greedy),
+**0.04%** (Lookahead-1). Pre-ruling, when chains were expected to be faster, 0.09% and 0.16%. No
+compounding at either end. Stop worrying about it.
+
+### L21 · Every balance number so far is a ceiling, because the harness has no clock
+
+Every policy hard-drops into the column it wants at every level. SPEC 5.5's speed curve is
+untested by anything in C1a, and hold and soft drop are never used. Real medians will be **lower**
+than the table above.
+
+Do not quote these numbers as predictions of player behaviour. They are an upper bound for an
+unhurried player, which is exactly the right thing for tuning the spawn floor and the wrong thing
+for tuning difficulty.
 
 ### L17 · A pinned digest gets re-derived, never copied from the failure message
 
