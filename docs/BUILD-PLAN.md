@@ -119,6 +119,41 @@ No coroutines, no clock, no logging, no Compose. See `SPEC.md` 4.
 
 **This is the chunk to be slow on.** Everything after it assumes it is right.
 
+**Outcome (2026-09-09).** `:libraries:cascade` landed with the API above. **89
+tests, 0 failures, 0 skipped, on all three of JVM, Android and iOS.** Verification:
+`./gradlew testDebugUnitTest :apps:compose:assembleDebug detekt` — 340 tests, 0
+failures, **1 skipped** (`:apps:integration` `HarnessSmokeTest`, Docker down),
+detekt 0 findings over 551 files.
+
+Notes for whoever builds on it:
+
+- **The transcript is the only channel points travel down.**
+  `next.score == previous.score + transcript.points` after every transition, and
+  a test asserts it over a whole run. That means the transcript carries five step
+  kinds SPEC 4.2 does not name (hard drop bonus, survival, level up, board
+  cleared, plus the gravity settle it does). The alternative was a second scoring
+  channel the floating numbers could drift from.
+- **Determinism is pinned as a digest, not compared in-process.** A seed plus 600
+  scripted inputs is serialized and reduced to an FNV-1a constant asserted in
+  `commonTest`, so the same number has to come out on JVM, Android and iOS. It
+  does. Changing that constant is a breaking change to every recorded Daily
+  Challenge score.
+- **`./gradlew testDebugUnitTest` does not run the iOS tests.** The engine's iOS
+  coverage comes from `:libraries:cascade:iosSimulatorArm64Test`, which has to be
+  run explicitly. It is the only thing that proves the determinism pin holds on
+  Kotlin/Native. Run it whenever the engine changes.
+- Three spec conflicts surfaced and are written up in `decisions.md`: the
+  horizontal merge position vs. the worked example in this file, Wildcard merge
+  symmetry, and where `EngineConfig` and the undo ring live.
+- The module has no `implementation` dependencies. It has one `api` dependency,
+  `kotlinx-serialization-core`, which `@Serializable` requires; and the
+  `drop2048.kotlin.multiplatform` convention plugin still injects
+  `kotlinx-coroutines-core` into every KMP module's `commonMain`, so "zero
+  dependencies" is true of the build file and not yet true of the compile
+  classpath. Nothing in the module uses it.
+- A `jvm()` target is declared so C1a's `tools/balance` can play the shipped
+  engine rather than a copy of it.
+
 ---
 
 ## C1a · `tools/balance` — the numbers

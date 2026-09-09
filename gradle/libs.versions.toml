@@ -137,6 +137,7 @@ testcontainers-postgres = { module = "org.testcontainers:postgresql", version.re
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesCore" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationJson" }
 
 coil = { module = "io.coil-kt.coil3:coil-compose", version = "3.3.0" }
 coil-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version = "3.3.0" }

@@ -73,6 +73,9 @@ if (!serverOnly) {
     include(":features:onboarding:impl")
 
     // Libraries
+    // The game engine. Zero project dependencies on purpose (SPEC 4.1) — it is a
+    // pure state machine and everything downstream assumes it stays that way.
+    include(":libraries:cascade")
     include(":libraries:config")
     include(":libraries:config:impl")
     include(":libraries:core")

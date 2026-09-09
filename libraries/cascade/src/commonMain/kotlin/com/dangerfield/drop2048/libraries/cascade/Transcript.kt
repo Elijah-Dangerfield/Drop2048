@@ -1,0 +1,141 @@
+package com.dangerfield.drop2048.libraries.cascade
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/** One block travelling from one cell to another during a gravity settle. */
+@Serializable
+data class BlockMove(val from: Cell, val to: Cell)
+
+/** Whether a merge was two matching values or a Wildcard taking a neighbour's. */
+@Serializable
+enum class MergeKind { VALUE, WILDCARD }
+
+/**
+ * One entry in a [Transcript].
+ *
+ * [step] is the cascade step the entry belongs to, starting at 1. Awards that
+ * are not part of a cascade (the hard drop bonus, survival, level up) carry
+ * step 0, which is also what the audio pitch in SPEC 9 keys off — step 0 is
+ * "no pitch offset".
+ */
+@Serializable
+sealed interface ResolutionStep {
+    val step: Int
+    val points: Int
+
+    /**
+     * Two blocks combined. [into] is the lower cell on a vertical merge and the
+     * *initiating* block's cell on a horizontal one (SPEC 4.3).
+     */
+    @Serializable
+    @SerialName("merge")
+    data class Merge(
+        override val step: Int,
+        val initiator: Cell,
+        val partner: Cell,
+        val into: Cell,
+        val result: BlockValue,
+        val kind: MergeKind,
+        override val points: Int,
+    ) : ResolutionStep
+
+    /**
+     * A Bomb destroying itself and its orthogonal neighbours. [destroyed]
+     * excludes the bomb's own cell, so a bomb with no neighbours scores nothing
+     * (SPEC 18.4).
+     */
+    @Serializable
+    @SerialName("detonation")
+    data class Detonation(
+        override val step: Int,
+        val bomb: Cell,
+        val destroyed: List<Cell>,
+        override val points: Int,
+    ) : ResolutionStep
+
+    /** A 2048 was created in [row], so the whole row clears — Stones included (SPEC 18.5). */
+    @Serializable
+    @SerialName("burst")
+    data class Burst(
+        override val step: Int,
+        val row: Int,
+        val cleared: List<Cell>,
+        override val points: Int,
+    ) : ResolutionStep
+
+    /** Everything that fell after a merge, burst or detonation. Scores nothing. */
+    @Serializable
+    @SerialName("gravity")
+    data class Gravity(
+        override val step: Int,
+        val moves: List<BlockMove>,
+    ) : ResolutionStep {
+        override val points: Int get() = 0
+    }
+
+    @Serializable
+    @SerialName("hardDrop")
+    data class HardDropBonus(
+        val rowsSkipped: Int,
+        override val points: Int,
+    ) : ResolutionStep {
+        override val step: Int get() = 0
+    }
+
+    @Serializable
+    @SerialName("survival")
+    data class Survival(
+        val level: Int,
+        override val points: Int,
+    ) : ResolutionStep {
+        override val step: Int get() = 0
+    }
+
+    @Serializable
+    @SerialName("levelUp")
+    data class LevelUp(
+        val level: Int,
+        override val points: Int,
+    ) : ResolutionStep {
+        override val step: Int get() = 0
+    }
+
+    @Serializable
+    @SerialName("boardCleared")
+    data class BoardCleared(
+        override val step: Int,
+        override val points: Int,
+    ) : ResolutionStep
+}
+
+/**
+ * What `RESOLVE` returns instead of a board (SPEC 4.2).
+ *
+ * The engine is finished by the time the first block moves on screen; the UI
+ * replays these steps in order. That is what makes "input during resolution is
+ * ignored" free rather than a special case, and what makes the cascade-step
+ * audio pitch a `steps.map { it.step }`.
+ *
+ * Every point the transition awarded is in here, cascade or not, so
+ * `next.score == previous.score + transcript.points` always holds. Nothing
+ * scores through a second channel.
+ */
+@Serializable
+data class Transcript(val steps: List<ResolutionStep> = emptyList()) {
+
+    val points: Int get() = steps.sumOf { it.points }
+
+    /** The deepest cascade step reached. 0 when nothing cascaded. */
+    val depth: Int get() = steps.maxOfOrNull { it.step } ?: 0
+
+    val merges: List<ResolutionStep.Merge> get() = steps.filterIsInstance<ResolutionStep.Merge>()
+
+    val bursts: List<ResolutionStep.Burst> get() = steps.filterIsInstance<ResolutionStep.Burst>()
+
+    val isEmpty: Boolean get() = steps.isEmpty()
+
+    companion object {
+        val Empty = Transcript()
+    }
+}
