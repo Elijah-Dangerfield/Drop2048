@@ -173,6 +173,76 @@ class HarnessTest {
         assertTrue(after < before, "the 500ms curve left as much slack ($after) as the 700ms one ($before)")
     }
 
+    /**
+     * The single most useful thing C1e measured, and the one most likely to be
+     * broken by accident later.
+     *
+     * A drop control decides *when* a block locks, never *where*: `Input.Lock`
+     * places at the landing cell, so nudging to the floor and letting the timer
+     * do it produce the same board. Measured over 10,000 runs the two profiles
+     * agree to the digit on every outcome column, which is what makes the whole
+     * pacing argument separable from the difficulty one.
+     *
+     * If this ever fails, the ▼ control has started changing outcomes, and every
+     * "pure pacing dial" claim in `BUILD-PLAN.md`'s C1e section is void.
+     */
+    @Test
+    fun theDropControlChangesTheWallClockAndNothingElse() {
+        (1L..40L).forEach { seed ->
+            val nudging = Harness.play(seed, Policy.Greedy, config, PlayerProfile.Average)
+            val patient = Harness.play(seed, Policy.Greedy, config, PlayerProfile.Patient)
+
+            assertEquals(patient.level, nudging.level, "seed $seed level")
+            assertEquals(patient.blocksDropped, nudging.blocksDropped, "seed $seed drops")
+            assertEquals(patient.score, nudging.score, "seed $seed score")
+            assertEquals(patient.highestTier, nudging.highestTier, "seed $seed highest tier")
+            assertTrue(
+                nudging.clock!!.elapsedMillis < patient.clock!!.elapsedMillis,
+                "seed $seed: nudging took no less wall clock than never touching the control",
+            )
+        }
+    }
+
+    /**
+     * More rows per press is less time per drop, and the same game.
+     *
+     * The second half is the point: `nudgeRows` is the one dial C1e swept that
+     * lives in `EngineConfig` and therefore moves the determinism digest, so the
+     * evidence that it buys pacing without buying difficulty has to be a test
+     * rather than a remembered table.
+     */
+    @Test
+    fun moreRowsPerNudgeIsFasterAndPlaysTheSameGame() {
+        val timings = listOf(1, 2, 3).map { rows ->
+            val outcomes = (1L..30L).map {
+                Harness.play(it, Policy.Greedy, config.copy(nudgeRows = rows), PlayerProfile.Average)
+            }
+            outcomes.sumOf { it.clock!!.elapsedMillis } to outcomes.map { it.level }
+        }
+
+        assertTrue(timings[0].first > timings[1].first, "3 rows a press was not slower than 2")
+        assertTrue(timings[1].first > timings[2].first, "2 rows a press was not slower than 3")
+        assertEquals(timings[0].second, timings[1].second, "nudgeRows changed the levels reached")
+        assertEquals(timings[1].second, timings[2].second, "nudgeRows changed the levels reached")
+    }
+
+    /**
+     * The nudge is most of the way back to what hard drop was worth.
+     *
+     * C1d predicted a level-1 drop somewhere around 1.5-2.5s once hard drop was
+     * gone. Measured, it is under a second, because three taps and a lock delay
+     * cost less than the four rows of gravity they replace. The bound here is
+     * loose on purpose — it is guarding the order of magnitude, which is the
+     * thing the prediction got wrong.
+     */
+    @Test
+    fun aNudgingPlayerSpendsUnderASecondOnALevelOneDrop() {
+        val clocks = (1L..30L).mapNotNull { Harness.play(it, Policy.Greedy, config, PlayerProfile.Average).clock }
+        val perDrop = clocks.sumOf { it.earlyElapsedMillis[1] } / clocks.sumOf { it.earlyDrops[1] }
+
+        assertTrue(perDrop < MAX_LEVEL_ONE_NUDGED_MILLIS, "a level-1 drop took ${perDrop}ms while nudging")
+    }
+
     private fun levelOneSlack(curve: SpeedCurve): Long {
         val clocks = (1L..20L).mapNotNull {
             Harness.play(it, Policy.Greedy, config.copy(speed = curve), PlayerProfile.Average).clock
@@ -193,5 +263,6 @@ class HarnessTest {
         const val MIN_DROP_MILLIS = 200L
         const val MAX_DROP_MILLIS = 5_000L
         const val MIN_LEVEL_ONE_SLACK_MILLIS = 1_000L
+        const val MAX_LEVEL_ONE_NUDGED_MILLIS = 1_200L
     }
 }

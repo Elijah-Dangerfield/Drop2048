@@ -42,10 +42,26 @@ object Curves {
         msPerRow = listOf(600, 560, 520, 480, 430, 380, 340, 300) + Original.msPerRow.drop(8)
     )
 
+    /**
+     * Faster than what shipped, added by C1e so the re-check of L28 has a bracket
+     * on both sides of [Fast500] rather than only above it.
+     *
+     * C1c only ever measured curves slower than the one it adopted, which was
+     * sound while hard drop existed: the question then was how much dead time a
+     * patient player sat through. Without hard drop the fall is a larger share of
+     * every drop for every player, so "is 500 already too fast" is a question
+     * with something at stake, and it cannot be answered by three curves that are
+     * all slower.
+     */
+    val Fast400 = Original.copy(
+        msPerRow = listOf(400, 385, 370, 355, 340, 325, 312, 300) + Original.msPerRow.drop(8)
+    )
+
     val Named: Map<String, SpeedCurve> = mapOf(
         "default" to SpeedCurve.Default,
         "original" to Original,
         "fast600" to Fast600,
         "fast500" to Fast500,
+        "fast400" to Fast400,
     )
 }

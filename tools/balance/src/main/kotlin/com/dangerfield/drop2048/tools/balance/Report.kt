@@ -13,8 +13,10 @@ import com.dangerfield.drop2048.libraries.cascade.BlockValue
  */
 object Report {
 
-    fun render(policy: String, table: String, runs: List<RunOutcome>, millis: Long): String =
-        render(policy, table, clock = "off", runs = runs, millis = millis)
+    fun render(policy: Policy, table: String, clock: String, runs: List<RunOutcome>, millis: Long): String {
+        val name = if (policy.cheats) "${policy.name} (ceiling, reads a block the player never sees)" else policy.name
+        return render(name, table, clock, runs, millis)
+    }
 
     @Suppress("LongMethod")
     fun render(policy: String, table: String, clock: String, runs: List<RunOutcome>, millis: Long): String {

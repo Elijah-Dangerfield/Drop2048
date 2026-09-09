@@ -239,9 +239,10 @@ The harness and the live telemetry in 17 must compute clutter from **the same fu
 `:libraries:cascade`**. The entire value of the metric is that offline and live numbers are
 directly comparable.
 
-It also counts the drops whose block exceeds the cap 5.3B would impose at *landing* time. The cap
-is read two drops early, so it can only ever be too loose, and this is the number that would show
-that compounding. It does not: 0.02% of Greedy's drops.
+It used to count the drops whose block exceeded the cap 5.3B would impose at *landing* time, which
+was 0.02% of Greedy's drops while the cap was read two drops early. D11 moved the draw to spawn
+time, so that count can now only ever be zero and the counter was removed with it. A metric that
+cannot report anything but zero is worse than no metric.
 
 The harness is how the spawn table in 5.3 gets its real numbers. **It has been run and the table
 below is the one it measured** — see `BUILD-PLAN.md`'s C1a outcome for the full distributions and
@@ -249,18 +250,28 @@ the three alternatives that were rejected.
 
 **The clock is optional and both halves are kept.** Clock-free, every policy places a block in the
 column it wants at every level, and everything it reports is a ceiling for an unhurried player.
-Those clock-free numbers survive D11 unchanged, because placement is unchanged; every *clocked*
-number does not, and C1e re-runs them.
 C1c added a `PlayerProfile` — a decision time and a tap rate — and a simulation of 5.5's drop
 timer and 6's controls, so a policy that cannot reach its preferred column in the time it has
 takes the best one it can reach. Running both is what says how big the ceiling was: three levels
 of median for Greedy and Lookahead-1, and a third off the 2048 rate. Numbers in `BUILD-PLAN.md`
 C1c.
 
+**D11 moved less than expected, and not where expected.** C1e re-ran everything. Outcome
+distributions are unchanged clocked and clock-free, to within about half a percentage point — and
+that residual is the spawn draw moving to spawn time, not the drop control, because a drop control
+decides *when* a block locks and never where. What moved is the wall clock: a level-1 drop is 0.96s
+for a player who taps ▼ against 4.15s for one who never does and 0.54s under the hard drop that no
+longer exists.
+
 The clocked half also reports, per level, the share of drops the lock delay placed rather than a
 drop input, the share where the policy did not get the column it asked for, and the **slack** —
 how long the policy sat with nothing to do while the block kept falling. The last of those is the
 only one that is not near zero in the opening, and it is what 5.5's early band was retuned on.
+
+**Every clocked number is conditional on `decisionMillis`, and that constant is unmeasured.** Swept
+from 150ms to 500ms it moves Greedy's median level by five and its 1024 rate by a factor of three —
+more than the clock itself and more than the spawn table. Until 17's telemetry answers it, no
+clocked median should be quoted more precisely than "about twenty".
 
 ## 5. Blocks
 
@@ -389,10 +400,22 @@ centre spawn, a block is at most two columns from anywhere, which the measured p
 370ms against a budget that never falls below about 780ms even at the speed floor. That is why
 6's soft drop and nudge, not the curve, set how fast a run actually goes.
 
-**Every pacing number in this section predates D11** and was measured in a game where one tap
-ended a fall. C1c put the gap at level 4 in 34 seconds hard-dropping against 289 seconds patient.
-Removing hard drop makes everyone the patient player and the nudge is only a partial substitute.
-C1e re-measures.
+**Re-measured without hard drop in C1e, and the curve was kept at 500ms.** The nudge turned out to
+be a much better substitute than expected: a level-1 drop takes **0.96s** for a player who taps ▼,
+against 4.15s for one who never does and 0.54s under the hard drop that used to exist, and time to
+level 4 is **56s / 223s / 33s** on the same three. The nudge recovers 88% of the wall-clock gap.
+
+Two things followed. The curve matters *less* now, not more: 300ms off the level-1 interval is
+worth 62ms a drop to a nudging player, because ▼ rather than gravity is carrying the block. And a
+faster opening was measured (`400, 385, 370, 355, 340, 325, 312, 300`) and rejected — it changes no
+outcome column, buys the nudging player 27ms a drop, and flattens the first band's acceleration from
+40% to 25%. What is left of the opening's dead time belongs to a player who never presses ▼, which
+is a tutorial problem (13), not a curve problem.
+
+`nudgeRows` was swept over 1-4 in the same chunk and left at 2. Returns collapse after 2 — the
+binding cost stops being rows and becomes the decision, the tap cadence and the lock delay — and
+unlike `blocksPerLevel` it does **not** move the determinism digest, because a nudge cannot change
+where a block lands. Full tables in `BUILD-PLAN.md` C1e.
 
 ### 5.6 Undo
 

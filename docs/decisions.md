@@ -6,6 +6,59 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The cheating policy stays, and the cheat moves onto the instrument
+
+**Decision:** `Policy.Lookahead1` keeps reading the next block it cannot see, and
+gains a `cheats` flag that `Report` prints on every line it renders, so its output
+reads `policy=lookahead1 (ceiling, reads a block the player never sees)`.
+
+Since D11 the next block is drawn at spawn time and never shown, so this policy
+plans around a value that does not exist yet. Measured, that is worth two levels
+of median and four times the 2048 rate over `Greedy`.
+
+**Alternatives:** demote it to a curiosity, or rewrite it to search the
+distribution of next draws instead of the actual one. The first leaves the project
+with no upper bound at all — `Greedy` is a competent player, not a bound, and
+SPEC 4.4 asks for a ceiling. The second is a different and far more expensive
+policy answering a question nobody asked.
+
+**Why a flag rather than a KDoc paragraph:** the failure mode is somebody quoting
+a lookahead median as a prediction of play, and that happens when they read the
+output, not when they read the source.
+
+**One landmine on the way in.** Declaring `cheats` on the sealed interface with a
+`get() = false` default turned it into a JVM default method, which makes
+initialising `Policy.Random` initialise `Policy`, which builds the companion and
+evaluates `Policy.All` while the object it is reading is still half-built. `All`
+then held a null and two tests died on a non-null parameter check, with no
+compiler warning. It is abstract now and each object states its own answer. Same
+shape as L22: a declaration order nobody can see, and correct-looking code.
+
+---
+
+## 2026-09-09 — `nudgeRows` does not move the determinism digest, measured
+
+**Decision:** treat `EngineConfig.nudgeRows` as a freely tunable remote key, unlike
+`blocksPerLevel`.
+
+D11 and `EngineConfig`'s own KDoc imply the opposite, on the reasonable grounds
+that it travels inside `GameState`. Checked rather than reasoned: the default was
+set to 3 and all five `DeterminismTest` cases passed on the JVM.
+
+**Two reasons, both independent.** `kotlinx.serialization` omits a value equal to
+its declared default, so moving the default moves nothing in the bytes. And
+`Input.Nudge` is behaviourally inert in the pinned script, because every drop ends
+in `Input.Lock` and `Lock` places at the block's *landing* cell — the engine cannot
+tell how far down a nudge already moved it.
+
+That second reason is the general one and it is worth stating on its own: **the
+vertical position of a falling block is not an input to anything the engine
+records.** It is why the drop control is a pure pacing dial, why `patient`,
+`softie` and a nudging player produce identical outcome distributions over 10,000
+runs, and why `nudgeRows` can be tuned live without invalidating a score.
+
+---
+
 ## 2026-09-09 — The screenshot harness is Roborazzi, and it had to be forced to actually compare
 
 **Decision:** `:libraries:ui` gets a Roborazzi + Robolectric screenshot harness.

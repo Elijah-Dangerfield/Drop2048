@@ -546,6 +546,212 @@ and `Cue.HardDrop` is now unreferenced.
 
 ---
 
+## C1e · Pacing re-measured without hard drop — **DONE** (2026-09-09)
+
+**Unblocked by** C1d.
+
+Every clocked number in this file was measured in a game where one press ended a fall. This chunk
+re-ran all of them against the ▼ nudge and swept the three dials that were left open. **Nothing was
+changed.** The opening curve stays at 500ms, `nudgeRows` stays at 2, `decisionMillis` stays at 250,
+and Lookahead-1 stays as the declared ceiling. Four measured non-changes and one correction to a
+handover prediction is the whole delivery, which is the point of measuring before tuning.
+
+All numbers: 10,000 runs per policy, seeds 1..10000, `EngineConfig.Default`, engine as shipped.
+`:tools:balance:test` — 16 tests, 0 failures, 0 skipped.
+
+### 1. The headline: the nudge is a pure pacing control
+
+**The drop control changes when a block locks and never where.** `Input.Lock` places at the
+*landing* cell, so a block's height when the player commits is not an input to anything. Measured:
+`patient` (never touches ▼), `softie` (holds for soft drop), `average` (taps ▼) and the restored
+hard-drop finish all produce **identical outcome columns to the digit** — median level 19, p90 23,
+372 drops, 84,716 score, 24.2% past 1024, 2.31% bursting, clutter 2.5, the same cascade histogram.
+Only the wall clock moves, by a factor of four. Pinned as
+`HarnessTest.theDropControlChangesTheWallClockAndNothingElse`.
+
+That is the fact the rest of this section rests on: **hard drop was never a difficulty lever and
+neither is the nudge**. L29 said "the biggest lever on the opening"; it was the biggest lever on the
+*clock*, and it is worth restating that way now that the control it described is gone.
+
+### 2. Hard-drop era against nudge era, clocked, all three policies
+
+The "hard drop" column is C1c's published table. The "nudge" column is this chunk. Both are
+`average` (250ms / 120ms), the shipped 500ms curve, `blocksPerLevel` 20.
+
+| Policy | median level | p90 | drops | 512 | 1024 | 2048 | clutter mean | death |
+|---|---|---|---|---|---|---|---|---|
+| Random, hard drop | 5 | 7 | 80 | 0.07% | — | — | 0.89 | row_zero 100% |
+| Random, nudge | 5 | 8 | 84 | 0.04% | — | — | 0.88 | row_zero 100% |
+| Greedy, hard drop | 19 | 23 | 376 | 57.3% | 23.78% | 2.24% | 2.49 | row_zero 100% |
+| Greedy, nudge | 19 | 23 | 372 | 56.47% | 24.2% | 2.31% | 2.5 | row_zero 100% |
+| Lookahead-1, hard drop | 22 | 27 | 422 | 41.6% | 43.1% | 10.1% | 2.86 | row_zero 100% |
+| Lookahead-1, nudge | 21 | 27 | 419 | 41.15% | 43.36% | 9.68% | 2.86 | row_zero 100% |
+
+Cascade depth, Greedy, share of drops: 43.91 / 35.18 / 13.24 / 5.19 / 1.77 / 0.59 / 0.06% at depths
+0-6, mean 0.87, depth>=2 20.9% — against C1c's 20.8% pre-D11. Highest tier **reached** (D7) is the
+column labelled 512/1024/2048; buckets are exclusive. No run in 30,000 hit the drop cap, faulted the
+engine, or died of `SPAWN_BLOCKED`.
+
+**The residual differences are not the control, they are the spawn draw.** The clock-free harness
+was re-run too, and it does *not* reproduce C1a to the digit either — Greedy's 1024 rate moved
+30.5% → 31.27%, Lookahead-1's 2048 rate 15.7% → 16.21%, medians unchanged. L36 said the clock-free
+numbers survive C1d untouched because `Lock` lands where `HardDrop` landed. The placement half is
+right; the *stream* half is not. C1d also moved the board-aware cap from draw time to spawn time,
+and L20 measured that as changing the drawn block on 0.02-0.04% of drops. At ~400 drops a run that
+reseeds roughly one run in twelve, which is exactly the size of the drift seen. **Every C1a and C1c
+number is now good to about half a percentage point, not to the digit.**
+
+### 3. The wall-clock pacing table
+
+Greedy, 500ms curve, `average` hand. The hard-drop row is the restored control measured on the
+*current* engine, so all three rows are the same seeds and the same spawn stream.
+
+| Player | level-1 s/drop | level-2 | level-3 | to level 4 | median run |
+|---|---|---|---|---|---|
+| Patient (never presses ▼) | 4.15s | 3.67s | 3.31s | **222.6s** | 760s |
+| Nudging (▼ at 120ms) | 0.96s | 0.93s | 0.91s | **55.8s** | 308s |
+| Hard drop (removed, reference) | 0.54s | 0.55s | 0.55s | **32.8s** | 206s |
+
+**C1d predicted a nudged level-1 drop at 1.5-2.5s. It is 0.96s, so the prediction was wrong by
+roughly a factor of two, in the game's favour.** The arithmetic C1d did was right and one term was
+missing: three taps at 120ms do replace the fall, but the *decision* time and the lock delay are
+paid by every player on every drop regardless, and gravity keeps running underneath the taps rather
+than pausing for them. At level 1 the last row is usually delivered by an ordinary drop tick that
+arrives while the thumb is between presses.
+
+The nudge recovers **88%** of the wall-clock gap hard drop used to open, on both measures
+independently: (4.15 - 0.96) / (4.15 - 0.54) = 88% per drop, and (222.6 - 55.8) / (222.6 - 32.8) =
+88% to level 4. What is not recovered is the *feel* of one decisive press, which no harness measures.
+
+L29 restated for the current game: **whether the player uses ▼ is still the biggest lever on the
+opening, and it is still a tutorial problem.** 223 seconds to level 4 against 56. C5 should treat
+teaching ▼ as load-bearing, exactly as C1c said of hard drop.
+
+### 4. L28 survives, and it got stronger
+
+Four curves, Greedy, same seeds, levels 9+ identical in all four. `fast400` is new in this chunk,
+because C1c only ever bracketed *slower* than what it adopted.
+
+| Curve (levels 1-8) | median | drops | 1024 | 2048 | clutter | L1 slack | L1 s/drop nudging | to L4 nudging | to L4 patient |
+|---|---|---|---|---|---|---|---|---|---|
+| `700, 620, 550, 490, 430, 380, 340, 300` | 19 | 372 | 24.2% | 2.31% | 2.5 | 4,808ms | 0.99s | 57.8s | 289.3s |
+| `600, 560, 520, 480, 430, 380, 340, 300` | 19 | 372 | 24.2% | 2.31% | 2.5 | 4,142ms | 0.96s | 56.8s | 261.4s |
+| `500, 470, 440, 410, 380, 350, 325, 300` (shipped) | 19 | 372 | 24.2% | 2.31% | 2.5 | 3,477ms | 0.96s | 55.8s | 222.6s |
+| `400, 385, 370, 355, 340, 325, 312, 300` | 19 | 372 | 24.2% | 2.31% | 2.5 | 2,708ms | 0.93s | 55.3s | 185.9s |
+
+Every outcome column is identical to the digit across a 300ms spread, at both ends of the drop
+control. **The opening curve still cannot change difficulty**, and the reason is now stronger than
+it was: it cannot change difficulty *and* it barely changes the clock either, for anyone who
+presses ▼. 300ms off the level-1 interval buys the nudging player 62ms a drop — 6% — because the
+nudge, not gravity, is carrying the block.
+
+**Ruled: the curve stays at 500ms.** The case for `fast400` is real but small and it is aimed at the
+wrong player. It buys 37 seconds off the patient opening, which is a sixth of what teaching ▼ buys,
+and it costs the levels 1-8 band most of its sense of acceleration: 500 → 300 is a 40% ramp across
+the first band, 400 → 300 is 25%, and level 1 would sit closer to level 8 than to anything the
+player can feel change. There is no measured reason to move it and one unmeasured reason not to.
+
+**Before and after: no change.** SPEC 5.5 levels 1-8 remain `500, 470, 440, 410, 380, 350, 325, 300`.
+`Curves.Fast400` is kept in the harness so this row stays re-runnable.
+
+### 5. `nudgeRows` swept, and it stays at 2
+
+Greedy, `average`, 500ms curve. Outcome columns omitted because **all four are identical to the
+digit** — median 19, p90 23, 372 drops, 24.2% / 2.31%, clutter 2.5.
+
+| `nudgeRows` | level-1 s/drop | level-2 | level-3 | to level 4 | median run | saved vs previous |
+|---|---|---|---|---|---|---|
+| 1 | 1.25s | 1.19s | 1.15s | 71.7s | 359s | — |
+| 2 (shipped) | 0.96s | 0.93s | 0.91s | 55.8s | 308s | 292ms/drop |
+| 3 | 0.87s | 0.83s | 0.83s | 50.7s | 290s | 85ms/drop |
+| 4 | 0.81s | 0.82s | 0.81s | 48.7s | 278s | 61ms/drop |
+
+**The returns collapse after 2.** Going from 1 to 2 is worth 292ms a drop; every row after that is
+worth under 90ms, because past two rows a press the binding constraint stops being rows and becomes
+the three fixed costs — 250ms to decide, 120ms between taps, 150ms of lock delay. The floor is the
+hard-drop row's 0.54s, and 2 is already 88% of the way there. Three would buy 5 seconds off the
+opening at the price of a control that moves a block most of the board in two presses, which is hard
+drop with extra steps and is the thing D11 removed on purpose.
+
+**Recommendation: leave it at 2.** The handoff's number is the measured one.
+
+### 6. The digest does not move, and that was checked rather than reasoned
+
+D11 and `EngineConfig`'s KDoc both imply that sweeping `nudgeRows` moves the pinned digest because
+it travels inside `GameState`. **It does not.** `DEFAULT_NUDGE_ROWS` was set to 3, all five
+`DeterminismTest` cases were run on the JVM, and all five passed.
+
+Two independent reasons, and both are worth knowing:
+
+- `kotlinx.serialization` omits values equal to their declared default, so moving the default moves
+  nothing in the bytes. A run played at a *non-default* `nudgeRows` does encode it and would digest
+  differently, but nothing in `DeterminismTest` plays one.
+- `Input.Nudge` is one input in eight in the pinned script and it is **behaviourally inert**, for
+  the same reason section 1 gives: every drop ends in `Lock`, and `Lock` places at the landing cell
+  no matter how far down the block already is. The engine cannot tell how many rows a nudge moved.
+
+So `nudgeRows` is a genuinely free remote knob in a way `blocksPerLevel` is not. That is a better
+position than C1d assumed it was in, and it should be recorded before someone declines to tune it
+live on a digest argument that does not apply.
+
+### 7. `decisionMillis` swept, and it is now the largest uncertainty in every clocked number
+
+C1d left the 250ms at its hard-drop-era value deliberately. Swept, Greedy, `average` tap rate,
+500ms curve:
+
+| `decisionMillis` | median level | p90 | drops | 1024 | 2048 | off preferred | timer-placed | L1 s/drop | to level 4 |
+|---|---|---|---|---|---|---|---|---|---|
+| 150 | 21 | 25 | 406 | 28.5% | 2.95% | 1.35% | 0.0% | 0.84s | 49.5s |
+| 200 | 19 | 24 | 378 | 24.73% | 2.57% | 1.88% | 0.0% | 0.89s | 52.5s |
+| **250 (shipped)** | **19** | **23** | **372** | **24.2%** | **2.31%** | **2.36%** | **0.0%** | **0.96s** | **55.8s** |
+| 300 | 18 | 21 | 349 | 20.1% | 1.44% | 2.1% | 0.39% | 0.98s | 58.3s |
+| 350 | 17 | 21 | 333 | 18.28% | 1.34% | 2.9% | 0.43% | 1.03s | 61.1s |
+| 400 | 17 | 20 | 330 | 16.95% | 0.82% | 3.13% | 0.53% | 1.09s | 64.9s |
+| 500 | 16 | 19 | 308 | 10.81% | 0.51% | 2.93% | 1.01% | 1.19s | 70.9s |
+
+**This one is not a pacing dial. It is the difficulty dial.** Across a range no more implausible
+than the assumption itself, the median moves five levels and the 1024 rate moves by a factor of
+nearly three. For comparison, the whole clock was worth three levels (L30) and the spawn table is
+worth one (L19). Every clocked number in this file is conditional on a constant nobody has measured,
+and that dependence is steeper than any of the levers the project has actually argued about.
+
+**Left at 250, deliberately, because there is no basis for moving it.** The two arguments point
+opposite ways and neither has evidence: there is no preview to read any more, which is less work,
+and there is no lookahead either, which puts more of the choice on the board. Picking between them
+by feel would replace an honest assumption with a dressed-up one. What changes is its status — it
+should be the first thing SPEC 17's telemetry answers, and until it does, no clocked median in this
+file should be quoted to better than "about twenty".
+
+### 8. Lookahead-1 keeps the ceiling, and now says so out loud
+
+L37: the policy reads a block that is drawn at spawn time and never shown, so since D11 it plans
+around information that does not exist yet. **Kept as the declared ceiling.** Demoting it does not
+produce an honest ceiling, it produces none — Greedy is a competent player, not a bound, and a
+lookahead that did not cheat would have to search the distribution of next draws, which is a
+different and far more expensive policy answering a question SPEC 4.4 never asked.
+
+What changed is that the declaration is now on the instrument instead of in a doc: `Policy.cheats`,
+and every report line it prints reads
+`policy=lookahead1 (ceiling, reads a block the player never sees)`. The failure mode is somebody
+quoting a lookahead median as a prediction of play, and that happens at the moment they read the
+output, not at the moment they read the KDoc. Measured, the cheat is worth **two levels of median
+and four times the 2048 rate** over Greedy.
+
+### 9. What could not be verified
+
+The player model is still the whole soft underbelly and section 7 now puts a number on how much that
+matters. Nothing here was played on a device: the wall clock is the model's. The sideways buffer is
+still modelled at its optimistic end and an input/lock tie is still resolved in the player's favour.
+The hard-drop row in section 3 is a control restored in the harness for one measurement and reverted
+— it is not in the tree, and hard drop is not in the game.
+
+Two things this chunk cannot see at all. **How the nudge feels** — 88% of the clock back is not 88%
+of the decisiveness back, and only a device answers that. And **whether players press it**: the
+entire 223s-to-56s spread is a behavioural question, and the harness models both ends rather than
+predicting which one a real player sits at.
+
+---
+
 ## C3a · Feel
 
 **Unblocked by** C3.
