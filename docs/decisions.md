@@ -6,6 +6,62 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The in-progress run is a string in `AppData`, not a typed field
+
+**Decision:** `AppData.savedRun` is a `String?` holding JSON. `SavedRun`, the type
+inside it, lives in `:features:game:impl` and is the only thing that knows the
+format.
+
+**Alternative:** a typed `GameState` field on `AppData`, which is what SPEC 11
+reads like. Rejected for two reasons that point the same way.
+
+The dependency is wrong: `AppData` is the app-wide cache, and typing this field
+would put the engine on its classpath and make the app-wide cache depend on a
+feature's private save format. It also creates a cycle — `:libraries:progress`
+holds `GameMode` and depends on `:libraries:drop2048:storage`, which depends on
+`:libraries:drop2048`, which is where `AppData` is.
+
+The blast radius is worse. The engine's serial shape moves with every chunk. A
+nested field that fails to decode takes **the whole of `AppData`** with it
+through `VersionedCacheJsonSerializer`, so a change to `EngineConfig` costs the
+player their install id and their onboarding flag over an abandoned run. A string
+decodes on its own, and a failure is "no saved run".
+
+## 2026-09-09 — Resume rides the pause seam, and the snapshot is the frame index
+
+**Decision:** the app dying is treated as a pause nobody got to handle. A
+`SavedRun` is written at every lock and at every pause; when a cascade is on
+screen it carries the board and score the resolution started from, the
+transcript, and the playback frame index. Restoring re-derives the frames with
+`framesFor` and relaunches the driver from that index.
+
+**Why:** C3 already made the frame index the mid-cascade snapshot for pause, and
+SPEC 18.9 asks for the same behaviour for a backgrounding. Building a second
+mechanism would mean two things that can disagree about what "mid-cascade" means.
+The frames are re-derived rather than stored because they are a pure function of
+the transcript — storing them would be a second copy of the same truth, and the
+copy is the one that goes stale.
+
+**Written at locks and pauses, not on every tick.** The value only changes
+meaningfully per drop. The cost is that a force-quit loses the sideways nudges of
+the drop in progress; a disk write twice a second for the whole of every run is
+the alternative.
+
+## 2026-09-09 — A run's duration is time played, not wall time
+
+**Decision:** `run_record.durationMs` accumulates only while the phase is
+`Playing` or `Resolving`. Every pause closes the stretch, and every save banks
+the stretch underway so a force-quit does not lose it.
+
+**Why:** SPEC 15 shows the sum of these as "total playtime", and SPEC 8.4
+auto-pauses on backgrounding — which is the pause players actually use. End minus
+start would report a run left on the lock screen overnight as eight hours, and
+one such run would dominate the lifetime total forever.
+
+The clock is the injected `kotlin.time.Clock` the app component already provides.
+The engine has none and does not get one (SPEC 4.1); the ViewModel owns time, as
+it already does for the drop timer.
+
 ## 2026-09-09 — The board is 5x8, settled on device, because the board is width-bound
 
 **Decision:** `EngineConfig.DEFAULT_ROWS` stays at 8. SPEC 3's seven-versus-eight

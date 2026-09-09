@@ -20,6 +20,10 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C3 · `:features:game` | **DONE** | `f34279c`. Playable on device. 5x8 and the HUD settled (L25) |
 | C1c · Balance with a clock | **DONE** | `321070a`. 500ms opening (D9). See L27-L31 |
 | C4 · Persistence + stats | **IN PROGRESS** | Also deletes `AppData.bestScore` |
+| C2c · Design language + screenshot harness | **IN PROGRESS** | The handoff (D10) |
+| C1d · Cut hard drop and hold, add nudge | queued | Engine change, digest will move (D11) |
+| C1e · Re-measure pacing without hard drop | queued | Blocked on C1d. Every number assumed it existed |
+| C3b · Game screen to handoff fidelity | queued | Blocked on C4 + C2c + C1d |
 | C3a · Feel | not started | |
 | C4 · Persistence + stats | not started | |
 | C5 · Tutorial | not started | |
@@ -60,7 +64,13 @@ These are not suggestions. A change that violates one gets reverted, not debated
    failed. Do not report green without running it.
 10. **Say what you did not verify.** Skipped tests, untested platforms, environment gaps get
     written down. A subagent that glosses a gap costs more than one that fails loudly.
-11. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
+11. **Prefer an automated test to driving a simulator.** Owner instruction, 2026-09-09. A
+    screenshot test or a ViewModel test runs in seconds, in CI, on every change, and by everyone
+    after you. A simulator run is a 90-second cycle that only you ever benefit from. Use the
+    device for what only a device can answer — feel, haptics, real gesture timing — and write a
+    test for everything else. C3 measured this: a screenshot harness would have caught two of its
+    three device bugs.
+12. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
     three and edits them concurrently with your run; your write will be silently lost (this has
     already happened once, L10). Put learnings, owner items and deferred work **in your report**
     instead. You *may* edit `SPEC.md`, `BUILD-PLAN.md` and `decisions.md` for your own chunk.
@@ -226,6 +236,54 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D10 · The design handoff is canonical for visuals and interaction, and stale for gameplay
+
+`/Users/elijahdangerfield/Documents/design_handoff_drop2048/` is a high-fidelity handoff. Owner
+ruling, 2026-09-09:
+
+**It wins on:** colour, type (Fredoka + Nunito), the hard-offset shadow system, radii, spacing,
+motion timings, layout, overlays, and the control scheme.
+
+**`SPEC.md` wins on:** merge rules, specials, the level clock, scoring, board dimensions, and v1
+scope. The handoff's README claims it "reflects all the latest gameplay decisions"; it does not,
+and its gameplay sections are to be read as prototype notes rather than requirements.
+
+Specifically **rejected** from the handoff: N-way simultaneous merges (`value × 2^N`), the absence
+of Wildcard / Bomb / Stone, `level = merges / 10`, its `850 - (level-1) * 65` speed curve, its row
+burst scoring, its 5x7 board, and "no backend, no accounts, no network".
+
+**5x8 stands.** Board dimensions are gameplay, and C3 settled it on a device with a measurement
+(L25) rather than by taste. `board.rows` remains a remote key.
+
+### D11 · Next preview, hold slot and hard drop are cut. The ▼ nudge replaces hard drop.
+
+Owner ruling. The handoff says all three "were tried and cut. Don't reintroduce them." This is an
+*interaction* change, so the handoff governs.
+
+- **SPEC 5.4 is struck**, including its "the preview is non-optional" language.
+- **Hard drop is gone.** ▼ (and a downward flick) advances the fall by **two ticks**. It is an
+  accelerator, not an instant drop.
+- Steering becomes drag-anywhere-on-board as primary, absolute from the grab point, with the
+  arrow buttons as the secondary path.
+
+**Four consequences, none of them obvious:**
+
+1. **The engine loses two `Input` cases and gains one.** `HardDrop` and `Hold` go, `Nudge`
+   arrives. That is an engine change, so **the determinism digest will move** and must be
+   re-derived by running the engine, not pasted from the failure (L17).
+2. **SPEC 7's hard drop bonus (`2 x rowsSkipped`) has nothing left to fire on.** Scoring lives in
+   the engine, so striking it moves the digest too. Decide whether the nudge pays anything; the
+   original bonus existed to reward confident play, and a nudge is a weaker claim to that.
+3. **SPEC 5.3's board-aware cap no longer has to be read at draw time.** That was forced entirely
+   by the preview: "a preview that can still change is a lie". With no preview, the cap can be
+   evaluated at landing time against the real board. This is a genuine simplification the ruling
+   makes available, and it removes the stale-data caveat L20 measured.
+4. **Every balance number in the project assumed hard drop existed.** C1c measured that using it
+   is the single biggest lever on early pacing: level 4 in **34 seconds** hard-dropping versus
+   **289 seconds** patient (L29). Removing it makes *everyone* the patient player, and the nudge
+   is only a partial substitute. **The opening pacing must be re-measured**, and D9's 500ms curve
+   was tuned in a world where hard drop existed.
 
 ### D9 · The opening drop speed is 500ms, and `blocksPerLevel` stays 20
 
@@ -668,7 +726,7 @@ C0's learnings were written into this file while the orchestrator was editing th
 and the orchestrator's write won. Four learnings were lost and had to be recovered from the
 agent's report.
 
-**Subagents no longer edit this file.** They report, the orchestrator writes. Standing rule 11.
+**Subagents no longer edit this file.** They report, the orchestrator writes. Standing rule 12.
 
 ---
 

@@ -12,10 +12,22 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
-### The hard-drop block teleports
+### Decide whether the ▼ nudge pays any score
 
-It vanishes from its column and reappears locked. `Motion.HardDropMillis` (90ms) exists and
-**nothing uses it**. This is the most-used input in the game and the fix is cheap.
+SPEC 7's hard drop bonus (`2 x rowsSkipped`) has nothing left to fire on once D11 lands. The bonus
+existed to reward confident play; a two-tick nudge is a weaker claim to that, and paying nothing is
+defensible.
+
+Whichever way it goes, **scoring lives in the engine, so this moves the determinism digest** — fold
+it into C1d rather than doing it separately.
+
+### Move the board-aware cap to landing time
+
+D11 removes the preview, which is the *only* reason SPEC 5.3 evaluates the cap at draw time ("a
+preview that can still change is a lie"). With no preview it can read the real board at landing.
+
+Simplifies the rule and removes the stale-data caveat L20 measured. Fold into C1d; it moves the
+digest too, so it should ride along with the other engine changes rather than moving it twice.
 
 ### `FuseReach` could come up ~10%
 
