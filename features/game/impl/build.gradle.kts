@@ -46,6 +46,7 @@ kotlin {
             implementation(projects.libraries.navigation)
 
             implementation(projects.libraries.cascade)
+            implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.core)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.flowroutines)
@@ -78,6 +79,8 @@ kotlin {
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.cascade)
+            implementation(projects.libraries.gameconfig)
+            implementation(projects.libraries.config)
             implementation(projects.libraries.core)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.drop2048)

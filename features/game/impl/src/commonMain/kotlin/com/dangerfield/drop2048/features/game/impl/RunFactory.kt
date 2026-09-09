@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.features.game.impl
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
+import com.dangerfield.drop2048.libraries.gameconfig.RemoteEngineConfig
 import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.random.Random
 import me.tatarka.inject.annotations.Inject
@@ -42,22 +43,31 @@ data class StartedRun(
 )
 
 /**
- * Endless mode: a fresh seed every time, on the compiled-in defaults.
+ * Endless mode: a fresh seed every time, on whatever SPEC 10's keys resolve to
+ * at the moment the run starts.
  *
- * The config is [EngineConfig.Default] rather than a remote value because
- * remote config is C7. When it lands, this is the one place that reads it, and
- * SPEC 10's rule still holds either way: the binary is fully playable with the
- * server unreachable.
+ * **This is the only call site of [RemoteEngineConfig.current], and that is the
+ * mechanism by which a fetched config takes effect at the start of the next run
+ * and never mid-run.** The value it returns is written into the [GameState]
+ * (D5) and every in-run read — the drop interval, the level bar's denominator,
+ * the nudge distance — goes through `state.config` rather than back to the
+ * config map. A refresh that lands while a run is alive changes nothing until
+ * the player starts another one.
  *
- * That default is **eight rows**, settled on device in C3. See SPEC 3.
+ * SPEC 10's rule holds unchanged: every key falls back to a compiled-in default,
+ * so with the server unreachable this returns exactly [EngineConfig.Default] and
+ * the binary is fully playable. That default is **eight rows**, settled on
+ * device in C3. See SPEC 3.
  */
 @ContributesBinding(AppScope::class)
 @Inject
-class EndlessRunFactory : RunFactory {
+class EndlessRunFactory(
+    private val engineConfig: RemoteEngineConfig,
+) : RunFactory {
     override fun newRun(): StartedRun {
         val seed = Random.nextLong()
         return StartedRun(
-            state = Cascade.newGame(seed = seed, config = EngineConfig.Default),
+            state = Cascade.newGame(seed = seed, config = engineConfig.current()),
             seed = seed,
             mode = GameMode.ENDLESS,
         )

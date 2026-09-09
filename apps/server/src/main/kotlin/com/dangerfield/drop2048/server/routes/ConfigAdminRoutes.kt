@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.server.routes
 import com.dangerfield.drop2048.server.config.AdminConfig
 import com.dangerfield.drop2048.server.data.AppConfigTargetingEngine
 import com.dangerfield.drop2048.server.data.ConfigSchema
+import com.dangerfield.drop2048.server.data.orCatalog
 import com.dangerfield.drop2048.server.data.validateRuleConditions
 import com.dangerfield.drop2048.server.domain.AppConfigAdminRepository
 import com.dangerfield.drop2048.server.domain.AppConfigManifestRepository
@@ -49,6 +50,11 @@ import java.util.UUID
  *
  * The optional `X-Admin-Actor` header is recorded on every mutation's audit
  * row so a shared token can still attribute who made a change.
+ *
+ * Every manifest read here goes through
+ * [com.dangerfield.drop2048.server.data.orCatalog], so a deploy no build has
+ * uploaded a manifest to still lists SPEC 10's keys with their compiled-in
+ * defaults instead of an empty table. An uploaded manifest replaces it outright.
  */
 fun Route.configAdminRoutes(
     config: AdminConfig,
@@ -178,7 +184,7 @@ fun Route.configAdminRoutes(
             val versions = manifestRepository.listVersions()
             val target = requested ?: versions.firstOrNull()?.versionCode
             val meta = versions.firstOrNull { it.versionCode == target }
-            val entries = manifestRepository.getManifest(target)
+            val entries = manifestRepository.getManifest(target).orCatalog()
             call.respond(
                 HttpStatusCode.OK,
                 ManifestResponse(
@@ -222,7 +228,7 @@ private suspend fun resolveFlags(
         installId = request.installId?.takeUnless { it.isBlank() },
     )
     val dbByPath = repository.listFlags().associateBy { it.path }
-    val manifestByPath = manifestRepository.getManifest(request.buildNumber).associateBy { it.path }
+    val manifestByPath = manifestRepository.getManifest(request.buildNumber).orCatalog().associateBy { it.path }
 
     val paths = (dbByPath.keys + manifestByPath.keys).toSortedSet()
     val flags = paths.map { path ->
@@ -263,13 +269,14 @@ private suspend fun seedFlagFromManifestIfMissing(
     actor: String,
 ) {
     if (repository.listFlags().any { it.path == flagPath }) return
-    val default = manifestRepository.getManifest(null).firstOrNull { it.path == flagPath }?.default ?: return
+    val default = manifestRepository.getManifest(null).orCatalog().firstOrNull { it.path == flagPath }?.default
+        ?: return
     repository.upsertFlag(flagPath, default, actor)
 }
 
 /** Build the type/allowed-values schema from the latest captured manifest. */
 private suspend fun schema(manifestRepository: AppConfigManifestRepository): ConfigSchema =
-    ConfigSchema.from(manifestRepository.getManifest(null))
+    ConfigSchema.from(manifestRepository.getManifest(null).orCatalog())
 
 private const val DEFAULT_AUDIT_LIMIT = 100
 

@@ -1,0 +1,155 @@
+package com.dangerfield.drop2048.libraries.gameconfig
+
+import com.dangerfield.drop2048.libraries.config.AppConfigMap
+import com.dangerfield.drop2048.libraries.config.FlagConfigValue
+import com.dangerfield.drop2048.libraries.config.IntConfigValue
+import com.dangerfield.drop2048.libraries.config.QaConfigValue
+import com.dangerfield.drop2048.libraries.config.StringConfigValue
+import me.tatarka.inject.annotations.Inject
+import software.amazon.lastmile.kotlin.inject.anvil.AppScope
+import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
+import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
+
+/**
+ * SPEC 10's ad, Pro and kill-switch keys.
+ *
+ * **These have no consumer yet and that is the point.** `:libraries:ads`,
+ * `:libraries:billing`, C6's Daily Challenge and C9's leaderboards all land
+ * later; BUILD-PLAN lists C10 as unblocked by C7 precisely because its gates are
+ * config-driven. Declaring the keys now means each of those chunks reads a value
+ * that already exists, already has a compiled-in default, and is already
+ * editable in the admin console — instead of inventing a path and a default
+ * under deadline.
+ *
+ * Every default is the number SPEC 12 states, so the compiled-in behaviour with
+ * the server unreachable is the behaviour SPEC 12 describes.
+ */
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class AdsEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Ads enabled"
+    override val description = "Master kill switch for all advertising, rewarded included."
+    override val path = "ads.enabled"
+    override val default = true
+}
+
+/**
+ * SPEC 12.3's first gate: no interstitial before this many runs this session.
+ * Four means the 4th run of a session is the earliest one that can carry an ad.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class InterstitialMinSessionRuns(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Interstitial: earliest run of a session"
+    override val description = "SPEC 12: never before the 4th run of a session."
+    override val path = "ads.interstitial.minSessionRuns"
+    override val default = 4
+}
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class InterstitialCooldownSeconds(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Interstitial: cooldown (seconds)"
+    override val description = "Minimum gap since the last interstitial. SPEC 12: 180s."
+    override val path = "ads.interstitial.cooldownSeconds"
+    override val default = 180
+}
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class InterstitialRewardedGapSeconds(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Interstitial: gap around a rewarded ad (seconds)"
+    override val description = "Never within this of a rewarded ad, in either direction. SPEC 12: 45s."
+    override val path = "ads.interstitial.rewardedGapSeconds"
+    override val default = 45
+}
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class InterstitialSuppressDaysSinceInstall(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Interstitial: suppress for days after install"
+    override val description = "Suppressed entirely for this many days after install. SPEC 12: 3."
+    override val path = "ads.interstitial.suppressDaysSinceInstall"
+    override val default = 3
+}
+
+/** SPEC 12's Continue placement: 1 free per run, a 2nd at higher friction, hard cap 2. */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class RewardedContinuesPerRun(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Rewarded cap: continues per run"
+    override val description = "Hard cap on rewarded continues in one run. SPEC 12: 2."
+    override val path = "ads.rewarded.continuesPerRun"
+    override val default = 2
+}
+
+/** SPEC 12's Daily retry placement: one extra attempt, once a day. */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class RewardedDailyRetriesPerDay(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
+    override val name = "Rewarded cap: Daily retries per day"
+    override val description = "Rewarded Daily Challenge retries per UTC day. SPEC 12: 1."
+    override val path = "ads.rewarded.dailyRetriesPerDay"
+    override val default = 1
+}
+
+/**
+ * The store's price tier id, not a currency amount. Price is set per-store and
+ * this key only chooses which configured product the paywall asks for, so a
+ * price experiment does not need a binary.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ProPriceTier(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap) {
+    override val name = "Pro price tier"
+    override val description = "Store product id the paywall requests. SPEC 12: \$2.99 at v1 scope."
+    override val path = "pro.price.tier"
+    override val default = "pro_299"
+}
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class ProUpsellEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Pro upsell enabled"
+    override val description = "The Settings entry and the once-per-session stacked-out card. SPEC 12."
+    override val path = "pro.upsell.enabled"
+    override val default = true
+}
+
+/**
+ * SPEC 10's kill switches for anything with a server or platform dependency.
+ *
+ * Off means the entry point is not offered, not that a broken screen is shown.
+ * Both default **on**: an unreachable server must leave the game exactly as the
+ * binary ships it, and a fallback that silently disabled features would make the
+ * offline path a different product.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class DailyChallengeEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Daily Challenge enabled"
+    override val description = "Kill switch for SPEC 14. Off hides the entry point."
+    override val path = "feature.dailyChallenge"
+    override val default = true
+}
+
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class LeaderboardsEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Leaderboards enabled"
+    override val description = "Kill switch for Game Center / Play Games boards. Off hides the entry point."
+    override val path = "feature.leaderboards"
+    override val default = true
+}

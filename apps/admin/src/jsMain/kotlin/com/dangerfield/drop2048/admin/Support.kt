@@ -88,10 +88,30 @@ internal fun csvSet(raw: String): Set<String>? =
 internal fun randomUuid(): String = js("crypto.randomUUID()") as String
 
 /**
- * A confirm prompt for values that hit every user hard — locking them out or
- * forcing an upgrade. Returns the warning to show, or null when the change is
- * routine. Keyed on (path, value) because the danger is value-specific
- * (`maintenanceMode = "blocking"` is a lockout; `"off"` is harmless).
+ * A confirm prompt for values that hit every user hard — locking them out,
+ * forcing an upgrade, or invalidating scores that are already on the board.
+ * Returns the warning to show, or null when the change is routine.
+ *
+ * Keyed on (path, value) because most of these are value-specific
+ * (`maintenanceMode = "blocking"` is a lockout; `"off"` is harmless). Two are
+ * not, and warn on any value: raising the minimum supported version, and
+ * [DIGEST_MOVING_PATHS].
+ *
+ * ### Why `level.blocksPerLevel` is on this list and the other gameplay keys are not
+ *
+ * The distinction is measured, not stylistic. The speed curve is a pacing dial
+ * with no effect on any outcome column (L28/D9); `speed.nudgeRows` cannot change
+ * where a block lands, so it does not touch the engine's recorded state at all
+ * (L40); the spawn table sets the tier ceiling and moves the median level by at
+ * most one (L19). All three are safe to turn live.
+ *
+ * `level.blocksPerLevel` feeds level advancement, so it **moves the pinned
+ * determinism digest**. Every Daily Challenge score and every seed-attached bug
+ * report recorded under the old value replays as a different run under the new
+ * one — and it still replays, which is the expensive kind of wrong. D9 keeps the
+ * key in reserve rather than excluding it, so the console's job is to make
+ * changing it a deliberate act. On prod the warning also forces the operator to
+ * type the environment name before Confirm arms.
  */
 internal fun dangerousWarning(path: String, value: String): String? {
     val v = value.trim()
@@ -102,9 +122,21 @@ internal fun dangerousWarning(path: String, value: String): String? {
             "This shows a maintenance banner to ALL users. Continue?"
         path == "upgrade.minSupportedVersionCode" ->
             "Raising the minimum supported version force-upgrades every user below it. Double-check the number. Continue?"
+        path in DIGEST_MOVING_PATHS ->
+            "This MOVES THE DETERMINISM DIGEST. Every Daily Challenge score and every seed-attached bug " +
+                "report recorded under the old value will replay as a DIFFERENT run — silently, because it " +
+                "still replays. Only the clock behaves this way; the speed curve, the nudge and the spawn " +
+                "table were all measured safe to change live. Continue?"
         else -> null
     }
 }
+
+/**
+ * Config paths that feed level advancement and therefore change what a seed
+ * replays to. One entry today; it is a set so the next one is a one-line change
+ * rather than a second `when` branch someone forgets to add.
+ */
+internal val DIGEST_MOVING_PATHS = setOf("level.blocksPerLevel")
 
 /** Compact, human-readable rendering of a JSON value for tables (no pretty-print). */
 internal fun JsonElement?.inline(): String = this?.toString() ?: "—"

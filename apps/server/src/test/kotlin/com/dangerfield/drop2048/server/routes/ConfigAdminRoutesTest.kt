@@ -31,6 +31,7 @@ import kotlinx.serialization.json.jsonObject
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Route-level tests for the config admin API against a fake repository — pins
@@ -306,6 +307,66 @@ class ConfigAdminRoutesTest {
                 setBody("""{"platform": "ios"}""")
             }
             assertEquals(HttpStatusCode.Unauthorized, resp.status)
+        }
+    }
+
+    @Test
+    fun manifest_withNothingUploaded_fallsBackToTheCatalog() = runTest {
+        testApp(FakeRepo()) { client ->
+            val resp = client.get("/v1/admin/config/manifest") { header("X-Admin-Token", token) }
+            assertEquals(HttpStatusCode.OK, resp.status)
+            val entries = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["entries"]!!.jsonArray
+            val paths = entries.map { it.jsonObject["path"]!!.let { p -> (p as JsonPrimitive).content } }
+            assertTrue("level.blocksPerLevel" in paths, "SPEC 10 gameplay key is listed")
+            assertTrue("spawn.table" in paths, "the spawn table is listed")
+            assertTrue("ads.interstitial.cooldownSeconds" in paths, "the ad gates are listed")
+            assertTrue("feature.dailyChallenge" in paths, "the kill switches are listed")
+        }
+    }
+
+    @Test
+    fun manifest_whenUploaded_replacesTheCatalogOutright() = runTest {
+        val manifest = FakeManifestRepo().apply {
+            byVersion[7] = listOf(ManifestEntry("board.rows", "int", JsonPrimitive(8), null, null))
+        }
+        testApp(FakeRepo(), manifest) { client ->
+            val resp = client.get("/v1/admin/config/manifest") { header("X-Admin-Token", token) }
+            val entries = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["entries"]!!.jsonArray
+            assertEquals(1, entries.size)
+        }
+    }
+
+    @Test
+    fun upsertFlag_withNoManifest_isTypeCheckedAgainstTheCatalog() = runTest {
+        testApp(FakeRepo()) { client ->
+            val bad = client.put("/v1/admin/config/flags/board.rows") {
+                header("X-Admin-Token", token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"value": "eight"}""")
+            }
+            assertEquals(HttpStatusCode.BadRequest, bad.status)
+
+            val good = client.put("/v1/admin/config/flags/board.rows") {
+                header("X-Admin-Token", token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"value": 7}""")
+            }
+            assertEquals(HttpStatusCode.OK, good.status)
+        }
+    }
+
+    @Test
+    fun resolve_withNoManifest_reportsTheCompiledInDefaults() = runTest {
+        testApp(FakeRepo()) { client ->
+            val resp = client.post("/v1/admin/config/resolve") {
+                header("X-Admin-Token", token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"platform": "ios"}""")
+            }
+            assertEquals(HttpStatusCode.OK, resp.status)
+            val flags = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["flags"]!!.jsonArray
+            val rows = flags.single { it.jsonObject["path"]!!.let { p -> (p as JsonPrimitive).content } == "level.blocksPerLevel" }
+            assertEquals("20", rows.jsonObject["resolved"]!!.toString())
         }
     }
 }

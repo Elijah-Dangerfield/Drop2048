@@ -71,8 +71,6 @@ if (!serverOnly) {
     include(":features:game:impl")
     include(":features:home")
     include(":features:home:impl")
-    include(":features:onboarding")
-    include(":features:onboarding:impl")
     include(":features:stats")
     include(":features:stats:impl")
 
@@ -83,6 +81,10 @@ if (!serverOnly) {
     include(":libraries:config")
     include(":libraries:config:impl")
     include(":libraries:core")
+    // SPEC 10's remote keys, one `ConfiguredValue` each, plus the assembler that
+    // turns the gameplay half into an `EngineConfig`. Sits between :config and
+    // :cascade so the engine keeps its zero project dependencies.
+    include(":libraries:gameconfig")
     include(":libraries:flowroutines")
     include(":libraries:flowroutines:testing")
     include(":libraries:navigation")

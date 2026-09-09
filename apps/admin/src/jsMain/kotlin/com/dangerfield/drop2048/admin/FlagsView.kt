@@ -209,6 +209,17 @@ private fun FlagDetail(
         P(attrs = { classes("muted"); style { property("margin", "4px 0 8px") } }) { Text(it) }
     }
 
+    if (row.path in DIGEST_MOVING_PATHS) {
+        P(attrs = { classes("modal-warning"); style { property("margin", "4px 0 8px") } }) {
+            Text(
+                "Changing this moves the determinism digest: every Daily Challenge score and every " +
+                    "seed-attached bug report recorded under the old value replays as a different run. " +
+                    "The speed curve, the nudge and the spawn table were all measured safe to change live — " +
+                    "this one was measured not to be.",
+            )
+        }
+    }
+
     // The three layers of every flag, spelled out: what the client build ships
     // with, what (if anything) we've set on the server, and what a client
     // matching the target lens actually receives.
@@ -275,6 +286,7 @@ private fun FlagDetail(
                             before = row.base.inline(),
                             after = "not set",
                             success = "Removed server value for ${row.path} — clients fall back to the baked value",
+                            warning = dangerousWarning(row.path, row.default.inline()),
                         ) { ctx.api.deleteFlag(row.path) }
                     }
                 }) { Text("Remove server value") }

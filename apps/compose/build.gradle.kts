@@ -90,6 +90,7 @@ kotlin {
             implementation(projects.libraries.drop2048.storage)
             implementation(projects.libraries.config)
             implementation(projects.libraries.config.impl)
+            implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.drop2048.storage)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.progress.impl)
@@ -101,8 +102,6 @@ kotlin {
             implementation(projects.features.game.impl)
             implementation(projects.features.home)
             implementation(projects.features.home.impl)
-            implementation(projects.features.onboarding)
-            implementation(projects.features.onboarding.impl)
             implementation(projects.features.stats)
             implementation(projects.features.stats.impl)
 

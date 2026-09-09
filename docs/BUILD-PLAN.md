@@ -836,6 +836,49 @@ compiled default instead of crashing.
 
 Fly deploy is part of this chunk, not a follow-up.
 
+**Outcome.** Twenty-six keys wired through `:libraries:gameconfig`, a new leaf module between
+`:libraries:config` and `:libraries:cascade` — one `ConfiguredValue` per key, every default read
+off `EngineConfig`'s own companion rather than retyped. The fifteen gameplay keys are assembled by
+`RemoteEngineConfig`; the eleven ad / Pro / kill-switch keys have no consumer until C10 and are
+seams with tests on the seam.
+
+**A fetched config takes effect at the start of the next run, never during one.**
+`EndlessRunFactory` is the only reader, the value goes into `GameState.config` (D5), and every
+in-run read already came off `state.config`. `RemoteConfigRunBoundaryTest` moves the map underneath
+a live run and asserts nothing budges until Restart. See `decisions.md`.
+
+`level.blocksPerLevel` is wired **with** the digest warning D9 asks for, at three places in the
+admin console: the flag description, a red banner on open, and `dangerousWarning` on every write
+path (which on prod also forces typing the environment name). Reverting it warns too.
+`DangerousWarningTest` pins that the ten keys measured safe — the curve, the nudge, the spawn
+table, the rest — do **not** warn, because a console that warns about everything is one nobody
+reads.
+
+Range checks are per-key: a bad value falls back to that key's own default and leaves its
+neighbours remote. `EngineConfig`'s `require` blocks are the backstop, inside `Catching`.
+`NeverRemoteTest` feeds the assembler every plausible path for `Scoring`, the cascade caps, `cols`,
+`spawnCapFloor` and `continueRowsCleared` and asserts none of them moves.
+
+The server gained `ConfigCatalog`, used only until CI uploads a real manifest: without it a fresh
+deploy's admin console has an empty flag table and `ConfigSchema` has nothing to type-check
+against. An uploaded manifest replaces it outright. It is a hand-maintained mirror and that cost is
+recorded in `decisions.md`.
+
+**Docker was up for the first time in this project, and the integration harness ran.**
+`:apps:integration`'s `HarnessSmokeTest` — the real client `RemoteConfigRemoteDataSource` over real
+TCP against the real in-process Ktor server on a Testcontainers Postgres — **passed**. So did all
+four server Testcontainers tests, after one of them was fixed: `DatabaseSchemaTest` asserted
+`app_config_values` was empty, which V4's own seed had made false the day it landed. It had never
+failed because it had never run.
+
+Full gate green with **0 skips**: 828 tests, 0 failures, detekt clean, both platforms compile.
+
+**Not verified.** The Fly deploy — there is no Fly app yet (`OWNER-TODO.md`), so nothing has been
+exercised against a deployed server: no real `GET /v1/app-config` over the internet, no admin
+console served from `/admin`, no change made in a browser reaching a device. The in-process harness
+covers the same code path over real TCP, which is the strongest claim available without the app.
+The app was also not launched on either simulator.
+
 ---
 
 ## C8 · Telemetry

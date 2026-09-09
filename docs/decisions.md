@@ -6,6 +6,116 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — A fetched config takes effect at the start of the next run, never during one
+
+**Decision:** `RunFactory.newRun()` is the only reader of remote gameplay config.
+`EndlessRunFactory` calls `RemoteEngineConfig.current()` once per run, writes the
+result into `GameState.config`, and everything the ViewModel needs while the run
+is alive — the drop interval, the level bar's denominator, the nudge distance,
+the board's shape — comes off `state.config` rather than back to the config map.
+
+**Why it needed deciding at all.** `OfflineFirstAppConfigRepository` refreshes on
+every app foreground past its throttle and publishes a live merged map, so a
+`ConfiguredValue` read twice in one process can give two answers. Nothing about
+that is wrong; what would be wrong is the game noticing mid-drop. A board that
+gains a row, a level bar whose denominator moves and a drop timer that changes
+interval, all without the player doing anything, is a bug with no description.
+
+**Why the fix was already half-built.** D5 put `EngineConfig` inside `GameState`
+so a seed reproduces a run byte for byte. Rules changing under a live run is the
+same failure at one scale smaller, and pinning the config at the run boundary
+covers both. A run resumed from C4's saved blob comes back on the numbers it was
+played under for the same reason.
+
+**Rejected:** reading config per drop and only applying "safe" keys live. It
+splits one value into two lifetimes, and the definition of safe is exactly the
+argument this chunk is trying to make explicit rather than incidental.
+
+`RemoteConfigRunBoundaryTest` moves the map underneath a live run and asserts
+nothing budges until Restart.
+
+## 2026-09-09 — Every SPEC 10 key is remote, including `level.blocksPerLevel`, and the console is where the hazard lives
+
+**Decision:** wire all of SPEC 10, `level.blocksPerLevel` included, and put its
+digest warning at the admin surface rather than excluding the key.
+
+D9 measured the distinction and it is not stylistic. The speed curve is a pacing
+dial with outcome columns identical to the digit across three candidates (L28).
+`speed.nudgeRows` cannot change where a block lands, so it never reaches the
+engine's recorded state (L40). The spawn table sets the tier ceiling and moves the
+median level by at most one (L19). All three are safe to turn live.
+
+`level.blocksPerLevel` feeds level advancement, so it **moves the pinned
+determinism digest**: every Daily Challenge score and every seed-attached bug
+report recorded under the old value replays as a different run, and it still
+replays, which is the expensive kind of wrong. D9 keeps it in reserve as the knob
+to reach for if live data says runs feel long, so excluding it would contradict a
+decision already made.
+
+The console carries it instead, in three places: the flag's description, a red
+banner in the detail row on open, and `dangerousWarning` on every write path —
+which on prod also forces the operator to type the environment name before
+Confirm arms. Reverting the key warns too, because going back moves the digest a
+second time. `DangerousWarningTest` pins both halves: the clock warns, and the
+ten keys measured safe do not, because a console that warns about everything is a
+console nobody reads.
+
+## 2026-09-09 — SPEC 10's keys live in `:libraries:gameconfig`, between config and the engine
+
+**Decision:** a new leaf module holds one `ConfiguredValue` per SPEC 10 key plus
+`RemoteEngineConfig`, the only thing that assembles them into an `EngineConfig`.
+
+`:libraries:cascade` cannot hold them: SPEC 4.1 gives the engine zero project
+dependencies and everything downstream assumes it stays that way.
+`:libraries:config` cannot hold them either without depending on the engine,
+which inverts the template's generic config stack onto one game. Putting them in
+`:features:game:impl` would work today and be wrong by C6, when Daily Challenge
+needs the same values from a different feature.
+
+Every default is read off `EngineConfig`'s own companion rather than retyped, so
+the compiled-in fallback and the number the engine ships with cannot drift apart.
+
+**Range checks are per-key, not per-config.** A bad value falls back to that
+value's own default and leaves its neighbours remote, so a typo in one row of the
+admin console cannot discard the other fourteen. `EngineConfig`'s and
+`SpeedCurve`'s `require` blocks are the backstop: the assembly runs inside
+`Catching` and a throw resolves to `EngineConfig.Default`.
+
+**The never-remote list is guarded from outside.** `Scoring`, the cascade caps,
+`spawnCapFloor`, `continueRowsCleared` and `cols` have no `ConfiguredValue` and
+must never gain one. `NeverRemoteTest` feeds the assembler a map naming every
+plausible path for them and asserts the result is unchanged — because a key
+pointed at scoring would compile silently and invalidate every score on the
+board.
+
+## 2026-09-09 — The server ships a config catalog, used only until CI uploads a manifest
+
+**Decision:** `ConfigCatalog` in `:apps:server` lists SPEC 10's keys with their
+types, compiled-in defaults and descriptions, and every manifest read in
+`ConfigAdminRoutes` goes through `orCatalog()`. An uploaded manifest replaces it
+outright.
+
+The admin console discovers flags from the uploaded per-version manifest, and
+nothing uploads one yet — CI manifest capture is not built. On a fresh deploy that
+makes the flag table empty: every value editable in principle, none discoverable
+in practice, and `ConfigSchema` with nothing to type-check against, so
+`board.rows = "eight"` would be accepted and silently ignored by the client.
+
+**Rejected: seeding `app_config_values` in a migration**, the way V4 seeded the
+kill-switch trio. A seeded row is a served override, so the day a later chunk
+retunes a compiled default the stale row would silently win. The catalog is a
+fallback, not a value.
+
+`ifEmpty` rather than a per-path merge, so "what did v1.0.1 ship with" stays an
+honest question once a real manifest exists.
+
+**Known cost:** the catalog is a hand-maintained mirror of the client's
+`ConfiguredValue` registry and can drift. `:apps:server` cannot import
+`:libraries:cascade` to check — the server-only Docker build excludes every
+client module by design. `ConfigCatalogTest` pins the path set, the types and the
+absence of never-remote keys; the durable fix is wiring the manifest upload into
+CI.
+
 ## 2026-09-09 — C3b's five rulings on the parts of the game screen the handoff never drew
 
 The design handoff is a 5x7 board with no special blocks, so it has nothing to say
