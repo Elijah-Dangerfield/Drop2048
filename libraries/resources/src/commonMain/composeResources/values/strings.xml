@@ -1,6 +1,32 @@
 <resources>
     <string name="app_name">Drop 2048</string>
 
-    <string name="onboarding_tagline">A block falls. Steer it onto its match and the two double. Chains trigger chains. Fill the grid and you\'re stacked out.</string>
+    <string name="onboarding_tagline">A block falls. Steer it onto its match and the two double. Chains trigger chains. Fill the grid and you are stacked out.</string>
     <string name="onboarding_start">Play</string>
+
+    <string name="game_score">Score</string>
+    <string name="game_best">Best</string>
+    <string name="game_level">Level %1$d</string>
+    <string name="game_hold">Hold</string>
+    <string name="game_next">Next</string>
+    <string name="game_pause">Pause</string>
+    <string name="game_move_left">Move left</string>
+    <string name="game_move_right">Move right</string>
+    <string name="game_drop">Drop</string>
+    <string name="game_board">Game board, %1$d columns by %2$d rows</string>
+    <string name="game_falling_block">%1$s falling in column %2$d, landing in row %3$d</string>
+
+    <!-- SPEC 8.2. "x2" is a multiplication sign in English and not in every locale,
+         so this is a whole format string rather than a prefix plus a number. -->
+    <string name="game_chain">CHAIN x%1$d</string>
+
+    <string name="game_paused">Paused</string>
+    <string name="game_resume">Resume</string>
+    <string name="game_restart">Restart</string>
+    <string name="game_quit">Quit</string>
+    <string name="game_left_handed">Left-handed controls</string>
+
+    <string name="game_stacked_out">Stacked out</string>
+    <string name="game_biggest">Biggest</string>
+    <string name="game_drop_again">Drop again</string>
 </resources>

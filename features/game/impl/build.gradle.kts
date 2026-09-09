@@ -3,23 +3,22 @@ plugins {
 }
 
 android {
-    namespace = "com.dangerfield.drop2048.features.onboarding.impl"
+    namespace = "com.dangerfield.drop2048.features.game.impl"
 }
 
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.features.onboarding)
             implementation(projects.features.game)
             implementation(projects.libraries.navigation)
 
+            implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.ui)
             implementation(projects.libraries.resources)
             implementation(projects.libraries.drop2048)
 
-            // Compose dependencies (navigation and lifecycle provided by drop2048.feature plugin)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
@@ -30,10 +29,10 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
-            implementation(projects.features.onboarding)
+            implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
-            implementation(libs.turbine)
+            implementation(projects.libraries.ui)
         }
     }
 }

@@ -67,6 +67,8 @@ if (!serverOnly) {
     include(":apps:admin")
 
     // Features
+    include(":features:game")
+    include(":features:game:impl")
     include(":features:home")
     include(":features:home:impl")
     include(":features:onboarding")

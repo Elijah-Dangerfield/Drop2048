@@ -15,15 +15,17 @@ against real play data. None of them are truths.**
 
 ## 0. Status
 
-C0, C1 and most of C2 are done. The Supabase identity stack is gone; the Ktor + Postgres server
+C0, C1, C2 and C3 are done. The game is playable end to end and a run can be lost. The Supabase identity stack is gone; the Ktor + Postgres server
 and the Compose-for-web admin console remain, for remote config only (see 10).
 
 `:libraries:cascade` is the engine and is complete and tested, including on Kotlin/Native.
-`:libraries:ui` has the five block palettes, the cue pairing and the board geometry; the four HUD
-primitives are outstanding.
+`:libraries:ui` has the five block palettes, the cue pairing, the board geometry and the four HUD
+primitives.
 
-Nothing is playable yet. That is C3. See `BUILD-PLAN.md` for the order and `ORCHESTRATION.md` for
-where each chunk stands.
+`:features:game` is the playable screen: the drop timer, the lock delay, transcript playback, the
+buttons scheme, the HUD, the danger state, pause and the stacked-out sheet. Audio is silent — the
+cue calls are all in place and the sample bank is C3a. See `BUILD-PLAN.md` for the order and
+`ORCHESTRATION.md` for where each chunk stands.
 
 ## 1. Pitch
 
@@ -58,13 +60,16 @@ economy land.
 
 ## 3. Board
 
-**5 columns x 8 rows.** Row 0 is the top.
+**5 columns x 8 rows.** Row 0 is the top. **Settled in C3 on device; fixed for v1.**
 
-The mockups draw 5 x 7. That is the discrepancy to settle in C3 against a real device: 8 rows
-gives one more row of reaction time in the danger state, 7 rows draws bigger blocks and reads
-better on a small phone. **Default to 8** and make `board.rows` a remote-config key so it can be
-changed without a release. Whichever wins, it is fixed for v1: the high score table is not
-comparable across dimensions.
+The mockups drew 5 x 7. Both were built and played on an iPhone 16e. The case for 7 was that it
+draws bigger blocks; it does not. At five columns the cell size is set by the **width** of the
+phone, not its height, so 7 rows drew a cell about 3% larger and turned the rest of the height
+into gutter above and below the stack. Seven costs a full row of reaction time in the danger
+state and buys nothing.
+
+`board.rows` stays a remote-config key so the question can be reopened with real data. The high
+score table is not comparable across dimensions, so it does not move mid-version.
 
 ### 3.1 Row zero
 
@@ -362,7 +367,12 @@ Universal, all schemes:
 - **Soft drop** accelerates to 40ms per row without placing.
 - **Lock delay** of 150ms at the resting cell before locking, allowing a last-instant column
   change. **One reset per drop**, so it cannot stall.
-- **Input during resolution is ignored.** Cascades play out uninterrupted.
+- **Input during resolution is ignored.** Cascades play out uninterrupted. **Amended in C3:** no
+  input reaches the engine mid-cascade, but the *last sideways move* is held and applied to the
+  block that spawns afterwards. Discarding it turned out to be a different rule and a bad one —
+  on device, every move tapped in the beat after a hard drop vanished and the new block went
+  straight down the middle. Hard drop and hold are deliberately not buffered: replaying either
+  would act on a board the player has not looked at yet.
 
 Hard drop into a full column locks the block in row 0, resolution runs, and if row 0 is still
 occupied the run ends. No special case.
@@ -402,12 +412,21 @@ case. Read the two together or they look like they disagree.
 ### 8.1 HUD
 
 The mockups show score and best top-left, level with a progress bar top-right, pause button, and
-the board filling the rest. They have **nowhere for the next preview or the hold slot**, and 5.4
-says the preview is non-optional. That conflict is C3's first design task.
+the board filling the rest. They had **nowhere for the next preview or the hold slot**, and 5.4
+says the preview is non-optional. **Settled in C3**, close to the recommendation but on two rows
+rather than one:
 
-Recommended resolution: next-two as small chips on the right of the header row where the level
-bar sits, level collapses to a number plus a thin bar underneath, hold slot as a single chip left
-of them, pause moves to the far right. No powerup tray in v1, which buys back the space.
+- **Row one:** SCORE left, abbreviated and counting up; BEST right, smaller and secondary.
+- **Row two:** `LEVEL n` with its thin bar taking the free width, then the HOLD chip, then the
+  NEXT chips, then pause at the far right.
+
+Two rows rather than one, which is the one place this departs from the recommendation. Score,
+best and level are three numbers of unpredictable width; on one row a preview chip is pushed
+sideways by a score rolling from 9,999 to 10,240, so the preview moves while the player is
+reading it. The second row costs about 40dp of a screen where the board turned out to be
+width-bound anyway (see 3), so it is height that had nothing else to do.
+
+No powerup tray in v1, which is what buys the space.
 
 Nothing else on screen. No banner ad. No timer bar. No clutter.
 

@@ -2,7 +2,7 @@ package com.dangerfield.drop2048
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dangerfield.drop2048.features.home.HomeRoute
+import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.features.onboarding.OnboardingRoute
 import com.dangerfield.drop2048.libraries.config.EnsureAppConfigLoaded
 import com.dangerfield.drop2048.libraries.core.logging.KLog
@@ -31,8 +31,12 @@ private const val BootConfigTimeoutMillis = 8_000L
 
 /**
  * App-level ViewModel. Resolves the start destination by reading the persistent
- * `AppData` cache — returning players land on [HomeRoute]; first-launch players
- * land on [OnboardingRoute].
+ * `AppData` cache — returning players land straight on [GameRoute]; first-launch
+ * players land on [OnboardingRoute].
+ *
+ * There is no menu in between on purpose. SPEC 13 opens the app in a run, and
+ * `HomeRoute` is still the template's placeholder screen; it stays registered
+ * for the bug-report and feedback flows that hang off it.
  *
  * Scoped as singleton so Android's splash-screen API can read the same instance
  * used by the App composable.
@@ -98,9 +102,9 @@ class AppViewModel(
             val onboarded = appCache.get().hasUserOnboarded
             logger.d {
                 "Resolving start destination: hasUserOnboarded=$onboarded → " +
-                    if (onboarded) "Home" else "Onboarding"
+                    if (onboarded) "Game" else "Onboarding"
             }
-            _startDestination.value = if (onboarded) HomeRoute() else OnboardingRoute()
+            _startDestination.value = if (onboarded) GameRoute() else OnboardingRoute()
             // Start destination resolved — release the platform splash; the
             // Compose boot gate now covers the rest of the wait.
             _isReady.value = true

@@ -322,6 +322,38 @@ dropped, lock delay resets exactly once, and the run ends on the right frame.
 **This is the "is it fun" checkpoint.** Play it for an hour before starting C3a. If it is not fun
 here, no amount of C4 through C13 fixes it, and this is the cheapest moment to change the design.
 
+**Outcome (2026-09-09).** Everything above landed. `:features:game` + `:features:game:impl` are
+wired into the nav graph and are now the app's start destination for a returning player;
+onboarding hands off to them too. Verification:
+`./gradlew testDebugUnitTest :apps:compose:assembleDebug
+:apps:compose:compileKotlinIosSimulatorArm64 detekt` — **377 tests, 0 failures, 1 skipped**
+(`:apps:integration` `HarnessSmokeTest`, Docker down, which is the expected count), detekt clean
+with both custom rules proven to dispatch, both platforms build.
+`:libraries:cascade:iosSimulatorArm64Test` re-run for free: 89 tests on Kotlin/Native, green.
+
+**The two design questions are settled**, both on an iPhone 16e simulator, both written up in
+`decisions.md` and folded into `SPEC.md`:
+
+- **5x8.** The board is *width*-bound at five columns, so seven rows drew a cell ~3% larger and
+  turned the rest into gutter. Seven costs a row of reaction time and buys nothing.
+- **HUD.** SPEC 8.1's recommendation, on two rows rather than one, because on one row the preview
+  chips get shoved sideways by the score counter rolling.
+
+**What playing it found**, in order of how much it mattered:
+
+1. **Every input in the beat after a hard drop was eaten.** Three columns' worth of intended play
+   ended up in one. SPEC 6 was amended: the last sideways move is buffered and replayed on the
+   next block. This is the single change that made the game feel like it was listening.
+2. **The ghost read as a Stone.** A translucent grey filled cell is exactly what a Stone looks
+   like — the one block with nothing on its face. It is an outline now.
+3. **The pause scrim was not modal.** The board and the pause button stayed hit-testable and in
+   the accessibility tree underneath it.
+
+**Balance, one honest read.** Greedy-ish play with the timer running reached level 3 and ~2.3K in
+about ninety seconds, tier 64. The early game is not the problem; the drop speed at levels 1-3
+(700-550ms) is slack enough that the timer, not the player, places most blocks. `tools/balance`
+should be re-run with a clock before anyone tunes the curve.
+
 ---
 
 ## C3a · Feel

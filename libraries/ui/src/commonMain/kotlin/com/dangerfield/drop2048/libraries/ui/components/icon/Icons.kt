@@ -42,6 +42,8 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Egg
 import androidx.compose.material.icons.rounded.EggAlt
 import androidx.compose.material.icons.rounded.FitScreen
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LocationCity
 import androidx.compose.material.icons.rounded.LocationOn
@@ -256,6 +258,15 @@ enum class Icons(
 
     FitScreen(
         default = androidx.compose.material.icons.Icons.Rounded.FitScreen,
+    ),
+
+    Pause(
+        default = androidx.compose.material.icons.Icons.Rounded.Pause,
+    ),
+
+    /** The hard-drop control (SPEC 6). Doubled so it does not read as "move down one". */
+    DropDown(
+        default = androidx.compose.material.icons.Icons.Rounded.KeyboardDoubleArrowDown,
     )
 
     ;

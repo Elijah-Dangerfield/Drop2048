@@ -6,6 +6,69 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The board is 5x8, settled on device, because the board is width-bound
+
+**Decision:** `EngineConfig.DEFAULT_ROWS` stays at 8. SPEC 3's seven-versus-eight
+question is closed.
+
+**How it was settled:** both were built and run on an iPhone 16e simulator, which
+is the smallest device this Mac has a runtime for. The mockups' case for 7 was
+that it "draws bigger blocks and reads better on a small phone". It does not.
+
+At five columns on a 6.1" phone the cell size is set by the **width**, not the
+height: 8 rows drew a ~64pt cell and 7 rows drew a ~66pt cell. The extra row's
+worth of height did not become a bigger block, it became gutter above and below
+the stack. So 7 costs a full row of reaction time in the danger state and buys
+about 3% of block size.
+
+This holds for any phone narrower than roughly 4:3 against its board area, which
+is every phone. If a tablet layout ever ships, it is the first place the
+constraint could flip, and `board.rows` is a remote key either way (SPEC 10).
+
+## 2026-09-09 — Transcript playback is a driver coroutine feeding the action channel
+
+**Decision:** `GameViewModel` keeps the resolved `GameState` unpublished, rebuilds
+the boards *between* transcript steps with a pure `framesFor`, and hands the
+frames to a coroutine that feeds them back in as `GameAction.ShowFrame`. Nothing
+animates the engine; the engine is finished before the first frame is drawn.
+
+**Alternatives considered.** Playing the transcript *inside* `handleAction` would
+have blocked the action channel for the length of the cascade, which queues player
+input rather than ignoring it — the opposite of SPEC 6. Publishing the resolved
+board immediately and overlaying effects on top would have meant the board on
+screen and the board in the engine disagreeing about where blocks are, which is
+the class of bug this whole architecture exists to avoid.
+
+**Why it matters beyond C3.** Because everything still arrives on one channel,
+there is exactly one writer of the engine state and no lock anywhere; SPEC 6's
+"input during resolution is ignored" is one guard; and SPEC 18.9's pause-mid-
+cascade is the frame index that already exists. C5's tutorial and C12's replay
+both drive the same seam.
+
+`framesFor` is a pure function in its own file with its own test, and the
+assertion that matters is that its **last frame equals the board the engine
+returned**. Every other way the replay could drift is a specific bug; that one
+catches the ones nobody thought of.
+
+## 2026-09-09 — A sideways move made during a cascade is replayed, not discarded
+
+**Decision:** SPEC 6's "input during resolution is ignored" is amended. Input
+still never reaches the engine mid-cascade. But the **last sideways move** is held
+and applied to the block that spawns afterwards.
+
+**Why:** playing the first build on device, every move tapped in the beat after a
+hard drop vanished, and the block that had just spawned went straight down the
+middle of the board. Three separate columns' worth of intended play ended up in
+one. The player did the right thing and the game did nothing, which reads as the
+game dropping inputs rather than as a rule.
+
+**What is deliberately not buffered.** Hard drop, because replaying one would end
+a run the player has not looked at yet. Hold, for the same reason. And it is one
+move rather than a queue: a queue would let a burst of panicked taps march the new
+block across the board on its own.
+
+---
+
 ## 2026-09-09 — The SPEC 5.3 spawn table is kept, and the merge ruling is what made it fit
 
 **Decision:** C1a measured the spawn table in SPEC 5.3 with `tools/balance` and

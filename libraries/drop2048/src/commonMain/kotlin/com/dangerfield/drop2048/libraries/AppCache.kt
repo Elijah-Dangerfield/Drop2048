@@ -39,6 +39,23 @@ data class AppData(
 
     /** Epoch-ms — last review prompt the coordinator forwarded to the platform. 0 = never. */
     val lastReviewPromptAt: Long = 0L,
+
+    /**
+     * Best score across every run on this device.
+     *
+     * SPEC 11 derives this from `run_record` and calls that the one source of
+     * truth. That table arrives in C4; until it does the HUD still has to draw a
+     * BEST, and a field here is the smallest thing that works. **C4 deletes it**
+     * and reads the max from the table instead — leaving both would be two
+     * numbers that can disagree about the same run.
+     */
+    val bestScore: Long = 0L,
+
+    /** SPEC 6's left-handed mirror. Moves to the settings screen in C11. */
+    val leftHandedControls: Boolean = false,
+
+    /** SPEC 6's landing outline. On by default, toggleable. Moves to settings in C11. */
+    val ghostEnabled: Boolean = true,
 ) {
     /**
      * Get the visit count for a screen by its tracking key.

@@ -96,8 +96,20 @@ object Motion {
  */
 @Composable
 @ReadOnlyComposable
-fun reducible(millis: Int): Int =
-    if (LocalReduceMotion.current) (millis * ReducedMotionScale).roundToInt() else millis
+fun reducible(millis: Int): Int = reduced(millis, LocalReduceMotion.current)
+
+/**
+ * The same scaling, for the one caller that cannot be a composable: the
+ * transcript playback pace lives in the game's ViewModel, because the engine has
+ * no clock and the frames are handed out over time rather than composed.
+ *
+ * The setting still comes from [LocalReduceMotion] — the screen reads it and
+ * tells the ViewModel — so there is still exactly one place the value is
+ * resolved. What this stops is a second `0.4f` written down somewhere the first
+ * one cannot be found from.
+ */
+fun reduced(millis: Int, reduceMotion: Boolean): Int =
+    if (reduceMotion) (millis * ReducedMotionScale).roundToInt() else millis
 
 /**
  * Not zero. A cascade that resolves instantly is unreadable — a player who asked
