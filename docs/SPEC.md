@@ -37,8 +37,8 @@ Tetris skeleton, 2048 brain.
 
 ## 2. v1 scope
 
-**In.** Endless mode on one board. Every merge, cascade and burst rule. All three specials. Next
-preview and hold. The rising spawn floor. Tutorial. Stats. Daily Challenge. Achievements.
+**In.** Endless mode on one board. Every merge, cascade and burst rule. All three specials. The
+rising spawn floor. Tutorial. Stats. Daily Challenge. Achievements.
 Platform leaderboards. Full settings including accessibility. Pro IAP. Rewarded continue and
 rewarded double-coins-equivalent. Interstitials under the section 12 gating. Debug menu.
 
@@ -101,8 +101,9 @@ It is a value-in, value-out state machine:
 GameState  x  Input  ->  Transition(newState, transcript, events)
 ```
 
-`GameState` is a `@Serializable` immutable data class holding the grid, the falling block, the
-next queue, the hold slot, score, level, blocks dropped, and the RNG state. The RNG is a
+`GameState` is a `@Serializable` immutable data class holding the grid, the falling block, score,
+level, blocks dropped, draws made, and the RNG state. There is no next queue and no hold slot;
+D11 cut both, and with them the reason to draw a block before it spawns. The RNG is a
 splitmix64 carried *inside* the state, not injected. A `GameState` plus a sequence of `Input`s
 determines the entire run, byte for byte, on every platform.
 
@@ -129,8 +130,8 @@ screen. This is what makes "input during resolution is ignored" free rather than
 makes the cascade-step audio pitch (see 9) a trivial `transcript.map { it.step }`, and makes the
 whole of section 6's algorithm testable without a renderer.
 
-**The transcript carries more step kinds than the four named above**: the hard drop bonus,
-survival, level up and board cleared are steps too, tagged with cascade step 0. That is deliberate.
+**The transcript carries more step kinds than the four named above**: survival, level up and
+board cleared are steps too, tagged with cascade step 0. That is deliberate.
 It buys the invariant `next.score == previous.score + transcript.points` after every transition,
 which is asserted over a whole run. The alternative was a second scoring channel that the floating
 numbers on screen could drift away from. Anything that awards points goes down this one channel.
@@ -208,10 +209,13 @@ It plays runs headless with a set of scripted policies and prints distributions.
 deliberately dumb, because the question is not "can a perfect player win", it is "does the board
 clog":
 
-- **Random**: uniform column, always hard drop. The floor. If this reaches level 6 the game is
+- **Random**: uniform column. The floor. If this reaches level 6 the game is
   too easy.
 - **Greedy**: takes the immediate merge if one exists, else the emptiest column.
-- **Lookahead-1**: greedy, but uses the next-block preview.
+- **Lookahead-1**: greedy, but plans one block ahead. **Since D11 this policy cheats**: the
+  block it looks at is not shown to the player and is not even drawn until the current one lands.
+  It is kept as the ceiling — SPEC 4.4 asks whether the board clogs against something better than
+  anyone will play — and must not be quoted as a prediction of play.
 
 It reports, per policy, over 10,000 runs: median and p90 level reached, the distribution of
 **highest tier reached**, cause of death, cascade depth histogram, and the **clutter metric**
@@ -243,8 +247,10 @@ The harness is how the spawn table in 5.3 gets its real numbers. **It has been r
 below is the one it measured** — see `BUILD-PLAN.md`'s C1a outcome for the full distributions and
 the three alternatives that were rejected.
 
-**The clock is optional and both halves are kept.** Clock-free, every policy hard-drops into the
+**The clock is optional and both halves are kept.** Clock-free, every policy places a block in the
 column it wants at every level, and everything it reports is a ceiling for an unhurried player.
+Those clock-free numbers survive D11 unchanged, because placement is unchanged; every *clocked*
+number does not, and C1e re-runs them.
 C1c added a `PlayerProfile` — a decision time and a tap rate — and a simulation of 5.5's drop
 timer and 6's controls, so a policy that cannot reach its preferred column in the time it has
 takes the best one it can reach. Running both is what says how big the ceiling was: three levels
@@ -304,11 +310,14 @@ Clamp down to the highest allowed tier when the draw exceeds it.
 A is what makes 2048 reachable inside one run instead of a thousand-merge grind. B is the safety
 valve that stops a 64 landing on a board of 2s.
 
-**The cap is evaluated at draw time, not at landing time**, which means it reads the board as it
-was *two drops earlier*. That is forced by 5.4: the preview shows two blocks and is non-optional,
-so a block has to be decided before it can be shown, and a preview that can still change is a lie
-to the player and useless to the lookahead policies in 4.4. The cost is that the cap can be one or
-two merges out of date on a fast-moving board. Take that over a preview that rewrites itself.
+**The cap is evaluated when the block spawns**, against the board it will land on. The board only
+changes at a lock, so those are the same board and the rule is exact.
+
+It used to be evaluated two drops early, at the moment a block entered the next-block preview: a
+preview that can still change is a lie, so the value had to be fixed before it could be shown.
+That was the *only* reason, and D11 removed the preview. C1a measured the staleness it cost at
+0.02-0.04% of drops (L20), so this simplification is expected to change nothing observable; what
+it removes is a caveat, not a bug.
 
 **Measured, not guessed.** Every number here predates the 4.3 merge-position ruling, so C1a
 re-measured it against the shipped engine over 10,000 runs per policy and kept it. Greedy reaches
@@ -324,14 +333,15 @@ kept again.
 **This whole table is a remote-config key** (see 10). It will be wrong on launch day and the fix
 should not need a store release.
 
-### 5.4 Next and hold
+### 5.4 Next and hold — struck (D11)
 
-- **Next preview shows two blocks.** Non-optional. Without it the game reads as random rather
-  than skillful, and the lookahead-1 policy in the harness is the proof.
-- **Hold slot.** Stash the falling block; the next block spawns immediately. If the slot is
-  occupied the two swap. **One swap per drop**, so it cannot be used to stall. Legal on the very
-  first drop, where holding an empty slot just pulls the next block.
-- Hold can be disabled in Settings for a purist board.
+The next-block preview and the hold slot are **cut**. The design handoff, which governs
+interaction, says both "were tried and cut. Don't reintroduce them."
+
+This section said the two-block preview was non-optional. It was the load-bearing claim behind
+three other things, and all three moved with it: the spawn draw now happens at spawn time (5.3),
+the HUD has no chips (8.1), and the engine's `Input` alphabet lost `Hold` and gained `Nudge` (6).
+Section 18.11's "hold on the first drop" edge case went with it.
 
 ### 5.5 Level and speed
 
@@ -369,7 +379,7 @@ slack; the clocked harness in 4.4 then measured it, and the diagnosis and the fi
 
 So this change is a feel change made on a measurement that says its risk is zero, and it is not
 claimed to make the game harder. **The lever that would is `blocksPerLevel`**, and it was measured
-and left alone: 20 to 15 takes a hard-dropping player to level 4 in 26s instead of 34s, but it
+and left alone: 20 to 15 took a hard-dropping player to level 4 in 26s instead of 34s, but it
 shortens runs by 11%, thins the tail past 1024, and — unlike the curve — it feeds level
 advancement, so it moves the pinned determinism digest and every score with it.
 
@@ -377,7 +387,12 @@ advancement, so it moves the pinned determinism digest and every score with it.
 and the burst becomes the only way to survive). Time is not one of them: on five columns with a
 centre spawn, a block is at most two columns from anywhere, which the measured player covers in
 370ms against a budget that never falls below about 780ms even at the speed floor. That is why
-6's soft drop and hard drop, not the curve, set how fast a run actually goes.
+6's soft drop and nudge, not the curve, set how fast a run actually goes.
+
+**Every pacing number in this section predates D11** and was measured in a game where one tap
+ended a fall. C1c put the gap at level 4 in 34 seconds hard-dropping against 289 seconds patient.
+Removing hard drop makes everyone the patient player and the nudge is only a partial substitute.
+C1e re-measures.
 
 ### 5.6 Undo
 
@@ -396,33 +411,34 @@ from an automated test, which matters while the loop is still being tuned.
 
 **Drag** lands in the same phase once the loop is proven, and becomes the default at that point
 if it feels better on device. Touch anywhere on the board, slide horizontally, the falling block
-tracks your finger's column. Swipe down or tap to hard-drop.
+tracks your finger's column. The handoff makes it absolute from the grab point rather than
+incremental. A downward flick is the nudge.
 
 **Tap Column** is v2 unless it is cheap once Drag exists.
 
 Universal, all schemes:
 
 - **Ghost outline** showing the exact landing cell. On by default, toggleable.
-- **Hard drop** places the block in the lowest empty cell of its column instantly, small bonus.
+- **Nudge (▼, or a downward flick)** advances the fall by **two ticks**. It is an accelerator,
+  not an instant drop, and it pays nothing (see 7). It replaced hard drop in D11.
 - **Soft drop** accelerates to 40ms per row without placing.
 - **Lock delay** of 150ms at the resting cell before locking, allowing a last-instant column
   change. **One reset per drop**, so it cannot stall.
 - **Input during resolution is ignored.** Cascades play out uninterrupted. **Amended in C3:** no
   input reaches the engine mid-cascade, but the *last sideways move* is held and applied to the
   block that spawns afterwards. Discarding it turned out to be a different rule and a bad one —
-  on device, every move tapped in the beat after a hard drop vanished and the new block went
-  straight down the middle. Hard drop and hold are deliberately not buffered: replaying either
-  would act on a board the player has not looked at yet.
+  on device, every move tapped in the beat after a block landed vanished and the new block went
+  straight down the middle. The nudge is deliberately not buffered: replaying it would drop a
+  block two rows into a board the player has not looked at yet.
 
-Hard drop into a full column locks the block in row 0, resolution runs, and if row 0 is still
-occupied the run ends. No special case.
+A block locking in a full column lands in row 0, resolution runs, and if row 0 is still occupied
+the run ends. No special case.
 
 ## 7. Scoring
 
 | Event | Points |
 |---|---|
 | Merge producing V | `V x cascadeStep`, step capped at 10 |
-| Hard drop | `2 x rowsSkipped` |
 | Row burst | `5000 + 250 x blocksCleared` |
 | Bomb detonation | `50 x blocksDestroyed` |
 | Level up | `100 x newLevel` |
@@ -435,9 +451,14 @@ is worth 2560 for that step alone, on top of everything under it.
 The cascade multiplier **does not reset across a burst**. Merges caused by post-burst gravity keep
 counting up.
 
-Hard drop's bonus stays a token. On a 5x8 board the maximum is 14 points against merges worth
-hundreds, which is a nudge toward confident play, not a strategy. (Original spec's open question
-5, resolved: leave it small.)
+**No input scores.** The hard drop bonus (`2 x rowsSkipped`) is struck with the input it paid
+for, and the ▼ nudge did **not** inherit it (D11). The bonus was paying for commitment — a hard
+drop gave up the rest of the fall and could not be taken back. A nudge gives up two rows and can
+be pressed again a moment later, so a per-row payout would reward the tap rather than the
+decision, and would oblige every player to mash a control the handoff drew as recessive. It would
+also fire on nearly every drop of nearly every run, which is a constant the score already has in
+Survival. Every remaining row of this table pays for something that happened on the board.
+(Original spec's open question 5 is resolved by removal rather than by tuning.)
 
 **Survival on a drop that levels up pays the level the block was dropped at**, before advancement.
 The drop was survived under the old level's speed, so that is the level it earned. The level-up
@@ -452,13 +473,11 @@ case. Read the two together or they look like they disagree.
 ### 8.1 HUD
 
 The mockups show score and best top-left, level with a progress bar top-right, pause button, and
-the board filling the rest. They had **nowhere for the next preview or the hold slot**, and 5.4
-says the preview is non-optional. **Settled in C3**, close to the recommendation but on two rows
-rather than one:
+the board filling the rest. The conflict this section used to describe — nowhere to put the next
+preview or the hold slot — **is gone rather than solved**: D11 cut both chips. The two rows stay:
 
 - **Row one:** SCORE left, abbreviated and counting up; BEST right, smaller and secondary.
-- **Row two:** `LEVEL n` with its thin bar taking the free width, then the HOLD chip, then the
-  NEXT chips, then pause at the far right.
+- **Row two:** `LEVEL n` with its thin bar taking the free width, then pause at the far right.
 
 Two rows rather than one, which is the one place this departs from the recommendation. Score,
 best and level are three numbers of unpredictable width; on one row a preview chip is pushed
@@ -497,7 +516,8 @@ says **"Drop again"**. Continue and any ad offer sit below it, never above.
 the game. A six-step cascade should be an ascending musical run that is a reward on its own. It
 is one of the two things section 22 says to keep if everything else is cut.
 
-Effects: spawn (subtle), move per column (very short click), hard drop (thud), lock (soft), merge
+Effects: spawn (subtle), move per column (very short click), nudge (very short click), lock
+(soft), merge
 (pitched by step), merge into 256+ (heavier, distinct), row burst (the longest sample in the
 game), bomb, danger enter/exit, stacked out, level up, UI tap and back.
 
@@ -599,7 +619,9 @@ First launch drops straight into a scripted run. No menus, no video, no wall of 
 is frozen throughout.
 
 1. One 2 spawns, one 2 is already placed. "Drag to move." They merge it.
-2. Drops 2-4 introduce the next preview and hard drop. They build to 16.
+2. Drops 2-4 introduce steering and the ▼ nudge. They build to 16. **C1c's finding applies
+   here**: whether a player uses the drop control was worth more to the opening than every
+   speed-curve change combined, so teaching ▼ is load-bearing rather than incidental.
 3. Drop 5 is pre-seeded so a single placement triggers a 3-step cascade. Zero explanation. Let
    them watch it.
 4. Drop 6 is pre-seeded with a 1024 next to two 512s. They trigger a 2048 burst on their sixth
@@ -703,9 +725,10 @@ Decided now, because every one of them will come up.
 9. **Backgrounded mid-cascade.** Snapshot, complete on resume before accepting input.
 10. **Continue taken.** Clear the top three rows, drop level by one, reset the drop timer to the
     start of its interval, preserve score.
-11. **Hold on the first drop.** Legal.
-12. **Hard drop into a full column.** Locks in row 0, resolution runs, stacked out if row 0 is
-    still occupied.
+11. **The first input of a run.** Nothing is queued, drawn or cached ahead of the falling block,
+    so there is no first-drop special case. (Was "hold on the first drop", struck with D11.)
+12. **A lock in a full column.** Lands in row 0, resolution runs, stacked out if row 0 is still
+    occupied.
 13. **Board completely emptied.** Bonus, distinct sound, keep going.
 14. **Infinite cascade.** Total block count strictly decreases per merge so it must terminate.
     Hard cap at 100 steps anyway, and report it as an error if hit.
@@ -725,7 +748,8 @@ The original spec's section 21, answered.
 3. **Terminal value on Wide.** Moot: Wide is cut. Revisit with the variant.
 4. **Stones removable by adjacent merges.** No. If late game proves unwinnable, lower
    `special.rates.stone` remotely first. Changing the rule is the last resort, not the first.
-5. **Hard drop bonus.** Stays a token. See 7.
+5. **Hard drop bonus.** Resolved by removal, not by tuning: D11 cut hard drop and the ▼ nudge did
+   not inherit the bonus. See 7.
 
 ## 20. Non-goals for v1
 

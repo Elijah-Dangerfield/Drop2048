@@ -56,12 +56,43 @@ data class SavedResolution(
  * recovered: the RNG state inside [state] has already advanced past the seed,
  * and `run_record` wants the seed the run started from so the run can be
  * replayed byte for byte.
+ *
+ * ### [version] is what makes an engine change safe to ship
+ *
+ * The blob embeds a whole [GameState], so any change to the engine's serial
+ * shape can invalidate it. Decision D11 is the first one that actually did:
+ * `preview`, `hold` and `holdUsedThisDrop` are gone.
+ *
+ * The tempting answer is to rely on `ignoreUnknownKeys`, which would have
+ * decoded a D11-era blob without complaint — and that is exactly the failure
+ * mode worth avoiding. It only works while every change is subtractive, it
+ * decides silently, and the first change it cannot absorb (a field that changes
+ * *meaning* rather than disappearing) would restore a corrupt run rather than
+ * refuse a stale one. A run restored into the wrong rules is worse than a run
+ * lost, because nothing on screen says so.
+ *
+ * So the version is explicit and has **no default**: a blob written before this
+ * field existed fails to decode outright, and a blob from a future or past
+ * format is refused by [SavedRunStore]. Either way the player loses the run in
+ * flight and nothing else — the install id, the onboarding flag and the whole
+ * run history live outside this string.
+ *
+ * **Bump [SAVE_FORMAT_VERSION] whenever `GameState`, `RunTally` or
+ * `SavedResolution` change shape.**
  */
 @Serializable
 data class SavedRun(
+    val version: Int,
     val state: GameState,
     val tally: RunTally,
     val seed: Long,
     val mode: GameMode,
     val resolution: SavedResolution? = null,
 )
+
+/**
+ * 2 — decision D11 removed `preview`, `hold` and `holdUsedThisDrop` from
+ * `GameState`. Version 1 is the shape C4 shipped, which had no version field at
+ * all and is therefore rejected by failing to decode.
+ */
+const val SAVE_FORMAT_VERSION = 2

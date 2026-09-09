@@ -20,19 +20,24 @@ import com.dangerfield.drop2048.system.Dimension
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The three bottom controls (SPEC 6): move left, hard drop, move right.
+ * The three bottom controls (SPEC 6, decision D11): ◀, ▼, ▶.
  *
- * Buttons ship first because they are the scheme an automated test can drive,
- * which matters while the loop is still being tuned. Drag arrives in C3a and
- * takes the default if it feels better on device.
+ * The middle button used to be hard drop and is now the **nudge**. That is not
+ * a rename: hard drop ended the block's fall and the nudge advances it two rows,
+ * so the control went from the most consequential press in the game to the least.
+ * It keeps its place in the middle because a thumb reaching for the centre is
+ * still the cheapest reach, and because the handoff puts it there.
+ *
+ * It is **not** widened any more. The old comment said the drop button was the
+ * widest because it was "the one press a player makes on nearly every block";
+ * that stopped being true with the ruling, and the handoff draws all three
+ * buttons equal with ▼ recessive. The recessive *styling* is C3b's; the equal
+ * width is here because it is a layout consequence of the ruling rather than a
+ * visual one.
  *
  * **Mirrored, not re-laid-out.** The left-handed option reverses the row rather
  * than rebuilding it, so the two arrangements cannot drift apart and there is
  * one place a fourth control would have to be added.
- *
- * The drop button is the widest and sits in the middle: SPEC 16 asks for
- * generous targets on the primary interaction surface, and the drop is the one
- * press a player makes on nearly every block.
  */
 @Composable
 fun ControlBar(
@@ -40,7 +45,7 @@ fun ControlBar(
     enabled: Boolean,
     onMoveLeft: () -> Unit,
     onMoveRight: () -> Unit,
-    onHardDrop: () -> Unit,
+    onNudge: () -> Unit,
     onSoftDropStart: () -> Unit,
     onSoftDropEnd: () -> Unit,
     labels: ControlLabels,
@@ -62,13 +67,13 @@ fun ControlBar(
             modifier = Modifier.weight(SideWeight).height(ControlHeight),
         )
 
-        DropButton(
+        NudgeButton(
             enabled = enabled,
-            label = labels.drop,
-            onHardDrop = onHardDrop,
+            label = labels.nudge,
+            onNudge = onNudge,
             onSoftDropStart = onSoftDropStart,
             onSoftDropEnd = onSoftDropEnd,
-            modifier = Modifier.weight(DropWeight).height(ControlHeight),
+            modifier = Modifier.weight(SideWeight).height(ControlHeight),
         )
 
         MoveButton(
@@ -107,12 +112,16 @@ private fun MoveButton(
 }
 
 /**
- * One control, two of SPEC 6's inputs: tap to hard drop, hold to soft drop.
+ * One control, two of SPEC 6's inputs: tap to nudge, hold to soft drop.
  *
  * They share a button because there is no room for a fourth and because they are
- * the same intent at two commitment levels — "down, now" and "down, faster".
- * A hold that ends in a hard drop would be both at once, so engaging the soft
- * drop disarms the tap for that gesture.
+ * now the same verb at two rates — two rows on a tap, a row every 40ms while
+ * held. Since the ruling that is a genuinely continuous relationship rather than
+ * the old "down, now" / "down, faster" pair, which is an argument for keeping
+ * the pairing rather than against it.
+ *
+ * A hold that also fired the tap would nudge twice, so engaging the soft drop
+ * disarms the tap for that gesture.
  *
  * The gesture only **watches**: it never consumes, so the button underneath
  * still detects its own click and still shows its own press state. That is also
@@ -120,17 +129,17 @@ private fun MoveButton(
  * by the time this sees the pointer come up.
  */
 @Composable
-private fun DropButton(
+private fun NudgeButton(
     enabled: Boolean,
     label: String,
-    onHardDrop: () -> Unit,
+    onNudge: () -> Unit,
     onSoftDropStart: () -> Unit,
     onSoftDropEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val softDropping = remember { mutableStateOf(false) }
     Button(
-        onClick = { if (!softDropping.value) onHardDrop() },
+        onClick = { if (!softDropping.value) onNudge() },
         enabled = enabled,
         icon = Icons.DropDown(label),
         deep = true,
@@ -156,7 +165,7 @@ private fun DropButton(
 data class ControlLabels(
     val moveLeft: String,
     val moveRight: String,
-    val drop: String,
+    val nudge: String,
 )
 
 /**
@@ -166,7 +175,6 @@ data class ControlLabels(
 private const val SoftDropAfterMillis = 160L
 
 private const val SideWeight = 1f
-private const val DropWeight = 1.4f
 
 /** Comfortably past the 48dp minimum: this is the surface the whole game is played on. */
 private val ControlHeight = 64.dp

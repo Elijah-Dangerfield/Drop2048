@@ -6,6 +6,12 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.Font
 import drop2048.libraries.ui.generated.resources.DMSerifText_Italic
+import drop2048.libraries.ui.generated.resources.fredoka_bold
+import drop2048.libraries.ui.generated.resources.fredoka_medium
+import drop2048.libraries.ui.generated.resources.fredoka_semibold
+import drop2048.libraries.ui.generated.resources.nunito_bold
+import drop2048.libraries.ui.generated.resources.nunito_extrabold
+import drop2048.libraries.ui.generated.resources.nunito_semibold
 import drop2048.libraries.ui.generated.resources.DMSerifText_Regular
 import drop2048.libraries.ui.generated.resources.Res
 import drop2048.libraries.ui.generated.resources.Roboto_Bold
@@ -44,22 +50,68 @@ val SansSerifFontFamily: FontFamily
     )
 
 /**
- * The face every number that changes is drawn in: block values, the score, the
- * level, the chain counter.
+ * Fredoka, 500/600/700. Numerals, the wordmark and every button label.
  *
- * **This is a known gap, deliberately reduced to one line.** None of these should
- * be set in a proportional face, because proportional digits are different widths
- * — a score ticking from 1111 to 2222 visibly jitters, and a block face redraws
- * its numeral every merge. The fix is a font with tabular (monospaced) figures,
- * or one with `font-feature-settings: "tnum"`. No font in this repo or in either
- * sibling has them, and the choice is an owner decision.
+ * Bundled rather than fetched from Google Fonts at runtime, as the handoff asks.
+ * A game whose first frame is its score cannot afford a face that arrives on the
+ * second, and a network font on a game with no other network call is a privacy
+ * surface for nothing.
  *
- * Until then this aliases the sans family, so every digit in the game is already
- * reading from one token and swapping in the real face is this declaration and
- * nothing else. Do not reach for [SansSerifFontFamily] to draw a number.
+ * These are static instances cut from the variable original at `wdth = 100`,
+ * because the design uses one width and three fixed weights. Three 50KB files
+ * beat one 160KB file the platform then has to interpolate on every frame.
+ */
+val FredokaFontFamily: FontFamily
+    @Composable get() = FontFamily(
+        Font(resource = Res.font.fredoka_medium, weight = FontWeight.Medium),
+        Font(resource = Res.font.fredoka_semibold, weight = FontWeight.SemiBold),
+        Font(resource = Res.font.fredoka_bold, weight = FontWeight.Bold),
+    )
+
+/**
+ * Nunito, 600/700/800. Labels and body copy.
+ *
+ * The quieter of the two faces, and the one that carries the small uppercase
+ * letter-spaced labels the design leans on: `SCORE`, `LEVEL`, `BIGGEST`.
+ */
+val NunitoFontFamily: FontFamily
+    @Composable get() = FontFamily(
+        Font(resource = Res.font.nunito_semibold, weight = FontWeight.SemiBold),
+        Font(resource = Res.font.nunito_bold, weight = FontWeight.Bold),
+        Font(resource = Res.font.nunito_extrabold, weight = FontWeight.ExtraBold),
+    )
+
+/**
+ * The face every number is drawn in: tile values, the score, the level, the
+ * chain counter.
+ *
+ * **Fredoka's figures are proportional, and that is measured rather than
+ * assumed.** The shipped file carries no `tnum` feature at all, and its ten
+ * digits have eight distinct advance widths at every weight the design uses. At
+ * 700 the `1` is 379 units against the `2`'s 566, a 49% spread. A score ticking
+ * from 1111 to 2222 visibly changes width, and during a cascade it does it
+ * several times a second.
+ *
+ * The token still points at Fredoka, because the handoff is explicit that
+ * numerals are Fredoka, and because on a **tile** the wobble does not exist: a
+ * tile draws one value, centred, and never animates between two.
+ *
+ * Where it does exist is the score counter, and there are three fixes, in
+ * increasing order of what they cost the design:
+ *
+ * 1. **Lay the score out digit by digit in fixed-width slots.** Keeps Fredoka
+ *    everywhere and costs one composable. This is the recommendation.
+ * 2. **Draw the score in [NunitoFontFamily] at ExtraBold.** Nunito's ten digits
+ *    are all exactly 600 units — tabular in effect, without needing the feature —
+ *    so this is a one-line fix with no layout work. It costs the most prominent
+ *    number on the screen its Fredoka look.
+ * 3. **Ship a `tnum`-patched cut of Fredoka.** Correct, and a build-time font
+ *    pipeline nobody wants to own for one number.
+ *
+ * This is an owner decision and it has not been made. Do not quietly pick one.
  */
 val DigitFontFamily: FontFamily
-    @Composable get() = SansSerifFontFamily
+    @Composable get() = FredokaFontFamily
 
 /**
  * The same size, weight and rhythm as [this], drawn in [DigitFontFamily].
@@ -67,7 +119,7 @@ val DigitFontFamily: FontFamily
  * What lets the score and the level pick a typography token like every other
  * piece of text while still being drawn in the face numbers are drawn in. The
  * alternative is a hand-built `TextStyle` at each call site, which is how one of
- * them ends up in the proportional face and nobody notices until a screenshot.
+ * them ends up in the wrong face and nobody notices until a screenshot.
  */
 val TypographyResource.digits: TypographyResource
     @Composable get() = TypographyResource(

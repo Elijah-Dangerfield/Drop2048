@@ -36,10 +36,6 @@ object Report {
                 "  score      median=${scores.median()}  p90=${scores.p90()}  max=${scores.last()}"
             )
             appendLine("  bursts     runs with at least one=${share(runs.count { it.bursts > 0 }, runs.size)}")
-            appendLine(
-                "  stale cap  drops above the cap the board would impose now=" +
-                    share(runs.sumOf { it.staleCapDrops.toLong() }, runs.sumOf { it.blocksDropped.toLong() })
-            )
             appendLine("  highest tier at run end")
             appendLine(tierRows(runs))
             appendLine("  cause of death")

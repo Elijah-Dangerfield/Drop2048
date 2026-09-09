@@ -17,25 +17,14 @@ object Cascade {
      */
     fun newGame(seed: Long, config: EngineConfig = EngineConfig.Default): GameState {
         val board = Board.empty(config.cols, config.rows)
-        var rng = Rng(seed)
-        var draws = 0
-        var lastSpecial = false
-        val drawn = mutableListOf<Block>()
-        repeat(config.previewSize + 1) {
-            val draw = Spawn.draw(rng, level = 1, board, draws, lastSpecial, config)
-            rng = draw.rng
-            lastSpecial = draw.wasSpecial
-            draws++
-            drawn += draw.block
-        }
+        val draw = Spawn.draw(Rng(seed), level = 1, board, drawIndex = 0, lastWasSpecial = false, config = config)
         return GameState(
             config = config,
             board = board,
-            falling = FallingBlock(drawn.first(), Cell(config.spawnColumn, 0)),
-            preview = drawn.drop(1),
-            rng = rng,
-            drawsMade = draws,
-            lastDrawWasSpecial = lastSpecial,
+            falling = FallingBlock(draw.block, Cell(config.spawnColumn, 0)),
+            rng = draw.rng,
+            drawsMade = 1,
+            lastDrawWasSpecial = draw.wasSpecial,
         )
     }
 
@@ -47,9 +36,8 @@ object Cascade {
             Input.Tick -> tick(state, falling)
             Input.MoveLeft -> move(state, falling, Direction.LEFT)
             Input.MoveRight -> move(state, falling, Direction.RIGHT)
-            Input.Hold -> hold(state, falling)
-            Input.Lock -> lock(state, falling, prefix = emptyList())
-            Input.HardDrop -> hardDrop(state, falling)
+            Input.Nudge -> nudge(state, falling)
+            Input.Lock -> lock(state, falling)
         }
     }
 
@@ -76,7 +64,6 @@ object Cascade {
                 level = maxOf(1, state.level - 1),
                 status = RunStatus.PLAYING,
                 deathCause = null,
-                holdUsedThisDrop = false,
             )
         )
         val danger = board.isRowOccupied(DANGER_ROW)
@@ -100,62 +87,40 @@ object Cascade {
     }
 
     /**
-     * SPEC 5.4. One swap per drop, so hold cannot be used to stall. Legal on the
-     * very first drop, where holding an empty slot just pulls the next block
-     * (SPEC 18.11).
+     * The ▼ control (decision D11): [EngineConfig.nudgeRows] ticks, applied in
+     * one transition, stopping the moment the cell below is occupied.
+     *
+     * It scores nothing and locks nothing. Everything about the fall that is not
+     * one row of gravity — the lock delay, the drop timer, whether ▼ was tapped
+     * or flicked — is still the ViewModel's, exactly as it was for [Tick].
      */
-    private fun hold(state: GameState, falling: FallingBlock): Transition {
-        if (!state.config.holdEnabled) return rejected(state, RejectionReason.HOLD_DISABLED)
-        if (state.holdUsedThisDrop) return rejected(state, RejectionReason.HOLD_ALREADY_USED)
-
-        val stashed = state.hold
-        val entering: GameState = if (stashed == null) {
-            val pulled = pullFromPreview(state)
-            pulled.state.copy(
-                hold = falling.block,
-                falling = FallingBlock(pulled.block, Cell(state.config.spawnColumn, 0)),
-            )
-        } else {
-            state.copy(
-                hold = falling.block,
-                falling = FallingBlock(stashed, Cell(state.config.spawnColumn, 0)),
-            )
+    private fun nudge(state: GameState, falling: FallingBlock): Transition {
+        var cell = falling.cell
+        repeat(state.config.nudgeRows) {
+            val below = cell + Direction.DOWN
+            if (!state.board.isEmpty(below)) return Transition(state.copy(falling = falling.copy(cell = cell)))
+            cell = below
         }
-        return Transition(entering.copy(holdUsedThisDrop = true))
-    }
-
-    private fun hardDrop(state: GameState, falling: FallingBlock): Transition {
-        val landing = state.board.landingRow(falling.cell.col, falling.cell.row)
-        val skipped = landing - falling.cell.row
-        val bonus = state.config.scoring.hardDropPerRow * skipped
-        val prefix = if (skipped > 0) {
-            listOf(ResolutionStep.HardDropBonus(rowsSkipped = skipped, points = bonus))
-        } else {
-            emptyList()
-        }
-        return lock(state, falling.copy(cell = Cell(falling.cell.col, landing)), prefix)
+        return Transition(state.copy(falling = falling.copy(cell = cell)))
     }
 
     /**
      * Place the block, resolve, score, advance the level, then check for stacked
      * out and spawn the next block.
      *
-     * The block always locks at its landing cell. A hard drop into a full column
-     * therefore locks in row 0, resolution runs, and the run ends only if row 0
-     * is still occupied afterwards — no special case (SPEC 6, SPEC 18.12).
+     * The block always locks at its **landing** cell rather than the cell it
+     * occupies, so a lock from mid-air falls the rest of the way first. A lock in
+     * a full column therefore lands in row 0, resolution runs, and the run ends
+     * only if row 0 is still occupied afterwards — no special case (SPEC 6,
+     * SPEC 18.12).
      */
-    private fun lock(
-        state: GameState,
-        falling: FallingBlock,
-        prefix: List<ResolutionStep>,
-    ): Transition {
+    private fun lock(state: GameState, falling: FallingBlock): Transition {
         val config = state.config
         val cell = Cell(falling.cell.col, state.board.landingRow(falling.cell.col, falling.cell.row))
         val placed = state.board.with(cell, falling.block)
         val resolution = Resolver.resolve(placed, listOf(Seed(cell, falling.lastDirection)), config)
 
         val steps = mutableListOf<ResolutionStep>()
-        steps += prefix
         steps += resolution.steps
 
         val boardCleared = resolution.board.isClear
@@ -186,7 +151,6 @@ object Cascade {
             score = state.score + transcript.points,
             blocksDropped = blocksDropped,
             level = level,
-            holdUsedThisDrop = false,
             inDanger = danger,
         )
 
@@ -219,11 +183,23 @@ object Cascade {
      * fault. Silently recovering here would hide the bug that caused it.
      */
     private fun spawnNext(state: GameState): Spawned {
-        val pulled = pullFromPreview(state)
+        val draw = Spawn.draw(
+            rng = state.rng,
+            level = state.level,
+            board = state.board,
+            drawIndex = state.drawsMade,
+            lastWasSpecial = state.lastDrawWasSpecial,
+            config = state.config,
+        )
+        val drawn = state.copy(
+            rng = draw.rng,
+            drawsMade = state.drawsMade + 1,
+            lastDrawWasSpecial = draw.wasSpecial,
+        )
         val cell = Cell(state.config.spawnColumn, 0)
-        if (pulled.state.board[cell] != null) {
+        if (drawn.board[cell] != null) {
             return Spawned(
-                state = pulled.state.copy(
+                state = drawn.copy(
                     falling = null,
                     status = RunStatus.STACKED_OUT,
                     deathCause = DeathCause.SPAWN_BLOCKED,
@@ -235,32 +211,8 @@ object Cascade {
             )
         }
         return Spawned(
-            state = pulled.state.copy(falling = FallingBlock(pulled.block, cell)),
+            state = drawn.copy(falling = FallingBlock(draw.block, cell)),
             events = emptyList(),
-        )
-    }
-
-    private class Pulled(val state: GameState, val block: Block)
-
-    /** Takes the head of the preview and draws one more to refill it. */
-    private fun pullFromPreview(state: GameState): Pulled {
-        val draw = Spawn.draw(
-            rng = state.rng,
-            level = state.level,
-            board = state.board,
-            drawIndex = state.drawsMade,
-            lastWasSpecial = state.lastDrawWasSpecial,
-            config = state.config,
-        )
-        val queue = state.preview + draw.block
-        return Pulled(
-            state = state.copy(
-                preview = queue.drop(1),
-                rng = draw.rng,
-                drawsMade = state.drawsMade + 1,
-                lastDrawWasSpecial = draw.wasSpecial,
-            ),
-            block = queue.first(),
         )
     }
 

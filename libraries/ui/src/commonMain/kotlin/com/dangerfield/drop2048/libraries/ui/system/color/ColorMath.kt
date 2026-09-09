@@ -55,14 +55,25 @@ fun composite(source: Color, destination: Color): Color {
 }
 
 /**
- * The same hue, darker, for the lip under a face.
+ * The same colour, darker, for the hard shadow under a face.
  *
- * Derived rather than authored per tier. A palette author choosing both would
- * eventually choose a pair that does not look like one object in two lights,
- * and there is only one right answer.
+ * Derived rather than authored per surface. A designer choosing both would
+ * eventually choose a pair that does not look like one object in two lights, and
+ * there is only one right answer.
+ *
+ * The drop happens in OKLCH lightness rather than by scaling sRGB channels,
+ * which is the handoff's own rule and is also the correct one: scaling channels
+ * desaturates as it darkens, so a saturated face and its shadow drift apart in
+ * hue exactly where the illusion depends on them being the same object.
  */
-fun Color.deepen(amount: Float = DEFAULT_DEEPENING): Color =
-    Color(red * (1f - amount), green * (1f - amount), blue * (1f - amount), alpha)
+fun Color.deepen(amount: Float = ShadowDrop): Color {
+    val lch = toOklch()
+    return Oklch(
+        lightness = (lch.lightness - amount).coerceAtLeast(0f),
+        chroma = lch.chroma,
+        hue = lch.hue,
+    ).toColor().copy(alpha = alpha)
+}
 
 internal fun Color.toLab(): Triple<Float, Float, Float> {
     val r = linearise(red)
@@ -85,7 +96,6 @@ private fun pivot(t: Float): Float =
     if (t > LAB_EPSILON) t.pow(1f / 3f) else LAB_KAPPA * t + LAB_L_OFFSET / LAB_L_SCALE
 
 private const val CONTRAST_OFFSET = 0.05f
-private const val DEFAULT_DEEPENING = 0.28f
 
 private const val SRGB_KNEE = 0.04045f
 private const val SRGB_SLOPE = 12.92f

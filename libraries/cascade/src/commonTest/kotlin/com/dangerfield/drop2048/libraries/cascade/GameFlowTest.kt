@@ -2,13 +2,12 @@ package com.dangerfield.drop2048.libraries.cascade
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The input alphabet and the state around a drop: movement, ticking, the hold
- * slot, the preview refilling, level advancement, and the danger state.
+ * The input alphabet and the state around a drop: movement, ticking, the ▼
+ * nudge, level advancement, and the danger state.
  *
  * NOT covered here: the drop timer, the lock delay and transcript playback.
  * Those are the ViewModel's (C3) — the engine has no idea time exists.
@@ -16,12 +15,12 @@ import kotlin.test.assertTrue
 class GameFlowTest {
 
     @Test
-    fun aFreshRunStartsAtLevelOneWithAFullPreview() {
+    fun aFreshRunStartsAtLevelOneWithOneBlockDrawnAndNothingQueued() {
         val state = Cascade.newGame(seed = 1)
 
         assertEquals(1, state.level)
         assertEquals(0L, state.score)
-        assertEquals(EngineConfig.DEFAULT_PREVIEW, state.preview.size)
+        assertEquals(1, state.drawsMade, "exactly one draw, and it is the block in flight")
         assertEquals(Cell(2, 0), state.falling?.cell)
         assertTrue(state.board.isClear)
     }
@@ -50,31 +49,42 @@ class GameFlowTest {
         assertTrue(atWall.events.contains(GameEvent.Rejected(RejectionReason.MOVE_BLOCKED)))
     }
 
+    /** Decision D11: two ticks in one input, and nothing else. */
     @Test
-    fun holdSwapsTheFallingBlockAndResetsOnTheNextDrop() {
+    fun nudgeAdvancesTheFallByTwoRowsAndScoresNothing() {
         val start = Cascade.newGame(seed = 4)
-        val first = start.falling?.block
+        val nudged = Cascade.apply(start, Input.Nudge)
 
-        val held = Cascade.apply(start, Input.Hold).state
-        val second = held.falling?.block
-        val dropped = Cascade.apply(held, Input.HardDrop).state
-
-        assertEquals(first, dropped.hold)
-        assertEquals(false, dropped.holdUsedThisDrop, "the swap allowance resets each drop")
-
-        val swapped = Cascade.apply(dropped, Input.Hold).state
-        assertEquals(first, swapped.falling?.block, "the stashed block comes back out")
-        assertEquals(dropped.falling?.block, swapped.hold)
-        assertNotNull(second)
+        assertEquals(Cell(2, EngineConfig.DEFAULT_NUDGE_ROWS), nudged.state.falling?.cell)
+        assertEquals(0L, nudged.state.score)
+        assertTrue(nudged.transcript.isEmpty, "a nudge is not a scoring event")
+        assertEquals(start.board, nudged.state.board, "a nudge places nothing")
+        assertEquals(start.blocksDropped, nudged.state.blocksDropped)
     }
 
+    /**
+     * The nudge is an accelerator, so it stops against the stack rather than
+     * pushing through it or locking on contact. A player leaning on ▼ over a
+     * resting block is not doing anything the engine should refuse.
+     */
     @Test
-    fun holdCanBeTurnedOffEntirely() {
-        val purist = Cascade.newGame(seed = 5, EngineConfig.Default.copy(holdEnabled = false))
-        val refused = Cascade.apply(purist, Input.Hold)
+    fun nudgeStopsShortOfWhatIsUnderneathAndIsNeverRejected() {
+        val state = stateOf(boardOf("S S S S S"), FallingBlock(value(2), Cell(2, 5)))
 
-        assertTrue(refused.events.contains(GameEvent.Rejected(RejectionReason.HOLD_DISABLED)))
-        assertEquals(purist, refused.state)
+        val once = Cascade.apply(state, Input.Nudge)
+        assertEquals(Cell(2, 6), once.state.falling?.cell, "one row of room, one row taken")
+
+        val again = Cascade.apply(once.state, Input.Nudge)
+        assertEquals(once.state, again.state, "a nudge with nowhere to go changes nothing")
+        assertTrue(!again.isRejected, "and it is not an error")
+    }
+
+    /** The rows a nudge is worth are configurable, because C1e has to sweep them. */
+    @Test
+    fun nudgeRowsComesFromTheConfigThatTravelsWithTheRun() {
+        val brisk = Cascade.newGame(seed = 5, EngineConfig.Default.copy(nudgeRows = 4))
+
+        assertEquals(Cell(2, 4), Cascade.apply(brisk, Input.Nudge).state.falling?.cell)
     }
 
     @Test
@@ -114,7 +124,7 @@ class GameFlowTest {
     fun onceTheRunIsOverEveryInputIsRefused() {
         val over = stateOf(Board.empty(5, 8)).copy(status = RunStatus.STACKED_OUT)
 
-        listOf(Input.Tick, Input.MoveLeft, Input.HardDrop, Input.Hold, Input.Lock).forEach { input ->
+        listOf(Input.Tick, Input.MoveLeft, Input.MoveRight, Input.Nudge, Input.Lock).forEach { input ->
             val transition = Cascade.apply(over, input)
             assertEquals(over, transition.state)
             assertTrue(transition.events.contains(GameEvent.Rejected(RejectionReason.RUN_OVER)))
@@ -133,7 +143,7 @@ class GameFlowTest {
 
         assertEquals(Cell(2, 5), state.landingCell)
 
-        val dropped = Cascade.apply(state, Input.HardDrop).state
+        val dropped = Cascade.apply(state, Input.Lock).state
         assertNull(dropped.board[Cell(2, 4)])
     }
 

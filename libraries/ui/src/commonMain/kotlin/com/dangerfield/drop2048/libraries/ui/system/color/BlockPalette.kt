@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
  * How one tier of block is painted.
  *
  * [ink] and [edge] are derived from [face] by [blockStyle] rather than authored,
- * so adding a tier or retuning a palette is one hex per tier. Hand-picking ink
+ * so adding a tier or retuning a palette is one `L C H` triple. Hand-picking ink
  * is the mistake this exists to prevent: Sodogku's KDoc records that assigning
  * its region inks by eye put light ink on three fills dark enough that the mark
  * nearly vanished, an error invisible in code review and obvious the moment the
@@ -41,14 +41,21 @@ data class BlockStyle(
  *
  * 1. **Adjacent tiers have to be obviously different.** A 4 landing next to an 8
  *    is the pair a player actually has to separate; a 4 next to a 512 is not.
- *    Every ramp holds a floor of ΔE 24 between neighbouring tiers, and 17
- *    between *any* two.
+ *    A ramp holds a floor of ΔE 24 between neighbouring tiers, and 17 between
+ *    *any* two.
  * 2. **The numeral has to be readable on every face.** Every ink clears 4.5:1
  *    against the face it sits on, which is WCAG AA for body text and generous
  *    for a numeral drawn at block size.
  * 3. **Lightness has to carry what hue cannot.** Roughly 8% of men cannot
- *    separate red from green, so a ramp separated only by hue collapses. Every
+ *    separate red from green, so a ramp separated only by hue collapses. A
  *    palette spans at least 0.45 of relative luminance.
+ *
+ * **[BlockPalettes.Default] no longer holds 1 or 3, because the design handoff
+ * overrode it.** That is a live finding rather than a regression to fix quietly:
+ * the exact numbers, and which tier pairs they land on, are pinned in
+ * `BlockPaletteTest` so nobody can move them without saying so. The four
+ * accessibility ramps below still hold all three, and they are the answer for
+ * the player the floors were written for.
  *
  * Colour is never the only signal regardless: the number is on the face, always.
  */
@@ -134,24 +141,37 @@ enum class BlockPaletteChoice {
 object BlockPalettes {
 
     /**
-     * The shipped ramp: sand through amber and orange into crimson, across the
-     * pinks and violets, out to blue and teal, with the 2048 a pale gold that
-     * exists nowhere else on the board.
+     * The shipped ramp, and it is now the **design's** ramp rather than a derived
+     * one.
      *
-     * Warm at the bottom because that is where a run spends its time and warm
-     * blocks on the deep indigo board read as sweets rather than as data. The
-     * turn into violet at 128 is deliberate: it is the point where a player
-     * starts building rather than clearing, and the board changing temperature
-     * says so without a HUD element.
+     * C2 hill-climbed eleven faces against the constraint set in
+     * [BlockPalette]'s KDoc, which was the right answer while nobody had drawn
+     * the game. The design handoff draws it, fixes one hue per tier, and holds
+     * lightness and chroma constant across the whole ramp so the board reads as
+     * one set of objects lit the same way rather than as a ladder that gets
+     * brighter. `L/C` is `0.78 / 0.15` below 2048 and `0.85 / 0.17` at 2048, which
+     * is the only tier allowed to glow.
      *
-     * The ink derivation genuinely branches on this ramp — four of the eleven
-     * take the light ink — which is what keeps the assertion in
-     * `everyInkIsTheHigherContrastCandidate` from being vacuously true of a
-     * constant.
+     * **That is a design decision that overrides a measured one, and it costs
+     * three of the floors this file's tests hold.** The numbers are recorded in
+     * `BlockPaletteTest.theDesignRampIsWhereTheHandoffPutIt` rather than argued
+     * about here, because the point of writing them down is that they move
+     * loudly. The short version: a constant lightness cannot span lightness, the
+     * 16 and the 32 sit 30° apart rather than the 45–60° the rest of the ramp
+     * uses, and the 2048 is the brand yellow, which is five degrees of hue from
+     * the 2.
+     *
+     * The mitigation the design leans on is real and is the reason this is
+     * arguable rather than wrong: every tile carries its own numeral, and the
+     * four palettes below exist for the player who cannot use the hue at all.
      */
     val Default: BlockPalette = paletteOf(
-        0xFFF6E7C8, 0xFFF6C445, 0xFFF08A2C, 0xFFE24B2B, 0xFFA81E48, 0xFFE1559B,
-        0xFF7B34C4, 0xFF3358D8, 0xFF21A9C4, 0xFF2E7D4F, 0xFFFFF089,
+        0.78f, 0.15f, 85f, 0.78f, 0.15f, 55f,
+        0.78f, 0.15f, 30f, 0.78f, 0.15f, 5f,
+        0.78f, 0.15f, 340f, 0.78f, 0.15f, 300f,
+        0.78f, 0.15f, 265f, 0.78f, 0.15f, 230f,
+        0.78f, 0.15f, 200f, 0.78f, 0.15f, 165f,
+        0.85f, 0.17f, 90f,
     )
 
     /**
@@ -163,10 +183,20 @@ object BlockPalettes {
      * even to somebody who sees two hues in it. Authored against a Viénot 1999
      * dichromat simulation and asserted against one in the test: a palette that
      * only separates in normal vision is exactly the failure this is for.
+     *
+     * The colours are unchanged from C2 — they were hill-climbed and they hold
+     * every floor. What changed is that they are now written in the same L/C/H
+     * terms the design ramp is, and get their ink and their hard shadow from the
+     * same derivation, so all five palettes are one system rather than one system
+     * plus four exceptions.
      */
     val Deuteranopia: BlockPalette = paletteOf(
-        0xFF235494, 0xFFAD841F, 0xFF2A49B6, 0xFFEAC224, 0xFF389EDC, 0xFFE1A960,
-        0xFF6878E4, 0xFFE2EB65, 0xFF8ACEF5, 0xFFEFD5A3, 0xFFD8E0EB,
+        0.4472f, 0.1176f, 256.4f, 0.6364f, 0.1209f, 84.5f,
+        0.4527f, 0.1762f, 266.8f, 0.8255f, 0.1616f, 93.0f,
+        0.6685f, 0.1300f, 240.0f, 0.7723f, 0.1119f, 72.2f,
+        0.6128f, 0.1627f, 274.3f, 0.9076f, 0.1567f, 112.7f,
+        0.8202f, 0.0879f, 234.5f, 0.8826f, 0.0711f, 83.5f,
+        0.9039f, 0.0173f, 256.3f,
     )
 
     /**
@@ -178,8 +208,12 @@ object BlockPalettes {
      * sits further toward yellow-green and never reaches orange.
      */
     val Protanopia: BlockPalette = paletteOf(
-        0xFF1B5B98, 0xFF948B1E, 0xFF2265C3, 0xFFD0EE2B, 0xFF38ADDC, 0xFFD8C73A,
-        0xFF598EDF, 0xFFD9E37A, 0xFF9ACAE5, 0xFFD6E19F, 0xFFD8E5EB,
+        0.4640f, 0.1175f, 251.2f, 0.6257f, 0.1228f, 104.4f,
+        0.5184f, 0.1616f, 258.0f, 0.8966f, 0.2007f, 118.8f,
+        0.7034f, 0.1219f, 229.5f, 0.8199f, 0.1540f, 102.2f,
+        0.6465f, 0.1346f, 258.6f, 0.8861f, 0.1299f, 113.5f,
+        0.8144f, 0.0631f, 233.2f, 0.8856f, 0.0866f, 115.9f,
+        0.9139f, 0.0162f, 227.0f,
     )
 
     /**
@@ -191,27 +225,34 @@ object BlockPalettes {
      * lightness climbing by tier.
      */
     val Tritanopia: BlockPalette = paletteOf(
-        0xFF1A7B80, 0xFFA6191E, 0xFF1FA9D2, 0xFFDA194B, 0xFF13E4E6, 0xFFEB5633,
-        0xFF85BDD1, 0xFFEF7394, 0xFF8CF3DF, 0xFFE99C95, 0xFFD8EBEB,
+        0.5329f, 0.0840f, 200.3f, 0.4676f, 0.1746f, 26.0f,
+        0.6847f, 0.1230f, 224.4f, 0.5719f, 0.2182f, 15.5f,
+        0.8335f, 0.1403f, 195.9f, 0.6475f, 0.1909f, 34.5f,
+        0.7667f, 0.0647f, 222.2f, 0.7093f, 0.1555f, 5.1f,
+        0.8958f, 0.1011f, 179.9f, 0.7670f, 0.0935f, 25.2f,
+        0.9260f, 0.0201f, 196.8f,
     )
 
     /**
      * High contrast: the numeral is the thing being protected here, not the hue.
      *
-     * Every face is light and every ink is the dark one, which is what buys the
-     * 6.3:1 floor between numeral and face — more than a full step above the
-     * other four ramps. That means the set reads as pale rather than as loud,
-     * which is the opposite of what "high contrast" sounds like and the right
-     * answer anyway: contrast is between the numeral and its face, and between
-     * the face and the deep board behind it, not between the blocks and the idea
-     * of a bright colour.
+     * Every face is light, which is what buys the widest ink-to-face margin of
+     * the five. That means the set reads as pale rather than as loud, which is
+     * the opposite of what "high contrast" sounds like and the right answer
+     * anyway: contrast is between the numeral and its face, and between the face
+     * and the deep board behind it, not between the blocks and the idea of a
+     * bright colour.
      *
      * Hue still rotates a full turn across the eleven so the ramp is not eleven
      * shades of one thing.
      */
     val HighContrast: BlockPalette = paletteOf(
-        0xFFEDE26E, 0xFFF4CDB3, 0xFFED6E7F, 0xFFF4B3DD, 0xFFD16EED, 0xFFC4BDF6,
-        0xFF5D9BF5, 0xFFAAEDF0, 0xFF64FEBB, 0xFFC6F6BB, 0xFFE4E7E7,
+        0.8988f, 0.1379f, 103.9f, 0.8751f, 0.0563f, 55.5f,
+        0.6941f, 0.1571f, 13.8f, 0.8393f, 0.0923f, 340.3f,
+        0.6999f, 0.2010f, 318.4f, 0.8235f, 0.0796f, 290.2f,
+        0.6884f, 0.1482f, 257.7f, 0.9026f, 0.0670f, 199.5f,
+        0.8977f, 0.1618f, 161.5f, 0.9248f, 0.0927f, 139.8f,
+        0.9257f, 0.0032f, 197.1f,
     )
 
     /** Every palette, in the order the settings screen offers them. */
@@ -233,22 +274,62 @@ object BlockPalettes {
 val LocalBlockPalette = staticCompositionLocalOf { BlockPalettes.Default }
 
 /**
- * Whichever of the two inks has more contrast against [face], and the lip that
- * goes under it.
+ * A tier's face, and the ink and the hard shadow the design derives from it.
  *
- * Worth computing rather than declaring. The derivation is also the thing that
- * notices: it currently answers "light" for four of the eleven default tiers and
- * "dark" for all eleven high-contrast ones, and it will notice again the next
- * time somebody darkens a face by eye.
+ * Everything below the face is a derivation, and all three derivations come
+ * from the handoff rather than from taste:
+ *
+ * - the shadow is the same colour at `L - 0.22`, which is what makes a tile look
+ *   like a solid object with a side rather than a rectangle with a drop shadow;
+ * - the ink is `oklch(0.26 0.07 H)` — the tier's own hue, taken almost to black,
+ *   so a numeral belongs to its tile instead of being one grey printed eleven
+ *   times.
+ *
+ * The one place this departs from the handoff is [inkFor]'s fallback, and it has
+ * to: the handoff only ever draws light tiles, so its ink rule has never met a
+ * face dark enough to swallow it. Three of the four accessibility ramps have
+ * exactly that. See [inkFor].
  */
-fun blockStyle(face: Color): BlockStyle = BlockStyle(
-    face = face,
-    ink = inkFor(face),
-    edge = face.deepen(),
-)
+fun blockStyle(face: Oklch): BlockStyle {
+    val color = face.toColor()
+    return BlockStyle(face = color, ink = inkFor(color, face.hue), edge = face.darker(ShadowDrop).toColor())
+}
 
-internal fun inkFor(face: Color): Color =
-    if (contrastRatio(face, DARK_INK) >= contrastRatio(face, LIGHT_INK)) DARK_INK else LIGHT_INK
+/** The same, for a colour that was authored as sRGB — the three specials. */
+fun blockStyle(face: Color): BlockStyle = blockStyle(face.toOklch())
+
+/**
+ * The design's hue-matched ink, unless that ink cannot be read on this face.
+ *
+ * Prefer-and-fall-back rather than best-of-three, and the order is the whole
+ * point. Best-of-three would silently reject the handoff's ink on every one of
+ * the eleven default tiers, because the flat near-black beats it on contrast
+ * everywhere — the design would be overruled by a tie-break it never entered.
+ * Preferring it means the shipped ramp gets exactly the ink that was drawn, and
+ * the fallback only ever fires where the design has nothing to say.
+ *
+ * It fires on twelve tiers in total, every one of them on one of the three
+ * colour-vision ramps, and never on the design ramp or on high contrast.
+ * `BlockPaletteTest` measures which.
+ */
+internal fun inkFor(face: Color, hue: Float): Color {
+    val tinted = Oklch(TintedInkLightness, TintedInkChroma, hue).toColor()
+    if (contrastRatio(face, tinted) >= InkContrastFloor) return tinted
+    return if (contrastRatio(face, DARK_INK) >= contrastRatio(face, LIGHT_INK)) DARK_INK else LIGHT_INK
+}
+
+/** How far below the face the hard shadow sits, in OKLCH lightness. */
+const val ShadowDrop: Float = 0.22f
+
+/**
+ * WCAG AA for body text. Stricter than a numeral drawn at tile size needs, and
+ * it is also the switch [inkFor] uses, so loosening it would quietly change
+ * which tiers take the design's ink.
+ */
+const val InkContrastFloor: Float = 4.5f
+
+private const val TintedInkLightness = 0.26f
+private const val TintedInkChroma = 0.07f
 
 /** For faces light enough that a dark numeral reads better. The board's own near-black. */
 internal val DARK_INK = Color(0xFF151024)
@@ -289,12 +370,26 @@ val SPECIAL_STYLES: Map<BlockSpecial, BlockStyle> = mapOf(
     BlockSpecial.Stone to blockStyle(Color(0xFF686B76)),
 )
 
-private fun paletteOf(vararg faces: Long): BlockPalette {
-    require(faces.size == TIER_VALUES.size) {
-        "a palette needs one face per tier: ${TIER_VALUES.size}, got ${faces.size}"
+/**
+ * Eleven tiers as a flat run of `lightness, chroma, hue`.
+ *
+ * Flat rather than a list of triples because a palette then lays out as a
+ * readable block of numbers where every column means the same thing down the
+ * whole ramp, which is how you see at a glance that the design ramp holds L and
+ * C constant and the accessibility ramps climb.
+ */
+private fun paletteOf(vararg components: Float): BlockPalette {
+    require(components.size == TIER_VALUES.size * ComponentsPerTier) {
+        "a palette needs $ComponentsPerTier components per tier for ${TIER_VALUES.size} tiers, " +
+            "got ${components.size}"
     }
-    val styles = faces.map { blockStyle(Color(it)) }
+    val styles = TIER_VALUES.indices.map { tier ->
+        val at = tier * ComponentsPerTier
+        blockStyle(Oklch(components[at], components[at + 1], components[at + 2]))
+    }
     return object : BlockPalette {
         override val styles: List<BlockStyle> = styles
     }
 }
+
+private const val ComponentsPerTier = 3

@@ -30,6 +30,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  *   • [BlockTierPreview]    — the eleven block tiers × all five palettes, with measured ΔE.
  *   • [BlockSpecialPreview] — Wildcard / Bomb / Stone, and how far each sits from the ramps.
  *   • [HudPreview]          — score, level bar, chain callout, danger ring.
+ *   • [GameBoardPreview]    — the well, its danger ring, and a board mid-run.
+ *   • [GameSurfacePreview]  — tiles, slots, the landing ghost's two states.
+ *   • [GameChromePreview]   — controls, wordmark, toast, the three overlays, the two faces.
  *   • [TypographyPreview]   — Display + Brand + Heading | Body + Label + Caption.
  *
  * Components don't have a combined preview on purpose — each one (Button, forms, …) has its own
@@ -99,6 +102,46 @@ private fun HudPreview() {
             "them is holding still here — the catalog shows what they look like, never what they do.",
     ) {
         HudPrimitives()
+    }
+}
+
+@Preview(widthDp = 1600, heightDp = 900)
+@Composable
+private fun GameBoardPreview() {
+    CatalogScaffold(
+        title = "Game · the board",
+        subtitle = "The well the tiles fall into, resting and in its danger state. Drawn at the " +
+            "design's own colours rather than the catalog's, because a chunky dark surface " +
+            "judged against white is judged against the wrong thing.",
+    ) {
+        GameBoardSection()
+    }
+}
+
+@Preview(widthDp = 1800, heightDp = 1100)
+@Composable
+private fun GameSurfacePreview() {
+    CatalogScaffold(
+        title = "Game · tiles and cells",
+        subtitle = "The eleven tiers as the handoff draws them, the empty slot and its " +
+            "active-column state, and the landing ghost in both of the states it has.",
+    ) {
+        GameTileSection()
+        GameCellSection()
+    }
+}
+
+@Preview(widthDp = 1800, heightDp = 1600)
+@Composable
+private fun GameChromePreview() {
+    CatalogScaffold(
+        title = "Game · chrome",
+        subtitle = "Everything around the board: the three controls, the pause button, the " +
+            "primary CTA, the wordmark, the toast, the three overlays and the two faces.",
+    ) {
+        GameControlSection()
+        GameOverlaySection()
+        GameTypeSection()
     }
 }
 

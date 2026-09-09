@@ -41,15 +41,23 @@ data class FallingBlock(
  * nesting them would make serialising one run quadratic and would put eight
  * copies of the board into the `AppData` blob SPEC 11 overwrites on every drop.
  * It lives in [UndoRing] alongside the state instead.
+ *
+ * ### There is no next-block queue
+ *
+ * There used to be one — a `preview` list plus a `hold` slot — and decision D11
+ * cut both. Nothing replaced the queue, because nothing needed to: a draw is a
+ * pure function of [rng], [level], [board] and [drawsMade], all of which are
+ * here, so drawing at the moment a block spawns is exactly as reproducible as
+ * drawing two drops early and holding the result. Keeping an invisible queue
+ * would only have preserved *when* the draw happened, and that timing is the one
+ * thing D11 wanted to change: the board-aware cap in [Spawn] now reads the board
+ * the block will actually land on rather than the board of two drops ago.
  */
 @Serializable
 data class GameState(
     val config: EngineConfig = EngineConfig.Default,
     val board: Board,
     val falling: FallingBlock?,
-    val preview: List<Block>,
-    val hold: Block? = null,
-    val holdUsedThisDrop: Boolean = false,
     val score: Long = 0,
     val level: Int = 1,
     val blocksDropped: Int = 0,
@@ -62,7 +70,7 @@ data class GameState(
 ) {
     val isOver: Boolean get() = status != RunStatus.PLAYING
 
-    /** The cell a hard drop would place the falling block in, for the ghost outline. */
+    /** The cell the falling block will come to rest in, for the ghost outline. */
     val landingCell: Cell?
         get() = falling?.let { Cell(it.cell.col, board.landingRow(it.cell.col, it.cell.row)) }
 

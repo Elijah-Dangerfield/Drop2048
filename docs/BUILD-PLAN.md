@@ -501,6 +501,51 @@ validation this has.
 
 ---
 
+## C1d · Cut hard drop and hold, add the nudge — **DONE** (2026-09-09)
+
+Decision D11 applied to the engine and to its two consumers. Four changes, shipped as one because
+the first three each move the determinism digest and moving it three times is three chances to
+paste an "actual" instead of deriving one.
+
+**`Input` lost `HardDrop` and `Hold` and gained `Nudge`.** `Nudge` advances the fall by
+`EngineConfig.nudgeRows` (2) and does nothing else — it does not lock, does not score, and stops
+against the stack rather than being rejected. The rows are a config value rather than a constant
+because the nudge is now the only acceleration a player has and C1e will want to sweep it.
+
+Removing hard drop cost the engine **no code path**. `Input.Lock` already locked at the block's
+*landing* cell rather than its current one, so hard drop was `Lock` plus a score prefix. Every
+call site that meant "put this block down now" — two test fixtures and the balance harness —
+became `Input.Lock` with no behaviour change at all.
+
+**The nudge pays nothing.** SPEC 7's `2 x rowsSkipped` is struck rather than inherited; the
+argument is in `Scoring`'s KDoc and in SPEC 7. Short version: the bonus was paying for
+commitment, a nudge is not a commitment, and a free reward on a repeatable input obliges every
+player to mash a control the handoff drew as recessive.
+
+**The board-aware cap moved to spawn time.** SPEC 5.4's non-optional preview was the *only* reason
+it read the board two drops early, and the preview is gone. `GameState` kept no invisible queue:
+a draw is a pure function of the rng, level, board and draw count already in the state, so
+drawing at spawn is exactly as reproducible and reads the real board. This deletes the caveat L20
+measured at 0.02-0.04%, and with it the harness's `staleCapDrops` counter, which could now only
+ever report zero.
+
+**The digest was re-pinned, for the second time.** `862 / 25 drops` became `592 / 22 drops`,
+digest `9182672379078956347` → `-9016281694182991228`. Re-derived by running the engine in a
+throwaway program and reading the values out, never by copying the assertion's "actual" (L17). The
+arithmetic is the check that it is the *right* number: 25 drops at roughly six skipped rows was
+about 300 points of bonus, which is most of the 270-point fall.
+
+**The saved-run blob is now versioned.** See `decisions.md`. A blob written by the C4 build would
+have decoded silently under `ignoreUnknownKeys`; it is refused instead, and the test that proves
+it loads the same bytes twice, once with a `version` spliced in, so a pass cannot come from the
+blob merely being malformed.
+
+**Not done here:** drag steering and the handoff's visual language (C3b), and re-measuring pacing
+(C1e). The `Cue` for the nudge is `Cue.Move` because `:libraries:ui` was being edited concurrently
+and `Cue.HardDrop` is now unreferenced.
+
+---
+
 ## C3a · Feel
 
 **Unblocked by** C3.

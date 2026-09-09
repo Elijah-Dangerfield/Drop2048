@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.libraries.ui.system.color
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -41,15 +42,47 @@ class BlockPaletteTest {
         assertEquals(BlockPalettes.Default.styles.last(), BlockPalettes.Default[3])
     }
 
+    /**
+     * The ink rule, both halves of it.
+     *
+     * A tier either takes the handoff's hue-matched ink — in which case the only
+     * thing to check is that it is readable, which
+     * [everyNumeralClearsTheReadabilityFloor] does — or it falls back, in which
+     * case the fallback has to have picked the better of the two flat inks. The
+     * second half is the assertion that used to cover the whole file, and it
+     * still catches the same bug: an ink assigned by eye onto a face too close
+     * to it.
+     */
     @Test
-    fun everyInkIsTheHigherContrastOfTheTwoCandidates() {
+    fun everyFallbackInkIsTheHigherContrastOfTheTwoCandidates() {
         forEachTier { choice, value, style ->
+            if (style.ink != DARK_INK && style.ink != LIGHT_INK) return@forEachTier
             val chosen = contrastRatio(style.ink, style.face)
             val rejected = contrastRatio(style.ink.other(), style.face)
             assertTrue(
                 chosen >= rejected,
                 "$choice's $value took the worse ink: ${style.ink} scores $chosen against " +
                     "${style.face}, the other candidate scores $rejected",
+            )
+        }
+    }
+
+    /**
+     * The design's ink is the *preferred* one, not the winner of a tie-break.
+     *
+     * Worth its own test because the difference is invisible in the rendered
+     * result and total in the code: a best-of-three would reject the hue-matched
+     * ink on all eleven default tiers, since the flat near-black beats it on
+     * contrast every time. If somebody "simplifies" [inkFor] into a max, this is
+     * the only thing that notices.
+     */
+    @Test
+    fun theShippedRampTakesTheDesignsHueMatchedInkOnEveryTier() {
+        BlockPalettes.Default.styles.forEachIndexed { tier, style ->
+            assertTrue(
+                style.ink != DARK_INK && style.ink != LIGHT_INK,
+                "the ${TIER_VALUES[tier]} fell back to a flat ink; the design specifies " +
+                    "oklch(0.26 0.07 H) and its faces are light enough to take it",
             )
         }
     }
@@ -65,12 +98,19 @@ class BlockPaletteTest {
      */
     @Test
     fun theInkDerivationFlipsWithTheFace() {
-        assertEquals(LIGHT_INK, inkFor(Color(0xFF15122B)))
-        assertEquals(DARK_INK, inkFor(Color(0xFFF6C445)))
+        assertEquals(LIGHT_INK, inkFor(Color(0xFF15122B), hue = 260f))
+        assertEquals(
+            Oklch(0.26f, 0.07f, 90f).toColor(),
+            inkFor(Color(0xFFF6C445), hue = 90f),
+            "a face this light takes the design's own ink, not a flat one",
+        )
 
-        val crimson = BlockPalettes.Default[32]
-        assertEquals(inkFor(crimson.face), crimson.ink)
-        assertEquals(LIGHT_INK, crimson.ink, "the 32 is dark enough to want the light numeral")
+        val deepBlue = BlockPalettes.Deuteranopia[2]
+        assertEquals(LIGHT_INK, deepBlue.ink, "the deuteranopia 2 is too dark for a dark numeral")
+        assertEquals(inkFor(deepBlue.face, deepBlue.face.toOklch().hue), deepBlue.ink)
+
+        val periwinkle = BlockPalettes.Deuteranopia[128]
+        assertEquals(DARK_INK, periwinkle.ink, "the deuteranopia 128 wants the flat dark numeral")
     }
 
     /** Colour is never the only signal, so the numeral has to be readable on every face. */
@@ -91,7 +131,7 @@ class BlockPaletteTest {
      */
     @Test
     fun neighbouringTiersClearTheSeparationFloor() {
-        BlockPalettes.all.forEach { (choice, palette) ->
+        accessibilityPalettes().forEach { (choice, palette) ->
             val worst = palette.closestNeighbours()
             assertTrue(
                 worst.distance >= NeighbourSeparationFloor,
@@ -104,7 +144,7 @@ class BlockPaletteTest {
     /** Looser than the neighbour floor, because the numerals do the rest of the work. */
     @Test
     fun noTwoTiersAnywhereInARampCollide() {
-        BlockPalettes.all.forEach { (choice, palette) ->
+        accessibilityPalettes().forEach { (choice, palette) ->
             val worst = palette.closestPair()
             assertTrue(
                 worst.distance >= CollisionFloor,
@@ -121,7 +161,7 @@ class BlockPaletteTest {
      */
     @Test
     fun everyPaletteSpansLightness() {
-        BlockPalettes.all.forEach { (choice, palette) ->
+        accessibilityPalettes().forEach { (choice, palette) ->
             val luminances = palette.styles.map { it.face.luminance() }
             val span = luminances.max() - luminances.min()
             assertTrue(span >= LuminanceSpanFloor, "$choice spans only $span of luminance")
@@ -153,6 +193,89 @@ class BlockPaletteTest {
                 "under $vision, $choice's ${pair.description} collapse to ${pair.distance}, " +
                     "under $SimulatedCollisionFloor",
             )
+        }
+    }
+
+    /**
+     * **The design ramp, measured, including where it misses.**
+     *
+     * The handoff replaced C2's hill-climbed default ramp with an authored one,
+     * and three of the floors the other four palettes hold do not survive that.
+     * Loosening the floors to make the suite green would delete the finding, and
+     * deleting the finding is the expensive move: it means the next person reads
+     * a passing suite and believes the shipped ramp holds a separation it does
+     * not.
+     *
+     * So the numbers are pinned instead. Every one of these is a *measurement*
+     * of the shipped ramp, and the assertions are two-sided — a retune that
+     * improves a number fails this test as loudly as one that worsens it, and it
+     * should, because either way the ramp is no longer the one that was drawn.
+     *
+     * What each miss actually is:
+     *
+     * - **Lightness span 0.19 against a floor of 0.45.** Not a mistake, a
+     *   deliberate property: `L` is 0.78 on every tier below 2048, so the board
+     *   reads as one set of objects lit the same way. It also means lightness
+     *   carries nothing, and lightness is the axis that survives every colour
+     *   vision deficiency.
+     * - **16 / 32 at ΔE 22.6 against a floor of 24.** The closest neighbouring
+     *   pair. Thirty degrees of hue where the rest of the ramp uses forty-five to
+     *   sixty.
+     * - **2 / 2048 at ΔE 14.6 against a floor of 17.** The closest pair anywhere,
+     *   and the interesting one: the 2048 is the brand yellow, five degrees of
+     *   hue from the 2. It is mitigated by the fact that a 2048 bursts its row
+     *   immediately, so the two are rarely on the board together — but a 2 and a
+     *   2048 side by side is a pair the ramp cannot separate.
+     *
+     * The mitigation across all three is the numeral, which every tile carries
+     * and which no palette setting can turn off, plus the four ramps below for
+     * the player who cannot use hue at all. Whether that is enough is an owner
+     * decision, not this test's.
+     */
+    @Test
+    fun theDesignRampIsWhereTheHandoffPutIt() {
+        val palette = BlockPalettes.Default
+        val faces = palette.styles.map { it.face }
+
+        val neighbours = faces.closestNeighbours()
+        assertEquals("16 and 32", neighbours.description)
+        assertNear(DesignRampClosestNeighbours, neighbours.distance, "closest neighbouring tiers")
+
+        val pair = faces.closestPair()
+        assertEquals("2 and 2048", pair.description)
+        assertNear(DesignRampClosestPair, pair.distance, "closest pair anywhere")
+
+        val luminances = faces.map { it.luminance() }
+        assertNear(DesignRampLuminanceSpan, luminances.max() - luminances.min(), "luminance span", LuminancePinTolerance)
+
+        val worstInk = palette.styles.minOf { contrastRatio(it.ink, it.face) }
+        assertNear(DesignRampWorstInk, worstInk, "worst numeral contrast")
+    }
+
+    /**
+     * The half of the design ramp's cost that no floor in this file was watching,
+     * and the reason the four accessibility palettes are not optional.
+     *
+     * A ramp of eleven hues at one constant lightness has, by construction,
+     * nothing left once a cone is missing. Under deuteranopia the 128 and the 256
+     * land ΔE 0.67 apart, which is the same colour.
+     *
+     * C2's authored ramp was not much better here — it collapsed to 6.15 under
+     * protanopia — so this is not a regression the handoff introduced so much as
+     * one it deepened. Neither ramp was ever the answer for a colour-blind
+     * player; the palettes are.
+     */
+    @Test
+    fun theDesignRampCollapsesUnderEachDeficiency() {
+        mapOf(
+            ColorVision.Deuteranopia to (DesignRampUnderDeuteranopia to "128 and 256"),
+            ColorVision.Protanopia to (DesignRampUnderProtanopia to "64 and 128"),
+            ColorVision.Tritanopia to (DesignRampUnderTritanopia to "256 and 512"),
+        ).forEach { (vision, expected) ->
+            val (distance, description) = expected
+            val worst = BlockPalettes.Default.seenBy(vision).closestPair()
+            assertEquals(description, worst.description, "the worst pair under $vision moved")
+            assertNear(distance, worst.distance, "the worst pair under $vision")
         }
     }
 
@@ -286,6 +409,23 @@ class BlockPaletteTest {
         }
     }
 
+    private fun accessibilityPalettes(): Map<BlockPaletteChoice, BlockPalette> =
+        BlockPalettes.all.filterKeys { it != BlockPaletteChoice.Default }
+
+    private fun assertNear(
+        expected: Float,
+        actual: Float,
+        what: String,
+        tolerance: Float = PinTolerance,
+    ) {
+        assertTrue(
+            abs(expected - actual) <= tolerance,
+            "$what measured $actual, pinned at $expected. If the ramp was retuned on purpose, " +
+                "re-derive this number by running it rather than pasting the value out of this " +
+                "message, and say in the commit why the design moved.",
+        )
+    }
+
     private fun forEachTier(assertion: (BlockPaletteChoice, Int, BlockStyle) -> Unit) {
         BlockPalettes.all.forEach { (choice, palette) ->
             palette.styles.forEachIndexed { tier, style -> assertion(choice, TIER_VALUES[tier], style) }
@@ -340,5 +480,23 @@ class BlockPaletteTest {
          * closer than a tier is once the mark is doing the work.
          */
         const val SpecialSimulatedFloor = 20f
+
+        /**
+         * Wide enough to absorb `Float` rounding through two colour-space
+         * conversions, narrow enough that any real retune of a tier trips it.
+         */
+        const val PinTolerance = 0.05f
+
+        /** Luminance runs 0..1, so it needs a tolerance two orders tighter. */
+        const val LuminancePinTolerance = 0.005f
+
+        const val DesignRampClosestNeighbours = 22.62f
+        const val DesignRampClosestPair = 14.64f
+        const val DesignRampLuminanceSpan = 0.1867f
+        const val DesignRampWorstInk = 7.16f
+
+        const val DesignRampUnderDeuteranopia = 0.67f
+        const val DesignRampUnderProtanopia = 4.01f
+        const val DesignRampUnderTritanopia = 1.46f
     }
 }

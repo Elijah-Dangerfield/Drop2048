@@ -21,12 +21,20 @@ import kotlinx.serialization.Serializable
 data class EngineConfig(
     val cols: Int = DEFAULT_COLS,
     val rows: Int = DEFAULT_ROWS,
-    val previewSize: Int = DEFAULT_PREVIEW,
+    /**
+     * How many ticks one press of ▼ is worth (decision D11).
+     *
+     * Two, and the handoff says two. It is a config value rather than a constant
+     * because the nudge is now the *only* acceleration a player has, C1e has to
+     * re-measure the opening without hard drop, and the number is the obvious
+     * dial to sweep while doing it. It travels inside [GameState] like every
+     * other tunable here, so a swept value cannot silently reshape a replay.
+     */
+    val nudgeRows: Int = DEFAULT_NUDGE_ROWS,
     val blocksPerLevel: Int = DEFAULT_BLOCKS_PER_LEVEL,
     val spawnCapDivisor: Int = DEFAULT_CAP_DIVISOR,
     val spawnCapFloor: Int = DEFAULT_CAP_FLOOR,
     val specialSuppressedDraws: Int = DEFAULT_SUPPRESSED_DRAWS,
-    val holdEnabled: Boolean = true,
     val continueRowsCleared: Int = DEFAULT_CONTINUE_ROWS,
     val cascadeStepCap: Int = DEFAULT_STEP_CAP,
     val cascadeMultiplierCap: Int = DEFAULT_MULTIPLIER_CAP,
@@ -36,7 +44,7 @@ data class EngineConfig(
     val scoring: Scoring = Scoring(),
 ) {
     init {
-        require(previewSize >= 0) { "previewSize must not be negative" }
+        require(nudgeRows > 0) { "nudgeRows must be positive" }
         require(blocksPerLevel > 0) { "blocksPerLevel must be positive" }
         require(spawnCapDivisor > 0) { "spawnCapDivisor must be positive" }
         require(cascadeStepCap > 0) { "cascadeStepCap must be positive" }
@@ -48,7 +56,7 @@ data class EngineConfig(
     companion object {
         const val DEFAULT_COLS = 5
         const val DEFAULT_ROWS = 8
-        const val DEFAULT_PREVIEW = 2
+        const val DEFAULT_NUDGE_ROWS = 2
         const val DEFAULT_BLOCKS_PER_LEVEL = 20
         const val DEFAULT_CAP_DIVISOR = 16
         const val DEFAULT_CAP_FLOOR = 4
@@ -187,10 +195,40 @@ data class SpeedCurve(
     }
 }
 
-/** SPEC 7. Never remote — changing these silently invalidates every high score. */
+/**
+ * SPEC 7. Never remote — changing these silently invalidates every high score.
+ *
+ * ### The nudge pays nothing, and that is a decision
+ *
+ * SPEC 7 used to award `2 x rowsSkipped` for a hard drop. Decision D11 removed
+ * hard drop, so that line had nothing left to fire on, and the open question was
+ * whether the ▼ nudge inherits it. It does not, for three reasons.
+ *
+ * The bonus was paying for **commitment**: hard drop gave up the rest of the
+ * fall, and there was no way to take it back. A nudge gives up two rows and can
+ * be pressed again a moment later, so paying per row would not reward a decision,
+ * it would reward the tap. Two rows at two points is four points against merges
+ * worth hundreds, so the payout could never be large enough to matter to a good
+ * player and would still be large enough to make mashing ▼ strictly better than
+ * not, on every block, forever. A control with a free reward and no cost is one
+ * the player is obliged to hold down, which is the opposite of the recessive
+ * accelerator the handoff drew.
+ *
+ * Second, the nudge is now the *only* acceleration in the game, so a per-row
+ * bonus would land on nearly every drop of nearly every run. A term that almost
+ * always fires is a constant multiplier on the drop count, and the score already
+ * has one of those in `survivalPerLevel`.
+ *
+ * Third, it keeps the table honest. Every remaining row of SPEC 7 pays for
+ * something that happened *on the board* — a merge, a burst, a detonation, a
+ * clear, a level. Nothing pays for an input any more.
+ *
+ * `ResolutionStep.HardDropBonus` went with the constant, so the transcript now
+ * only ever carries board events plus survival and level-up. The invariant that
+ * matters is untouched: `next.score == previous.score + transcript.points`.
+ */
 @Serializable
 data class Scoring(
-    val hardDropPerRow: Int = HARD_DROP_PER_ROW,
     val burstBase: Int = BURST_BASE,
     val burstPerBlock: Int = BURST_PER_BLOCK,
     val bombPerBlock: Int = BOMB_PER_BLOCK,
@@ -199,7 +237,6 @@ data class Scoring(
     val boardCleared: Int = BOARD_CLEARED,
 ) {
     companion object {
-        const val HARD_DROP_PER_ROW = 2
         const val BURST_BASE = 5000
         const val BURST_PER_BLOCK = 250
         const val BOMB_PER_BLOCK = 50

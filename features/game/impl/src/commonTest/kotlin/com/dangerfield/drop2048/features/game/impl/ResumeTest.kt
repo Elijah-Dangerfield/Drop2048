@@ -43,7 +43,7 @@ class ResumeTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
             assertPhase(GamePhase.Playing)
             state.score to assertNotNull(savedRun())
@@ -70,7 +70,7 @@ class ResumeTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
             assertNotNull(savedRun())
         }
@@ -98,7 +98,7 @@ class ResumeTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             assertPhase(GamePhase.Resolving)
             assertNotNull(savedRun())
         }
@@ -138,7 +138,7 @@ class ResumeTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             advance(millis = 200)
             background()
 
@@ -171,7 +171,7 @@ class ResumeTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
             assertPhase(GamePhase.StackedOut)
             assertNull(savedRun(), "the save is cleared when the run ends")
@@ -207,7 +207,7 @@ class ResumeTest : CoroutineTest() {
     fun playtimeSoFar_isBankedOnEverySave() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
             clock.advance(by = 25_000)
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
 
             assertEquals(25_000, assertNotNull(savedRun()).tally.playedMs)
@@ -238,7 +238,7 @@ class ResumeTest : CoroutineTest() {
             act(GameAction.Resume)
             clock.advance(by = 10_000)
 
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
 
             assertEquals(40_000, recordedRuns().single().durationMs)

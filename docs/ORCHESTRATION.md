@@ -21,11 +21,10 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1c · Balance with a clock | **DONE** | `321070a`. 500ms opening (D9). See L27-L31 |
 | C4 · Persistence + stats | **DONE** | `run_record`, resume incl. mid-cascade, stats screen |
 | C2c · Design language + screenshot harness | **IN PROGRESS** | The handoff (D10) |
-| C1d · Cut hard drop and hold, add nudge | queued | Engine change, digest will move (D11) |
-| C1e · Re-measure pacing without hard drop | queued | Blocked on C1d. Every number assumed it existed |
-| C3b · Game screen to handoff fidelity | queued | Blocked on C4 + C2c + C1d |
-| C3a · Feel | not started | |
-| C4 · Persistence + stats | not started | |
+| C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
+| C1e · Re-measure pacing without hard drop | **IN PROGRESS** | Every clocked number assumed hard drop existed |
+| C3b · Game screen to handoff fidelity | queued | Blocked on C2c |
+| C3a · Feel | not started | Needs audio assets from the owner |
 | C5 · Tutorial | not started | |
 | C6 · Daily Challenge | not started | |
 | C7 · Remote config | not started | |
@@ -85,6 +84,16 @@ Both are the same template, further along. Read them when unsure how something i
 - **`../Cards`** — the other build from the same template.
 - **`../KMPTemplate`** — presumably the template source itself. Check before assuming Drop2048's
   copy is canonical.
+
+## The design handoff
+
+`/Users/elijahdangerfield/Documents/design_handoff_drop2048/` is canonical for visuals and
+interaction and **stale for gameplay** (D10).
+
+**Read `docs/reference/design-handoff-deltas.md` before you open it.** Its README opens by claiming
+it reflects the latest gameplay decisions, and it does not — its merge rule, level formula, speed
+curve, board size, scoring and scope have all been explicitly rejected. The deltas page lists every
+one.
 
 **Port, do not copy blind.** A port arrives shaped like the app it came from. Strip its domain,
 rename it for what it does rather than what it did, and keep the *reason* comments.

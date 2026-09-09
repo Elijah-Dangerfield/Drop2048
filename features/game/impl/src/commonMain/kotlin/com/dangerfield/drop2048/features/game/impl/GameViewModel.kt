@@ -120,14 +120,14 @@ class GameViewModel(
      * SPEC 6 says input during resolution is ignored, and it is: nothing here
      * reaches the engine mid-cascade. But *discarding* it turned out to be a
      * different rule, and a bad one — playing this on device, every move tapped
-     * in the beat after a hard drop vanished, so the block that had just spawned
-     * went straight down the middle. The player did the right thing and the game
-     * did nothing.
+     * in the beat after a block landed vanished, so the block that had just
+     * spawned went straight down the middle. The player did the right thing and
+     * the game did nothing.
      *
      * So the last one is held and replayed once the next block exists. Only
      * sideways moves, and only the most recent: a queue would let a burst of
-     * panicked taps march a block across the board on its own, and a buffered
-     * hard drop would kill a run the player had not looked at yet.
+     * panicked taps march a block across the board on its own, and a buffered ▼
+     * would drop a block two rows into a board the player had not looked at yet.
      */
     private var bufferedMove: Input? = null
 
@@ -159,8 +159,7 @@ class GameViewModel(
             GameAction.LockNow -> action.lockNow()
             GameAction.MoveLeft -> action.move(Input.MoveLeft)
             GameAction.MoveRight -> action.move(Input.MoveRight)
-            GameAction.HardDrop -> action.hardDrop()
-            GameAction.Hold -> action.hold()
+            GameAction.Nudge -> action.nudge()
             GameAction.SoftDropStart -> action.softDrop(on = true)
             GameAction.SoftDropEnd -> action.softDrop(on = false)
             GameAction.Pause -> action.pause()
@@ -311,7 +310,7 @@ class GameViewModel(
             lockPending = false
             return
         }
-        lock(Input.Lock)
+        lock()
     }
 
     private suspend fun GameAction.move(input: Input) {
@@ -331,20 +330,34 @@ class GameViewModel(
         }
     }
 
-    private suspend fun GameAction.hardDrop() {
+    /**
+     * The ▼ control and the downward flick (decision D11).
+     *
+     * Two rows and no lock, so unlike the hard drop it replaced this does **not**
+     * start a resolution. What it does have to do is arm the lock delay: without
+     * that, nudging a block onto the stack leaves it sitting there until the next
+     * drop tick notices, and at level 1 that is half a second of a block visibly
+     * resting on the pile doing nothing. That is the same arming [tick] does, and
+     * for the same reason.
+     *
+     * Deliberately not buffered during a resolution. A move that arrives mid
+     * cascade is replayed on the next block because a sideways step is cheap and
+     * recoverable; two rows of fall on a board the player has not looked at yet
+     * is not.
+     */
+    private suspend fun GameAction.nudge() {
         if (state.phase != GamePhase.Playing) return
-        if (engine.falling == null) return
-        sendEvent(GameEffect.Play(Cue.HardDrop))
-        lock(Input.HardDrop)
-    }
-
-    private suspend fun GameAction.hold() {
-        if (state.phase != GamePhase.Playing) return
-        val transition = Cascade.apply(engine, Input.Hold)
+        val transition = Cascade.apply(engine, Input.Nudge)
         if (transition.isRejected) return
         engine = transition.state
-        sendEvent(GameEffect.Play(Cue.Spawn))
+        sendEvent(GameEffect.Play(Cue.Move))
         updateState { it.published() }
+
+        val falling = engine.falling ?: return
+        if (!engine.board.isEmpty(falling.cell + Direction.DOWN) && !lockPending) {
+            lockPending = true
+            scheduleLock()
+        }
     }
 
     private fun GameAction.softDrop(on: Boolean) {
@@ -498,7 +511,7 @@ class GameViewModel(
         }
     }
 
-    private suspend fun GameAction.lock(input: Input) {
+    private suspend fun GameAction.lock() {
         lockJob?.cancel()
         lockPending = false
         lockResetUsed = false
@@ -510,7 +523,7 @@ class GameViewModel(
         val before = if (landing != null && block != null) engine.board.with(landing, block) else engine.board
         val scoreBefore = engine.score
 
-        val transition = Cascade.apply(engine, input)
+        val transition = Cascade.apply(engine, Input.Lock)
         engine = transition.state
         tallyUp(transition)
         reportFaults(transition)
@@ -629,6 +642,7 @@ class GameViewModel(
         if (engine.isOver) return
         savedRunStore.save(
             SavedRun(
+                version = SAVE_FORMAT_VERSION,
                 state = engine,
                 tally = tallyIncludingTimeSoFar(),
                 seed = started.seed,
@@ -658,9 +672,6 @@ class GameViewModel(
         level = engine.level,
         levelFraction = engine.blocksDropped % engine.config.blocksPerLevel /
             engine.config.blocksPerLevel.toFloat(),
-        next = engine.preview,
-        hold = engine.hold,
-        canHold = engine.config.holdEnabled && !engine.holdUsedThisDrop,
         dropIndex = engine.blocksDropped,
         inDanger = engine.inDanger,
         biggestTier = tally.highestTier,
@@ -694,9 +705,9 @@ enum class GamePhase { Playing, Resolving, Paused, StackedOut }
 /**
  * Everything on screen, and nothing the engine would call state.
  *
- * The board, the falling block and the preview are the engine's own types rather
- * than mirrored view models. There is one board in this app and one shape it can
- * be in; a parallel hierarchy would exist only to be kept in sync.
+ * The board and the falling block are the engine's own types rather than
+ * mirrored view models. There is one board in this app and one shape it can be
+ * in; a parallel hierarchy would exist only to be kept in sync.
  */
 data class GameUiState(
     val board: Board = Board.empty(1, 1),
@@ -708,9 +719,6 @@ data class GameUiState(
     val best: Long = 0,
     val level: Int = 1,
     val levelFraction: Float = 0f,
-    val next: List<Block> = emptyList(),
-    val hold: Block? = null,
-    val canHold: Boolean = true,
     val inDanger: Boolean = false,
     val phase: GamePhase = GamePhase.Playing,
     /** The cascade step the last chain reached, 0 when nothing has chained. */
@@ -741,8 +749,9 @@ sealed interface GameAction {
     data object LockNow : GameAction
     data object MoveLeft : GameAction
     data object MoveRight : GameAction
-    data object HardDrop : GameAction
-    data object Hold : GameAction
+
+    /** ▼, or a downward flick. Two rows of fall (decision D11). */
+    data object Nudge : GameAction
     data object SoftDropStart : GameAction
     data object SoftDropEnd : GameAction
     data object Pause : GameAction

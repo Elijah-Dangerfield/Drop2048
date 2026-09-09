@@ -45,12 +45,12 @@ import drop2048.libraries.resources.generated.resources.game_best
 import drop2048.libraries.resources.generated.resources.game_biggest
 import drop2048.libraries.resources.generated.resources.game_board
 import drop2048.libraries.resources.generated.resources.game_chain
-import drop2048.libraries.resources.generated.resources.game_drop
 import drop2048.libraries.resources.generated.resources.game_drop_again
 import drop2048.libraries.resources.generated.resources.game_falling_block
 import drop2048.libraries.resources.generated.resources.game_left_handed
 import drop2048.libraries.resources.generated.resources.game_move_left
 import drop2048.libraries.resources.generated.resources.game_move_right
+import drop2048.libraries.resources.generated.resources.game_nudge
 import drop2048.libraries.resources.generated.resources.game_paused
 import drop2048.libraries.resources.generated.resources.game_quit
 import drop2048.libraries.resources.generated.resources.game_restart
@@ -121,13 +121,13 @@ fun GameScreen(
                     enabled = live,
                     onMoveLeft = { onAction(GameAction.MoveLeft) },
                     onMoveRight = { onAction(GameAction.MoveRight) },
-                    onHardDrop = { onAction(GameAction.HardDrop) },
+                    onNudge = { onAction(GameAction.Nudge) },
                     onSoftDropStart = { onAction(GameAction.SoftDropStart) },
                     onSoftDropEnd = { onAction(GameAction.SoftDropEnd) },
                     labels = ControlLabels(
                         moveLeft = stringResource(Res.string.game_move_left),
                         moveRight = stringResource(Res.string.game_move_right),
-                        drop = stringResource(Res.string.game_drop),
+                        nudge = stringResource(Res.string.game_nudge),
                     ),
                 )
             }
@@ -322,8 +322,6 @@ private fun GameScreenPreview() {
                 best = 130_450,
                 level = 7,
                 levelFraction = 0.4f,
-                next = listOf(NumberBlock(BlockValue.V2), NumberBlock(BlockValue.V8)),
-                hold = NumberBlock(BlockValue.V32),
             ),
             onAction = {},
         )

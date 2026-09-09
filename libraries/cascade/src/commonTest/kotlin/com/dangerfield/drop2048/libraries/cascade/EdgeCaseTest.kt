@@ -162,13 +162,13 @@ class EdgeCaseTest {
     @Test
     fun case09_aCascadeInterruptedByBackgroundingSurvivesSerialization() {
         val start = Cascade.newGame(seed = 7L)
-        val mid = Cascade.apply(start, Input.HardDrop)
+        val mid = Cascade.apply(start, Input.Lock)
 
         val round = json.decodeFromString<Transition>(json.encodeToString(mid))
         assertEquals(mid, round)
 
-        val fromLive = Cascade.apply(mid.state, Input.HardDrop)
-        val fromDisk = Cascade.apply(round.state, Input.HardDrop)
+        val fromLive = Cascade.apply(mid.state, Input.Lock)
+        val fromDisk = Cascade.apply(round.state, Input.Lock)
         assertEquals(json.encodeToString(fromLive), json.encodeToString(fromDisk))
     }
 
@@ -198,23 +198,28 @@ class EdgeCaseTest {
         assertNotNull(continued.state.falling)
     }
 
+    /**
+     * SPEC 18.11 used to be "holding on the first drop is legal". Decision D11
+     * removed hold, and what remains worth pinning is the case underneath it: the
+     * very first input of a run arrives before anything has been queued, drawn or
+     * cached, because nothing is queued, drawn or cached any more.
+     */
     @Test
-    fun case11_holdingOnTheFirstDropIsLegalAndPullsTheNextBlock() {
+    fun case11_theFirstInputOfARunNeedsNothingToHaveBeenQueued() {
         val start = Cascade.newGame(seed = 99L)
-        val firstBlock = start.falling?.block
-        val nextUp = start.preview.first()
 
-        val held = Cascade.apply(start, Input.Hold)
+        assertEquals(1, start.drawsMade)
+        assertFalse(Cascade.apply(start, Input.Nudge).isRejected)
+        assertFalse(Cascade.apply(start, Input.MoveLeft).isRejected)
 
-        assertFalse(held.isRejected)
-        assertEquals(firstBlock, held.state.hold)
-        assertEquals(nextUp, held.state.falling?.block)
-        assertEquals(start.config.previewSize, held.state.preview.size)
-        assertTrue(Cascade.apply(held.state, Input.Hold).isRejected, "one swap per drop")
+        val locked = Cascade.apply(start, Input.Lock)
+        assertFalse(locked.isRejected)
+        assertNotNull(locked.state.falling, "the next block is drawn by the lock that needed it")
+        assertEquals(2, locked.state.drawsMade)
     }
 
     @Test
-    fun case12_aHardDropIntoAFullColumnLocksInRowZeroAndEndsTheRun() {
+    fun case12_aLockIntoAFullColumnLandsInRowZeroAndEndsTheRun() {
         val board = boardOf(
             """
             . . . . .
@@ -274,9 +279,9 @@ class EdgeCaseTest {
             val input = when (chooser.valueIn(6)) {
                 0 -> Input.MoveLeft
                 1 -> Input.MoveRight
-                2 -> Input.Hold
+                2 -> Input.Nudge
                 3 -> Input.Tick
-                else -> Input.HardDrop
+                else -> Input.Lock
             }
             val transition = Cascade.apply(state, input)
             transitions += transition

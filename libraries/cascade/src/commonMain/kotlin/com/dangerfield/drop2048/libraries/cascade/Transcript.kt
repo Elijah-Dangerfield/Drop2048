@@ -15,9 +15,12 @@ enum class MergeKind { VALUE, WILDCARD }
  * One entry in a [Transcript].
  *
  * [step] is the cascade step the entry belongs to, starting at 1. Awards that
- * are not part of a cascade (the hard drop bonus, survival, level up) carry
- * step 0, which is also what the audio pitch in SPEC 9 keys off — step 0 is
- * "no pitch offset".
+ * are not part of a cascade (survival, level up) carry step 0, which is also
+ * what the audio pitch in SPEC 9 keys off — step 0 is "no pitch offset".
+ *
+ * There is no input-driven step left. `HardDropBonus` was the only one, and
+ * decision D11 removed both the input and the award; see [Scoring] for why the
+ * ▼ nudge did not inherit it.
  */
 @Serializable
 sealed interface ResolutionStep {
@@ -76,15 +79,6 @@ sealed interface ResolutionStep {
         val moves: List<BlockMove>,
     ) : ResolutionStep {
         override val points: Int get() = 0
-    }
-
-    @Serializable
-    @SerialName("hardDrop")
-    data class HardDropBonus(
-        val rowsSkipped: Int,
-        override val points: Int,
-    ) : ResolutionStep {
-        override val step: Int get() = 0
     }
 
     @Serializable

@@ -181,12 +181,11 @@ class PlaybackTest {
             config = EngineConfig.Default,
             board = before,
             falling = FallingBlock(NumberBlock(BlockValue.V4), Cell(2, 0)),
-            preview = listOf(blockOf(2), blockOf(2)),
             rng = Rng(1),
             drawsMade = EngineConfig.DEFAULT_SUPPRESSED_DRAWS,
         )
 
-        val transition = Cascade.apply(state, Input.HardDrop)
+        val transition = Cascade.apply(state, Input.Lock)
         val placed = before.with(Cell(2, 5), NumberBlock(BlockValue.V4))
         val frames = framesFor(placed, state.score, transition.transcript)
 

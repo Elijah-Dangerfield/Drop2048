@@ -6,6 +6,38 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The saved run carries a format version, and the version is what invalidates it
+
+**Decision:** `SavedRun` gains `version: Int` with **no default**, and
+`SavedRunStore.load()` returns null unless it equals `SAVE_FORMAT_VERSION`. Bump
+the constant whenever `GameState`, `RunTally` or `SavedResolution` change shape.
+
+**Context:** D11 removed `preview`, `hold` and `holdUsedThisDrop` from
+`GameState`, which is the first engine change since C4 that could invalidate a
+blob sitting on a real device.
+
+**Alternative, and the reason it was rejected:** rely on `ignoreUnknownKeys`,
+which is already set. It would have worked here — a pre-D11 blob decodes cleanly
+into the new shape, losing only the held block — and that is exactly the problem.
+It only works while every change is subtractive, it decides silently, and the
+first change it cannot absorb is a field that changes *meaning* rather than
+disappearing. That one would restore a run into the wrong rules with nothing on
+screen to say so, and a run restored wrong is worse than a run lost.
+
+Having no default is the load-bearing half. A default would make a pre-D11 blob
+decode as "version 2" and be accepted, which is the silent path again.
+
+The cost is bounded and was already the accepted cost of storing this as a
+string: the player loses the run in flight and nothing else. The install id, the
+onboarding flag and the whole `run_record` history live outside the blob.
+
+The test that guards it loads a hand-written pre-D11 blob twice, once as-is and
+once with nothing changed but a `version` spliced in. The first must be refused
+and the second must resume. Without the second half the test would pass on any
+malformed field and prove nothing.
+
+---
+
 ## 2026-09-09 — The in-progress run is a string in `AppData`, not a typed field
 
 **Decision:** `AppData.savedRun` is a `String?` holding JSON. `SavedRun`, the type

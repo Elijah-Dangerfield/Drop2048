@@ -66,16 +66,54 @@ class SpawnTest {
         assertEquals(setOf(2, 4), drawn)
     }
 
+    /**
+     * The draws are counted, not the drops, and with the preview gone (decision
+     * D11) the two are the same thing — so the run has to actually be played
+     * three blocks deep to see the third draw.
+     */
     @Test
     fun specialsAreSuppressedForTheFirstThreeDrawsOfARun() {
         (0 until 40).forEach { seed ->
-            val state = Cascade.newGame(seed.toLong(), config.copy(specialRates = alwaysSpecial()))
-            val firstThree = listOf(state.falling?.block) + state.preview
+            var state = Cascade.newGame(seed.toLong(), config.copy(specialRates = alwaysSpecial()))
+            val opening = mutableListOf<Block?>()
+            repeat(config.specialSuppressedDraws) {
+                opening += state.falling?.block
+                state = Cascade.apply(state, Input.Lock).state
+            }
             assertTrue(
-                firstThree.none { it is SpecialBlock },
-                "seed $seed opened with a special: $firstThree",
+                opening.none { it is SpecialBlock },
+                "seed $seed opened with a special: $opening",
             )
         }
+    }
+
+    /**
+     * SPEC 5.3's cap now reads the board the block will land on rather than the
+     * board of two drops ago (decision D11).
+     *
+     * The board only changes at a lock, so the test has to be a lock that moves
+     * the ceiling: a 1024 landing on a 1024 makes a 2048, which bursts its own
+     * row and leaves the board empty. The ceiling goes from `2048 / 16` down to
+     * the floor of 4 in one transition. Drawn at spawn, the next block is a 4;
+     * drawn two drops early against the pre-burst board, a level-20 table could
+     * hand out a 64.
+     */
+    @Test
+    fun theCapIsReadAtSpawnAgainstTheBoardTheLockJustProduced() {
+        val state = stateOf(
+            boardOf("1024 . . . ."),
+            level = 20,
+            config = config.copy(specialRates = emptyList()),
+        )
+
+        val transition = drop(state, value(1024), col = 0)
+
+        assertTrue(transition.state.board.isClear, "the burst emptied the board")
+        assertEquals(
+            config.spawnCapFloor,
+            transition.state.falling?.block?.numberValue?.points,
+            "an empty board caps the very next spawn at the floor",
+        )
     }
 
     @Test

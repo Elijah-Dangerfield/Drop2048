@@ -52,19 +52,15 @@ internal fun tier(points: Int): BlockValue =
 internal fun stateOf(
     board: Board,
     falling: FallingBlock? = null,
-    preview: List<Block> = listOf(value(2), value(2)),
     config: EngineConfig = EngineConfig.Default,
     level: Int = 1,
     score: Long = 0,
     blocksDropped: Int = 0,
     seed: Long = 1,
-    hold: Block? = null,
 ): GameState = GameState(
     config = config,
     board = board,
     falling = falling,
-    preview = preview,
-    hold = hold,
     score = score,
     level = level,
     blocksDropped = blocksDropped,
@@ -80,7 +76,15 @@ internal fun resolve(
     config: EngineConfig = EngineConfig.Default,
 ): Resolution = Resolver.resolve(board, listOf(Seed(from, lastDirection)), config)
 
-/** Drops [block] into [col] from row 0 and locks it, returning the whole transition. */
+/**
+ * Drops [block] into [col] from row 0 and locks it, returning the whole
+ * transition.
+ *
+ * [Input.Lock] locks at the block's *landing* cell, so this places it at the
+ * bottom of the column without a test having to tick it down eight times. It is
+ * what `Input.HardDrop` used to do here, minus the bonus that decision D11
+ * removed.
+ */
 internal fun drop(
     state: GameState,
     block: Block,
@@ -88,5 +92,5 @@ internal fun drop(
     lastDirection: Direction? = null,
 ): Transition = Cascade.apply(
     state.copy(falling = FallingBlock(block, Cell(col, 0), lastDirection)),
-    Input.HardDrop,
+    Input.Lock,
 )

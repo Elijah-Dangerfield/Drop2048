@@ -25,6 +25,30 @@ import kotlin.test.assertTrue
  * move with them; it was re-derived from the engine, not from the old numbers.
  * No scores existed yet. Every later change to these constants needs the same
  * kind of written reason.
+ *
+ * Re-pinned a second time, 2026-09-09, for decision D11. Three things moved the
+ * digest at once and they shipped together so it only had to move once:
+ *
+ * 1. `Input` lost `HardDrop` and `Hold` and gained `Nudge`, so the scripted
+ *    player below plays a different, shorter run.
+ * 2. SPEC 7's `2 x rowsSkipped` hard drop bonus was struck and the nudge did not
+ *    inherit it, so the score is lower and `HardDropBonus` no longer appears in
+ *    any transcript.
+ * 3. `GameState` lost `preview`, `hold` and `holdUsedThisDrop`, and the spawn
+ *    draw moved from enqueue time to spawn time — so both the serialized shape
+ *    and the RNG stream's alignment with the board changed.
+ *
+ * Re-derived by running the engine and reading the values out, not by copying
+ * the "actual" out of the assertion failure. Those look identical in a diff and
+ * are not: pasting the actual makes the test agree with whatever the code now
+ * does, which is the same as deleting it. Still no recorded scores and no Daily
+ * Challenge, which is the only reason a second re-pin is affordable at all.
+ *
+ * `862 / 25 drops` became `592 / 22 drops`, and the arithmetic is the check that
+ * the re-derivation is the right number rather than merely a number: 25 drops at
+ * roughly six skipped rows was about 300 points of hard drop bonus, and 300 is
+ * most of the 270-point fall. The rest is three fewer drops, because the run
+ * plays out differently once the draw moves to spawn time.
  */
 class DeterminismTest {
 
@@ -88,6 +112,11 @@ class DeterminismTest {
     /**
      * A deliberately dumb scripted player, generated from the engine's own RNG so
      * the script needs no platform randomness of its own.
+     *
+     * The weights are the pre-D11 ones with the two removed inputs replaced in
+     * place: `Hold` became `Nudge` and `HardDrop` became `Lock`. Keeping the
+     * shape of the script means the new pin is a comparable run rather than a
+     * differently-shaped one that happens to be pinned too.
      */
     private fun scriptedInputs(seed: Long, count: Int): List<Input> {
         var rng = Rng(seed)
@@ -97,8 +126,8 @@ class DeterminismTest {
                 0, 1 -> Input.MoveLeft
                 2, 3 -> Input.MoveRight
                 4 -> Input.Tick
-                5 -> Input.Hold
-                else -> Input.HardDrop
+                5 -> Input.Nudge
+                else -> Input.Lock
             }
         }
     }
@@ -119,9 +148,9 @@ class DeterminismTest {
         const val FNV_OFFSET = -0x340d631b7bdddcdbL
         const val FNV_PRIME = 0x100000001b3L
 
-        const val PINNED_SCORE = 862L
-        const val PINNED_BLOCKS_DROPPED = 25
+        const val PINNED_SCORE = 592L
+        const val PINNED_BLOCKS_DROPPED = 22
         const val PINNED_LEVEL = 2
-        const val PINNED_DIGEST = 9_182_672_379_078_956_347L
+        const val PINNED_DIGEST = -9_016_281_694_182_991_228L
     }
 }

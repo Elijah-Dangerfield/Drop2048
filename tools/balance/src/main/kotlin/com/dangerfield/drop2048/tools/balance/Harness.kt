@@ -37,7 +37,6 @@ class RunOutcome(
     val bursts: Int,
     val depths: IntArray,
     val clutter: IntArray,
-    val staleCapDrops: Int,
     val clock: ClockStats? = null,
 )
 
@@ -67,13 +66,25 @@ class ClockStats(
  * Plays whole runs of the shipped engine with no renderer, and with or without
  * a clock.
  *
- * Clock-free, every policy hard-drops into the column it wants at every level,
+ * Clock-free, every policy places a block in the column it wants at every level,
  * which is the right instrument for the spawn table and the wrong one for
  * difficulty: it reports what an unhurried player would manage. Hand it a
  * [PlayerProfile] and [DropClock] puts SPEC 5.5's timer and SPEC 6's controls
  * between the policy and the board, and the same policy has to earn its column.
  *
  * Both are kept because the gap between them is the measurement.
+ *
+ * **C1e must re-run everything here.** Decision D11 removed hard drop, and C1c
+ * measured that whether hard drop was used was the single biggest lever on the
+ * opening — level 4 in 34s against 289s. Every clocked number this harness has
+ * produced was measured in a game where one tap ended a fall, and none of them
+ * carry over. The clock-free numbers do carry over, because placement is
+ * unchanged; only the wall clock moved.
+ *
+ * The stale-cap counter is gone with the same ruling: the board-aware cap now
+ * reads the board at spawn, so the quantity L20 measured at 0.02-0.04% is
+ * identically zero and a metric that can only report zero is worse than no
+ * metric.
  */
 object Harness {
 
@@ -104,7 +115,6 @@ object Harness {
         var death = Death.DROP_CAP
         val depths = IntArray(DEPTH_BUCKETS)
         val clutter = IntArray(config.cols * config.rows + 1)
-        var staleCapDrops = 0
 
         var elapsed = 0L
         var timerPlaced = 0
@@ -120,7 +130,6 @@ object Harness {
         var buffered = false
 
         while (state.blocksDropped < MAX_DROPS) {
-            if (exceedsLandingTimeCap(state, config)) staleCapDrops++
             val level = state.level
             val bucket = minOf(level, LEVEL_BUCKETS - 1)
             if (profile != null && reachedAt[bucket] < 0) reachedAt[bucket] = elapsed
@@ -178,7 +187,6 @@ object Harness {
             bursts = bursts,
             depths = depths,
             clutter = clutter,
-            staleCapDrops = staleCapDrops,
             clock = profile?.let {
                 ClockStats(
                     elapsedMillis = elapsed,
@@ -198,38 +206,26 @@ object Harness {
     }
 
     /**
-     * Whether the block about to land is one SPEC 5.3's board-aware cap would
-     * have refused if it had been evaluated now instead of at draw time.
-     *
-     * The cap reads the board two drops early — SPEC 5.3 says so, and SPEC 5.4's
-     * non-optional preview forces it. That means it can only ever loosen on stale
-     * data, never tighten, so this counts exactly the drops where the safety
-     * valve was open wider than the board justified. If chains ever get frequent
-     * enough that `highestOnBoard` climbs faster than two drops, this is the
-     * number that shows it compounding.
-     */
-    private fun exceedsLandingTimeCap(state: GameState, config: EngineConfig): Boolean {
-        val value = state.falling?.block?.numberValue ?: return false
-        val highest = state.board.highestValue()?.points ?: 0
-        val ceiling = maxOf(config.spawnCapFloor, highest / config.spawnCapDivisor)
-        return value.points > ceiling
-    }
-
-    /**
-     * Steers the falling block to [col] and hard-drops it.
+     * Steers the falling block to [col] and locks it where it would land.
      *
      * The horizontal moves are real [Input.MoveLeft] / [Input.MoveRight]s rather
      * than a teleport, because moving is what sets `lastDirection`, and that is
      * slot 2 of SPEC 4.3's merge priority order. A harness that placed blocks
      * directly would be playing a slightly different game from the one that
      * ships.
+     *
+     * This used to end in `Input.HardDrop`, which decision D11 removed.
+     * [Input.Lock] locks at the landing cell, so the *placement* is identical and
+     * every clock-free number C1a measured still means what it meant. What is
+     * gone is the score bonus, and — in the clocked harness — any pretence that a
+     * player can put a block down in one press. See [DropClock].
      */
     fun drop(state: GameState, col: Int): Transition {
-        val from = state.falling?.cell?.col ?: return Cascade.apply(state, Input.HardDrop)
+        val from = state.falling?.cell?.col ?: return Cascade.apply(state, Input.Lock)
         val step = if (col > from) Input.MoveRight else Input.MoveLeft
         var current = state
         repeat(abs(col - from)) { current = Cascade.apply(current, step).state }
-        return Cascade.apply(current, Input.HardDrop)
+        return Cascade.apply(current, Input.Lock)
     }
 
     private fun higher(a: BlockValue?, b: BlockValue?): BlockValue? = when {

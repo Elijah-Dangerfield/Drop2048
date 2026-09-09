@@ -4,6 +4,7 @@ import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
 import com.dangerfield.drop2048.libraries.cascade.Cell
+import com.dangerfield.drop2048.libraries.cascade.Direction
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -103,6 +104,28 @@ internal class GameScenario private constructor(
     fun waitOutLockDelay() = advance(LockDelayMillis + 1)
 
     /**
+     * Put the falling block down, the way a player has to since decision D11.
+     *
+     * There is no one-press drop any more, so this taps ▼ until the block is
+     * resting and then lets the lock delay run out. It advances **no** drop
+     * ticks, which matters for the same reason L31 does: `tick()` moves a whole
+     * drop interval, and a test that reaches for it to land a block ends up
+     * asserting about the block after the one it meant.
+     *
+     * A nudge into a blocked cell is a no-op, so a block that cannot fall at all
+     * — the stacked-out cases — simply arms the lock on the first press.
+     */
+    fun land() {
+        var presses = 0
+        while (presses++ <= state.board.rows) {
+            act(GameAction.Nudge)
+            val falling = viewModel.state.falling ?: break
+            if (!viewModel.state.board.isEmpty(falling.cell + Direction.DOWN)) break
+        }
+        waitOutLockDelay()
+    }
+
+    /**
      * Advance until the resolution finishes, and **no further**.
      *
      * A flat "advance thirty seconds" would also run the drop timer for thirty
@@ -163,7 +186,6 @@ internal class GameScenario private constructor(
             picture: String = "",
             falling: Block? = NumberBlock(BlockValue.V2),
             fallingAt: Cell = Cell(2, 0),
-            preview: List<Block> = listOf(NumberBlock(BlockValue.V2), NumberBlock(BlockValue.V4)),
             level: Int = 1,
             blocksDropped: Int = 0,
             best: Long = 0,
@@ -176,7 +198,6 @@ internal class GameScenario private constructor(
                 config = config,
                 board = board,
                 falling = falling?.let { FallingBlock(it, fallingAt) },
-                preview = preview,
                 rng = Rng(SCENARIO_SEED),
                 level = level,
                 blocksDropped = blocksDropped,

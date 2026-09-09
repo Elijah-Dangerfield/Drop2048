@@ -18,6 +18,11 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * blob it cannot read as "no saved run" — the engine's serial shape moves with
  * every chunk, and a run saved by a build with a different `EngineConfig` must
  * cost the player that run, not the app its launch.
+ *
+ * Two things can make a blob unreadable, and both end here rather than at the
+ * launch path: it does not parse, or it parses and its
+ * [SavedRun.version] is not [SAVE_FORMAT_VERSION]. See [SavedRun] for why the
+ * version is checked rather than trusted to `ignoreUnknownKeys`.
  */
 interface SavedRunStore {
     suspend fun load(): SavedRun?
@@ -40,6 +45,7 @@ class AppCacheSavedRunStore(
         return Catching { json.decodeFromString(SavedRun.serializer(), stored) }
             .logOnFailure { "Saved run could not be decoded; starting fresh" }
             .getOrNull()
+            ?.takeIf { it.version == SAVE_FORMAT_VERSION }
     }
 
     override suspend fun save(run: SavedRun) {
@@ -58,9 +64,9 @@ class AppCacheSavedRunStore(
 
     private companion object {
         /**
-         * `ignoreUnknownKeys` so a field this build no longer has does not cost
-         * the player a run mid-cascade. A field it does not yet have is already
-         * covered by the defaults on [SavedRun].
+         * `ignoreUnknownKeys` so a stale field is a version mismatch to be
+         * refused deliberately rather than a decode crash on the launch path.
+         * It is not the invalidation mechanism; [SavedRun.version] is.
          */
         val json = Json {
             ignoreUnknownKeys = true

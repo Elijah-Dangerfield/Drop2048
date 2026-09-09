@@ -5,11 +5,19 @@ internal data class Draw(val rng: Rng, val block: Block, val wasSpecial: Boolean
 /**
  * SPEC 5.3's two stacked constraints, plus SPEC 5.2's special rates.
  *
- * The draw happens when a block enters the *preview*, not when it enters the
- * board, because SPEC 5.4 makes the two-block preview non-optional and a
- * preview that can still change is a lie. That means the board-aware cap is
- * evaluated against the board two drops before the block lands, which is the
- * price of an honest preview.
+ * The draw happens when the block **spawns**, against the board it will land on.
+ *
+ * It used to happen two drops earlier, when the block entered the next-block
+ * preview: a preview that can still change is a lie, so the value had to be
+ * fixed the moment it was shown, and the board-aware cap below therefore read a
+ * board two drops stale. Decision D11 cut the preview, and nothing else ever
+ * wanted the early draw. The cap now reads the real board.
+ *
+ * The board does not change while a block is in flight — only a lock changes it
+ * — so "at spawn" and "at landing" are the same board, and the cap is now
+ * exactly the rule SPEC 5.3 describes rather than an approximation of it. L20
+ * measured the approximation at 0.02-0.04% of drops, so expect no visible
+ * change; what this buys is one fewer caveat, not one fewer bug.
  *
  * When a special is suppressed — the first three draws of a run, or the draw
  * straight after a special — the special roll is not taken at all rather than

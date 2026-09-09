@@ -206,6 +206,18 @@ amplitude-control fallback, the pre-Oreo path, and the whole iOS Core Haptics pa
 **The burst envelope and the stacked-out double are guesses.** SPEC 21 puts the burst at half of
 what makes this game feel good, so these need hands on hardware, not a code review.
 
+### `SAVE_FORMAT_VERSION` needs an owner, or it will be forgotten silently
+
+C1d added `SAVE_FORMAT_VERSION` so a saved run from an older build is refused rather than restored
+into rules it was not played under. It must be bumped whenever `GameState`, `RunTally` or
+`SavedResolution` change shape.
+
+**Nothing enforces that.** If it is forgotten, the failure is silent and only appears on a real
+upgrade, on a real player's device, with their run in it.
+
+Decide whether this becomes a checklist item on every engine chunk, or whether something in the
+build should assert it.
+
 ### Write the policy for changing `PINNED_DIGEST`, before C6 not after
 
 The engine pins a determinism digest that proves a seed replays identically on every platform. It

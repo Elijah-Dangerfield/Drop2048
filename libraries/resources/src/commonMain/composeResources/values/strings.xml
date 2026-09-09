@@ -7,12 +7,14 @@
     <string name="game_score">Score</string>
     <string name="game_best">Best</string>
     <string name="game_level">Level %1$d</string>
-    <string name="game_hold">Hold</string>
-    <string name="game_next">Next</string>
     <string name="game_pause">Pause</string>
     <string name="game_move_left">Move left</string>
     <string name="game_move_right">Move right</string>
-    <string name="game_drop">Drop</string>
+
+    <!-- The ▼ control (decision D11). A content description, so it says what the
+         press does rather than naming the glyph: it advances the fall, it does
+         not drop the block. -->
+    <string name="game_nudge">Speed up the fall</string>
     <string name="game_board">Game board, %1$d columns by %2$d rows</string>
     <string name="game_falling_block">%1$s falling in column %2$d, landing in row %3$d</string>
 

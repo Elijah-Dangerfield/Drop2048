@@ -81,7 +81,6 @@ private fun Board.after(step: ResolutionStep): Board = when (step) {
 
     is ResolutionStep.Gravity -> settled(step)
 
-    is ResolutionStep.HardDropBonus,
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     is ResolutionStep.BoardCleared,
@@ -105,7 +104,6 @@ private fun Board.settled(step: ResolutionStep.Gravity): Board {
 
 private fun ResolutionStep.holdMillis(): Int = when (this) {
     is ResolutionStep.Burst -> Motion.BurstMillis
-    is ResolutionStep.HardDropBonus,
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     -> ScoreOnlyMillis
@@ -124,7 +122,6 @@ private fun ResolutionStep.cue(): Cue? = when (this) {
     is ResolutionStep.Burst -> Cue.Burst
     is ResolutionStep.LevelUp -> Cue.LevelUp
     is ResolutionStep.Gravity,
-    is ResolutionStep.HardDropBonus,
     is ResolutionStep.Survival,
     is ResolutionStep.BoardCleared,
     -> null

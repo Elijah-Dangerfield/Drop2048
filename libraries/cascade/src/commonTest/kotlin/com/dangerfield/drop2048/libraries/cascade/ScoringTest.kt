@@ -48,14 +48,38 @@ class ScoringTest {
         assertEquals(listOf(4 * 1, 8 * 2, 16 * 2), merges.map { it.points })
     }
 
+    /**
+     * Decision D11's scoring ruling, asserted rather than described. Hard drop's
+     * `2 x rowsSkipped` is gone and the ▼ nudge did not inherit it, so no input
+     * puts a point on the board any more. See `Scoring`'s KDoc for the argument.
+     */
     @Test
-    fun aHardDropIsWorthTwoPointsPerRowSkipped() {
-        val state = stateOf(flatBottom)
-        val transition = drop(state, value(2), col = 0)
+    fun noInputScoresAnything() {
+        var state = stateOf(flatBottom, FallingBlock(value(2), Cell(0, 0)))
 
-        val bonus = transition.transcript.steps.filterIsInstance<ResolutionStep.HardDropBonus>().single()
-        assertEquals(6, bonus.rowsSkipped)
-        assertEquals(12, bonus.points)
+        listOf(Input.MoveRight, Input.MoveLeft, Input.Tick, Input.Nudge, Input.Nudge).forEach { input ->
+            val transition = Cascade.apply(state, input)
+            assertTrue(
+                transition.transcript.isEmpty,
+                "$input produced a transcript step: ${transition.transcript.steps}",
+            )
+            assertEquals(0L, transition.state.score, "$input scored")
+            state = transition.state
+        }
+    }
+
+    /**
+     * The only steps a lock can add outside a cascade. Pinned as a set so a
+     * future award that pays for an input has to change this test on the way in.
+     */
+    @Test
+    fun aDropOnAnEmptyBoardScoresSurvivalAndNothingElse() {
+        val transition = drop(stateOf(flatBottom, level = 3), value(2), col = 0)
+
+        assertEquals(
+            listOf(ResolutionStep.Survival(level = 3, points = 30)),
+            transition.transcript.steps,
+        )
     }
 
     @Test
@@ -124,7 +148,7 @@ class ScoringTest {
     @Test
     fun theScoreOnlyEverMovesByTheTranscriptTotal() {
         var state = Cascade.newGame(seed = 4_815_162_342L)
-        val script = listOf(Input.MoveLeft, Input.HardDrop, Input.MoveRight, Input.HardDrop, Input.HardDrop)
+        val script = listOf(Input.MoveLeft, Input.Nudge, Input.Lock, Input.MoveRight, Input.Nudge, Input.Lock)
 
         repeat(60) { round ->
             val input = script[round % script.size]

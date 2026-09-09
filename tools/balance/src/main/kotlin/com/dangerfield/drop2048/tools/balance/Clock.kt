@@ -12,7 +12,7 @@ import kotlin.random.Random
 
 /** Who actually put the block down. */
 enum class Placement {
-    /** A drop input put it down: a tap for a hard drop, or a hold for a soft drop. */
+    /** A drop input put it down: a run of ▼ nudges, or a hold for a soft drop. */
     PLAYER,
 
     /**
@@ -27,10 +27,18 @@ enum class Placement {
     TIMER,
 }
 
-/** How a clocked policy ends a drop once it has reached the column it wants. */
+/**
+ * How a clocked policy ends a drop once it has reached the column it wants.
+ *
+ * There is no instant option any more. Decision D11 removed hard drop, so the
+ * fastest a block can reach the floor is a thumb repeating ▼, and that is
+ * modelled here as a real repeat at [PlayerProfile.tapMillis] rather than as a
+ * single free press. **This is the change C1e has to re-measure**; the model is
+ * faithful but no number produced with it has been looked at yet.
+ */
 enum class Finish {
-    /** A tap on the shared drop control (SPEC 6). */
-    HARD_DROP,
+    /** Repeated taps on ▼: `EngineConfig.nudgeRows` rows per tap, one tap per `tapMillis`. */
+    NUDGE,
 
     /** A hold on the same control: 40ms a row, flat at every level. */
     SOFT_DROP,
@@ -50,8 +58,14 @@ enum class Finish {
  * which one it came from.
  *
  * [Average] is the one the headline numbers use. 250ms to decide is roughly
- * choice-reaction time plus a glance at the preview, and 120ms between taps is
+ * choice-reaction time plus a glance at the board, and 120ms between taps is
  * a comfortable repeat rate rather than a mashing one.
+ *
+ * The decision time used to include a glance at the next-block preview, which
+ * decision D11 removed. Whether it should therefore be *shorter* — less to read
+ * — or *longer* — no lookahead, so more of the choice has to be made from the
+ * board — is a real question and an unanswered one. It is left at 250ms so C1e
+ * changes one thing at a time.
  */
 data class PlayerProfile(
     val name: String,
@@ -60,15 +74,16 @@ data class PlayerProfile(
     val finish: Finish,
 ) {
     companion object {
-        val Average = PlayerProfile("average", decisionMillis = 250, tapMillis = 120, finish = Finish.HARD_DROP)
-        val Quick = PlayerProfile("quick", decisionMillis = 150, tapMillis = 70, finish = Finish.HARD_DROP)
-        val Deliberate = PlayerProfile("deliberate", decisionMillis = 400, tapMillis = 180, finish = Finish.HARD_DROP)
+        val Average = PlayerProfile("average", decisionMillis = 250, tapMillis = 120, finish = Finish.NUDGE)
+        val Quick = PlayerProfile("quick", decisionMillis = 150, tapMillis = 70, finish = Finish.NUDGE)
+        val Deliberate = PlayerProfile("deliberate", decisionMillis = 400, tapMillis = 180, finish = Finish.NUDGE)
 
         /**
          * SPEC 6's other half of the shared drop control: hold instead of tap and
-         * the block falls at 40ms a row rather than instantly. Kept as a profile
-         * because a harness in which soft drop is never pressed cannot say
-         * whether soft drop matters.
+         * the block falls at a flat 40ms a row. Kept as a profile because a
+         * harness in which soft drop is never pressed cannot say whether soft
+         * drop matters — and since decision D11 it matters more, because soft
+         * drop and the nudge are now the only two ways to hurry a block at all.
          */
         val Softie = PlayerProfile("softie", decisionMillis = 250, tapMillis = 120, finish = Finish.SOFT_DROP)
 
@@ -130,7 +145,6 @@ object DropClock {
     fun resolutionMillis(transcript: Transcript): Long = transcript.steps.sumOf { step ->
         when (step) {
             is ResolutionStep.Burst -> BURST_MILLIS
-            is ResolutionStep.HardDropBonus,
             is ResolutionStep.Survival,
             is ResolutionStep.LevelUp,
             -> SCORE_ONLY_MILLIS
@@ -159,7 +173,7 @@ object DropClock {
     ): ClockedDrop {
         val config = state.config
         val falling = state.falling
-            ?: return ClockedDrop(Cascade.apply(state, Input.HardDrop), 0, 0, Placement.PLAYER, true, false)
+            ?: return ClockedDrop(Cascade.apply(state, Input.Lock), 0, 0, Placement.PLAYER, true, false)
 
         val fallMillis = config.speed.msPerRow(state.level)
         val preferred = policy.column(state, random, config)
@@ -188,11 +202,13 @@ object DropClock {
             when {
                 now == nextInput -> {
                     if (block.cell.col == target) {
-                        slack = restingMillis(current, fallMillis)
+                        if (slack < 0) slack = restingMillis(current, fallMillis)
                         when (profile.finish) {
-                            Finish.HARD_DROP -> {
+                            Finish.NUDGE -> {
                                 placement = Placement.PLAYER
-                                finished = Cascade.apply(current, Input.HardDrop)
+                                current = Cascade.apply(current, Input.Nudge).state
+                                lockAt = armLock(current, lockAt, now)
+                                nextInput = now + profile.tapMillis
                             }
 
                             Finish.SOFT_DROP -> {
@@ -235,7 +251,7 @@ object DropClock {
 
         val landedIn = current.falling?.cell?.col ?: target
         return ClockedDrop(
-            transition = finished ?: Cascade.apply(current, Input.HardDrop),
+            transition = finished ?: Cascade.apply(current, Input.Lock),
             elapsedMillis = now,
             slackMillis = if (slack < 0) 0 else slack,
             placement = placement,
@@ -288,6 +304,21 @@ object DropClock {
     }
 
     private fun stepToward(from: Int, to: Int): Input = if (to > from) Input.MoveRight else Input.MoveLeft
+
+    /**
+     * The ViewModel's half of the nudge: a ▼ that leaves the block resting starts
+     * the lock delay rather than waiting for the next drop tick to notice.
+     *
+     * Without this the harness would charge a nudging player up to a whole tick
+     * of dead time on the last press of every drop, which at level 1 is half a
+     * second and is exactly the number C1e is trying to measure.
+     */
+    private fun armLock(state: GameState, lockAt: Long, now: Long): Long {
+        if (lockAt != NEVER) return lockAt
+        val falling = state.falling ?: return lockAt
+        if (state.board.isEmpty(falling.cell + Direction.DOWN)) return lockAt
+        return now + LOCK_DELAY_MILLIS
+    }
 
     private const val CASCADE_STEP_MILLIS = 150
     private const val BURST_MILLIS = 420

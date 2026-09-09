@@ -95,11 +95,11 @@ class GameViewModelTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             assertPhase(GamePhase.Resolving)
 
             val boardMidCascade = state.board
-            act(GameAction.MoveLeft, GameAction.MoveRight, GameAction.HardDrop, GameAction.Hold)
+            act(GameAction.MoveLeft, GameAction.MoveRight, GameAction.Nudge)
 
             assertEquals(boardMidCascade, state.board, "board moved on input during resolution")
             assertNull(state.falling, "a block was accepted during resolution")
@@ -114,7 +114,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun moveDuringResolution_appliesToTheNextBlock() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
-            act(GameAction.HardDrop)
+            land()
             assertPhase(GamePhase.Resolving)
 
             act(GameAction.MoveLeft)
@@ -130,7 +130,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun moveDuringResolution_keepsOnlyTheLastOne() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
-            act(GameAction.HardDrop)
+            land()
             act(GameAction.MoveLeft, GameAction.MoveLeft, GameAction.MoveRight)
 
             waitOutResolution()
@@ -139,28 +139,43 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * A two-step cascade, stopped one frame in.
+     *
+     * It used to be a one-step merge asserted at the instant of the lock, which
+     * worked because `HardDrop` locked without any virtual time passing. There is
+     * no zero-time way to put a block down since decision D11 — [GameScenario.land]
+     * has to wait out the lock delay — so the first frame has always been drawn by
+     * the time the assertion runs. A deeper cascade is what restores the
+     * distinction: one merge shown, the second still to come, and the resolved
+     * board nowhere on screen yet.
+     */
     @Test
     fun playback_walksTheTranscriptRatherThanJumpingToTheEnd() = runUnitTest {
         playing(
             picture = """
-                .  .  .  .  .
                 .  .  2  .  .
+                .  .  4  .  .
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
 
             assertPhase(GamePhase.Resolving)
             assertEquals(
-                NumberBlock(BlockValue.V2),
-                state.board[Cell(2, 7)],
-                "the merged board was published before the merge was drawn",
+                NumberBlock(BlockValue.V4),
+                state.board[Cell(2, 6)],
+                "the first merge was drawn",
             )
-            assertEquals(NumberBlock(BlockValue.V2), state.board[Cell(2, 6)])
+            assertEquals(
+                NumberBlock(BlockValue.V4),
+                state.board[Cell(2, 7)],
+                "and the second one had not been, so the resolved board was not published early",
+            )
 
             waitOutResolution()
             assertPhase(GamePhase.Playing)
-            assertEquals(NumberBlock(BlockValue.V4), state.board[Cell(2, 7)])
+            assertEquals(NumberBlock(BlockValue.V8), state.board[Cell(2, 7)])
             assertTrue(
                 cues.contains(Cue.Merge(step = 1)),
                 "expected a step-1 merge cue during playback, got $cues",
@@ -183,7 +198,7 @@ class GameViewModelTest : CoroutineTest() {
             fallingAt = Cell(2, 0),
             config = EngineConfig.Default.copy(rows = 8),
         ) {
-            act(GameAction.HardDrop)
+            land()
 
             assertPhase(GamePhase.Resolving)
 
@@ -208,7 +223,7 @@ class GameViewModelTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             waitOutResolution()
 
             assertEquals(GamePhase.StackedOut, state.phase)
@@ -255,7 +270,7 @@ class GameViewModelTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
-            act(GameAction.HardDrop)
+            land()
             act(GameAction.Pause)
             assertPhase(GamePhase.Paused)
 
@@ -289,20 +304,76 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * Decision D11's ▼: two rows, no lock, no resolution.
+     *
+     * Deliberately asserted **without** advancing a drop tick. L31 is the warning:
+     * `tick()` moves a whole drop interval, and at level 1 that is enough for a
+     * nudged block to land, lock, resolve and be replaced — so a nudge test built
+     * on `tick()` would be asserting about the next block, and would pass or fail
+     * on the level-1 interval rather than on the nudge.
+     */
     @Test
-    fun hold_swapsOncePerDrop() = runUnitTest {
+    fun nudge_advancesTwoRowsWithoutLocking() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            act(GameAction.Nudge)
+
+            assertFallingAt(col = 2, row = EngineConfig.DEFAULT_NUDGE_ROWS)
+            assertPhase(GamePhase.Playing)
+
+            act(GameAction.Nudge)
+            assertFallingAt(col = 2, row = EngineConfig.DEFAULT_NUDGE_ROWS * 2)
+            assertPhase(GamePhase.Playing)
+        }
+    }
+
+    /**
+     * The nudge is not a hard drop, and the assertion that says so is the *floor*:
+     * a block two rows above the stack takes one press, not a press and a landing.
+     */
+    @Test
+    fun nudge_intoTheStack_stopsShortAndThenLocksOnTheDelay() = runUnitTest {
         playing(
-            falling = NumberBlock(BlockValue.V2),
-            preview = listOf(NumberBlock(BlockValue.V16), NumberBlock(BlockValue.V32)),
+            picture = """
+                .  .  8  .  .
+            """,
+            fallingAt = Cell(2, 4),
         ) {
-            act(GameAction.Hold)
+            act(GameAction.Nudge)
 
-            assertEquals(NumberBlock(BlockValue.V2), state.hold)
-            assertEquals(NumberBlock(BlockValue.V16), state.falling?.block)
-            assertEquals(false, state.canHold)
+            assertFallingAt(col = 2, row = 6)
+            assertPhase(GamePhase.Playing)
 
-            act(GameAction.Hold)
-            assertEquals(NumberBlock(BlockValue.V16), state.falling?.block, "hold was used twice")
+            act(GameAction.Nudge)
+            assertFallingAt(col = 2, row = 6)
+            assertPhase(GamePhase.Playing)
+
+            waitOutLockDelay()
+            assertPhase(GamePhase.Resolving)
+        }
+    }
+
+    /**
+     * SPEC 6's buffer covers sideways moves only. A ▼ replayed onto the block
+     * that spawns after a cascade would drop it two rows into a board the player
+     * has not seen settle.
+     */
+    @Test
+    fun nudgeDuringResolution_isNotBuffered() = runUnitTest {
+        playing(
+            picture = """
+                .  .  .  .  .
+                .  .  2  .  .
+            """,
+            fallingAt = Cell(2, 0),
+        ) {
+            land()
+            assertPhase(GamePhase.Resolving)
+
+            act(GameAction.Nudge)
+            waitOutResolution()
+
+            assertFallingAt(col = 2, row = 0)
         }
     }
 

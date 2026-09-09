@@ -8,8 +8,6 @@ enum class RejectionReason {
     RUN_OVER,
     NO_FALLING_BLOCK,
     MOVE_BLOCKED,
-    HOLD_ALREADY_USED,
-    HOLD_DISABLED,
 }
 
 /**

@@ -7,9 +7,9 @@ import com.dangerfield.drop2048.libraries.cascade.GameState
  * A scripted player. SPEC 4.4 makes these deliberately dumb: the question is not
  * whether a perfect player can win, it is whether the board clogs.
  *
- * None of them avoid death, stack for a burst, or use hold. A policy that played
- * well would answer a question nobody is asking, and would hide the clog the
- * spawn table causes behind its own skill.
+ * None of them avoid death or stack for a burst. A policy that played well would
+ * answer a question nobody is asking, and would hide the clog the spawn table
+ * causes behind its own skill.
  *
  * `kotlin.random.Random` is spelled out at every use because [Policy.Random] is
  * one of the policies and shadows the import inside this file.
@@ -39,7 +39,7 @@ sealed interface Policy {
         fun byName(name: String): Policy? = All.firstOrNull { it.name.equals(name, ignoreCase = true) }
     }
 
-    /** Uniform column, always hard drop. SPEC 4.4's floor: if this reaches level 6 the game is too easy. */
+    /** Uniform column. SPEC 4.4's floor: if this reaches level 6 the game is too easy. */
     data object Random : Policy {
         override val name = "random"
 
@@ -68,14 +68,25 @@ sealed interface Policy {
     }
 
     /**
-     * Greedy, plus the merges the *next* previewed block could make from the
-     * board this drop leaves behind.
+     * Greedy, plus the merges the *next* block could make from the board this
+     * drop leaves behind.
      *
-     * SPEC 5.4 calls this policy the reason the two-block preview is
-     * non-optional. It stays as dumb as [Greedy] in every other respect — in
-     * particular it does not avoid a placement that ends the run, because the
-     * moment a policy starts avoiding death it stops measuring whether the board
-     * clogs.
+     * **This policy now cheats, and that is deliberate but load-bearing.** It was
+     * written when SPEC 5.4 showed the player the next two blocks, so its
+     * lookahead was information a real player had. Decision D11 cut the preview,
+     * and it also moved the draw to spawn time — so the block this reads does not
+     * exist until the drop it is planning around has already landed.
+     *
+     * It is kept unchanged because its job never was to model a player: it is
+     * SPEC 4.4's *ceiling*, the answer to "does the board clog even against
+     * something better than anyone will play". A ceiling is allowed to cheat as
+     * long as everyone knows it does. **C1e has to decide** whether to keep
+     * reporting it as the ceiling or to demote it, and either way must not quote
+     * it as a prediction of play.
+     *
+     * It stays as dumb as [Greedy] in every other respect — in particular it does
+     * not avoid a placement that ends the run, because the moment a policy starts
+     * avoiding death it stops measuring whether the board clogs.
      */
     data object Lookahead1 : Policy {
         override val name = "lookahead1"
