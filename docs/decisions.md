@@ -6,6 +6,122 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The screenshot harness is Roborazzi, and it had to be forced to actually compare
+
+**Decision:** `:libraries:ui` gets a Roborazzi + Robolectric screenshot harness.
+Fifteen goldens live in `libraries/ui/screenshots/`, committed.
+`./gradlew :libraries:ui:recordRoborazziDebug` re-records them; every other test
+run compares them.
+
+**Why Roborazzi and not the alternatives.** Paparazzi renders through layoutlib
+and does not read Compose Multiplatform's `composeResources`, so the bundled
+Fredoka and Nunito would not load and every golden would be of a design nobody
+ships. The JetBrains Compose Multiplatform screenshot tooling is still tied to
+the Android Gradle plugin's own `screenshotTest` source set and cannot see a
+`commonMain` composable in a KMP module. Roborazzi runs inside the Android
+target's ordinary unit tests, reads the module's real assets, and needed no
+build-logic changes beyond one plugin and a `testOptions` flag. Neither
+`../Sodogku` nor `../Cards` has solved this, so there was nothing to port.
+
+**The trap, and it is the part worth remembering.** Out of the box
+`captureRoboImage` is a **no-op** unless a Roborazzi flag is set. A plain
+`testDebugUnitTest` runs every screenshot test, passes every one of them, and
+never looks at a pixel. This was measured rather than assumed: a golden was
+replaced with a completely different image and the task stayed green.
+
+The module therefore sets `roborazzi.test.verify=true` on its test tasks by
+default and stands it down only for the record task. The reason it is done this
+way rather than by hanging `verifyRoborazziDebug` off `check` is that the
+project's standard verification command is fixed at four tasks, and a check that
+is not in the command people run is a check that does not run.
+
+**What it does not cover.** Robolectric implements the *Android* framework, so
+this is the Android target only. There is no equivalent for iOS, and a green run
+means "the composition and its colours are unchanged", not "it looks right
+everywhere".
+
+---
+
+## 2026-09-09 — Fredoka ships as the numeral face, and its figures are proportional
+
+**Decision:** Fredoka 500/600/700 and Nunito 600/700/800 are bundled as static
+instances cut from the variable originals. `DigitFontFamily` points at Fredoka,
+as the handoff specifies. **The score counter's wobble is not fixed and must not
+be quietly fixed by swapping the face.**
+
+**The measurement.** The shipped Fredoka carries no `tnum` feature at all, and
+its ten digits have eight distinct advance widths at every weight the design
+uses. At 700 the `1` is 379 units against the `2`'s 566 — a 49% spread. Nunito,
+by contrast, has all ten digits at exactly 600 units: tabular in effect without
+needing the feature.
+
+**Why ship it anyway.** On a *tile* the wobble does not exist — a tile draws one
+value, centred, and never animates between two — and tiles are where almost every
+numeral in the game is. The wobble is confined to the score counter and the level
+number.
+
+**The three fixes, for the owner to choose between:** lay the score out digit by
+digit in fixed-width slots (keeps Fredoka, costs one composable, recommended);
+draw the score in Nunito ExtraBold (one line, costs the most prominent number on
+the screen its Fredoka look); or ship a `tnum`-patched cut of Fredoka (correct,
+and a font pipeline nobody wants to own for one number).
+
+---
+
+## 2026-09-09 — The design's tile ramp replaces the hill-climbed one, and three floors go with it
+
+**Decision:** `BlockPalettes.Default` is now the handoff's ramp — one hue per
+tier at `L/C = 0.78/0.15`, and `0.85/0.17` at 2048 — rather than C2's
+hill-climbed set. All five palettes are now authored as `L C H` triples and get
+their ink and their hard shadow from one derivation.
+
+**What it costs, measured on the shipped Kotlin:**
+
+| floor | holds at | design ramp | worst pair |
+|---|---|---|---|
+| neighbouring tiers | ΔE 24 | **22.6** | 16 / 32 |
+| any pair | ΔE 17 | **14.6** | 2 / 2048 |
+| luminance span | 0.45 | **0.187** | — |
+| numeral contrast | 4.5:1 | 7.16:1 | — |
+
+The luminance span is not a mistake, it is the ramp's defining property: `L` is
+constant so the board reads as one set of objects lit the same way. It also means
+lightness carries nothing, which is the axis that survives every colour vision
+deficiency. Under the Viénot simulation the default ramp's closest pair collapses
+to **ΔE 0.67** (128 and 256, under deuteranopia). C2's ramp was not much better
+there — 6.15 under protanopia — so this is a deepening rather than a new problem.
+
+**The floors were not loosened.** The four accessibility palettes still hold all
+of them. The default ramp's numbers are *pinned* instead, two-sided, in
+`BlockPaletteTest.theDesignRampIsWhereTheHandoffPutIt` and
+`theDesignRampCollapsesUnderEachDeficiency`, so a retune in either direction
+fails loudly and has to be argued for. **Whether ΔE 14.6 between the 2 and the
+2048 is acceptable is an owner call and has not been made.** The mitigation is
+real: every tile carries its numeral, no setting can turn it off, and a 2048
+bursts its row immediately so the pair is rarely co-present.
+
+---
+
+## 2026-09-09 — The tile's ink is the design's hue-matched one, with a fallback the design never needed
+
+**Decision:** `inkFor` prefers the handoff's `oklch(0.26 0.07 H)` — the tier's
+own hue taken almost to black — and falls back to the higher-contrast of the two
+flat inks only when that ink cannot clear 4.5:1 on the face.
+
+**Why prefer rather than take the best of three.** The flat near-black beats the
+hue-matched ink on contrast on every one of the eleven default tiers. A
+best-of-three would therefore reject the handoff's ink everywhere, silently, and
+the design would lose a tie-break it never entered. Preferring it means the
+shipped ramp gets exactly the ink that was drawn.
+
+The fallback fires on twelve tiers, every one of them on the dark half of one of
+the three colour-vision ramps, and never on the default or high-contrast ones.
+The handoff only ever draws light tiles, so its ink rule has never met a face
+dark enough to swallow it — which is precisely why the four accessibility
+palettes cannot inherit the rule unmodified.
+
+---
+
 ## 2026-09-09 — The saved run carries a format version, and the version is what invalidates it
 
 **Decision:** `SavedRun` gains `version: Int` with **no default**, and

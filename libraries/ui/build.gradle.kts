@@ -18,13 +18,27 @@ android {
     }
 }
 
-// `verifyRoborazziDebug` is what actually compares the goldens. Plain
-// `testDebugUnitTest` does NOT: with no Roborazzi flag set, `captureRoboImage`
-// is a deliberate no-op, so the screenshot tests pass without looking at a
-// single pixel. That is exactly the shape of a test suite that is green because
-// it is not running, so the verify task hangs off `check` where CI will find it.
-tasks.matching { it.name == "check" }.configureEach {
-    dependsOn("verifyRoborazziDebug")
+// Make the screenshot tests compare by default, rather than only under
+// `verifyRoborazziDebug`.
+//
+// Out of the box Roborazzi's `captureRoboImage` is a no-op unless a flag is set,
+// so a plain `testDebugUnitTest` runs every screenshot test, passes every one of
+// them, and never looks at a pixel. That was measured, not assumed: a golden was
+// swapped for a different image and the task stayed green. A suite that is green
+// because it is not running is worse than no suite, because it is also a claim.
+//
+// The project's standard verification command is `testDebugUnitTest` and three
+// other tasks, and it is fixed, so the harness has to be meaningful under that
+// command or it will not be run. Verify is therefore the default and is only
+// stood down for the record task, which has to be allowed to write.
+val recordingGoldens = gradle.startParameter.taskNames.any {
+    it.contains("recordRoborazzi", ignoreCase = true)
+}
+
+if (!recordingGoldens) {
+    tasks.withType<Test>().configureEach {
+        systemProperty("roborazzi.test.verify", "true")
+    }
 }
 
 kotlin {

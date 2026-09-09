@@ -69,7 +69,12 @@ These are not suggestions. A change that violates one gets reverted, not debated
     device for what only a device can answer — feel, haptics, real gesture timing — and write a
     test for everything else. C3 measured this: a screenshot harness would have caught two of its
     three device bugs.
-12. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
+12. **Never run a repo-wide git operation.** No bare `git stash`, no `git checkout .`, no
+    `git clean`, no `reset --hard`. Other agents are writing to this checkout and those commands
+    do not know that (L38 — one bare `git stash` swept up two agents' work and the orchestrator's
+    docs). Scope everything to your paths: `git stash push -- <paths>`, `git add <paths>`. To test
+    whether a failure is pre-existing, read `git log -p` or copy a file out of HEAD to a temp path.
+13. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
     three and edits them concurrently with your run; your write will be silently lost (this has
     already happened once, L10). Put learnings, owner items and deferred work **in your report**
     instead. You *may* edit `SPEC.md`, `BUILD-PLAN.md` and `decisions.md` for your own chunk.
@@ -246,6 +251,20 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D13 · The ▼ nudge pays no score
+
+SPEC 7's hard drop bonus is struck rather than transferred. C1d's argument, and it is a good one:
+
+- The bonus paid for **commitment**. Hard drop gave up the rest of the fall irrevocably. A nudge
+  gives up two rows and can be pressed again, so a per-row payout rewards the tap rather than the
+  decision, and obliges every player to mash a control the handoff deliberately drew as recessive.
+- The nudge is now the only acceleration, so the term would fire on nearly every drop of nearly
+  every run. That is a constant, and the score already has one in Survival.
+- Every remaining row of SPEC 7 pays for something that happened **on the board**.
+
+Guarded by `noInputScoresAnything` plus a test pinning the exact step list of a plain drop, so a
+future award that pays for an input has to change a test on the way in.
+
 ### D12 · What a "run" is, and what "playtime" counts
 
 SPEC 11 said "one row per completed run" and "duration" without defining either. C4 ruled both:
@@ -368,6 +387,72 @@ live numbers are directly comparable.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L38 · `git stash` is repo-wide, so in a multi-agent checkout it is destructive to other people's work
+
+C2c ran `git stash push --include-untracked` to check whether a lint failure was pre-existing. Its
+own changes were scoped to one module; **the stash was not.** It swept up two other agents' in-flight
+work and the orchestrator's docs, and the `pop` then failed on `ORCHESTRATION.md` because it had
+been rewritten in the meantime.
+
+Nothing was lost, but recovering it cost a reconciliation pass, and the restore staged files that
+were then swept into a commit whose message does not mention them.
+
+**Rules now:** never bare `git stash` in this repo. Use `git stash push -- <paths>`, a scratch
+clone, or do not stash. To test whether a failure is pre-existing, check out the file from HEAD to
+a temp path, or read `git log -p` — do not move the working tree out from under a concurrent agent.
+
+This is L10's lesson generalised: the failure mode is not "editing a shared doc", it is **any
+repo-wide operation** in a checkout more than one agent is writing to.
+
+### L39 · A screenshot harness that captures nothing passes every test
+
+Roborazzi's `captureRoboImage` is a **no-op unless a flag is set.** A plain `testDebugUnitTest` runs
+every screenshot test, passes every one, and never compares a pixel.
+
+C2c measured it rather than trusting it: it replaced a golden with a completely different image and
+the task stayed green. The module now sets `roborazzi.test.verify=true` on its test tasks by
+default, and the swapped-golden experiment was re-run afterwards to confirm the failure appears.
+
+**This is the watch list's "a clean run does not prove the check ran" in a third shape** — after
+detekt's cached classloader and a Compose-free module having nothing to match. Verify the verifier.
+
+The harness immediately earned itself: it caught two real bugs in C2c's own components (glyphs
+rendering top-left instead of centred, and the primary button inflating to fill the screen), both
+invisible in code review.
+
+### L35 · A rejection test without a positive control proves nothing
+
+C1d had to prove an old saved-run blob is refused after `GameState` changed shape. The test loads a
+real pre-D11 blob (with `preview`, `hold`, `holdUsedThisDrop`, no version) and asserts it is
+refused.
+
+**Then it loads the same bytes with nothing changed but a `version` spliced in, and asserts that
+one resumes.** Without that second half, the test would pass on any malformed field and prove only
+that *something* was wrong with the blob, not that the version check is what caught it.
+
+The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
+you think, by changing only that thing and watching it pass.
+
+### L36 · Removing hard drop cost the engine no code path
+
+`Input.Lock` already locked at the block's **landing** cell rather than its current one, so
+`hardDrop` was `lock` plus a score prefix. Every "put this block down now" call site became
+`Input.Lock` with zero behavioural change.
+
+Worth noticing as a design signal: when deleting a feature turns out to be free, the feature was
+probably a thin policy over a primitive that was already right. The engine's clock-free numbers
+survive C1d unchanged for the same reason — **placement is identical**, only the wall clock moved.
+
+### L37 · `Lookahead-1` now cheats, and that may be fine
+
+With the preview cut, the lookahead policy reads a block that is neither shown to the player nor
+drawn until the current one lands. C1d left it that way deliberately and documented it: SPEC 4.4
+wants it as a **ceiling**, and a ceiling may cheat as long as everyone knows.
+
+C1e has to decide whether to keep reporting it as the ceiling or demote it, and **must never quote
+it as a prediction of play**. Also note `PlayerProfile.decisionMillis = 250` was calibrated to
+include "a glance at the preview" and is now a guess about a different game.
 
 ### L32 · A state copy that omits one field started an invisible game, and it shipped for two chunks
 
@@ -787,7 +872,7 @@ C0's learnings were written into this file while the orchestrator was editing th
 and the orchestrator's write won. Four learnings were lost and had to be recovered from the
 agent's report.
 
-**Subagents no longer edit this file.** They report, the orchestrator writes. Standing rule 12.
+**Subagents no longer edit this file.** They report, the orchestrator writes. Standing rule 13.
 
 ---
 
