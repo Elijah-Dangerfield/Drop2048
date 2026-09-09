@@ -1,0 +1,8 @@
+package com.dangerfield.drop2048.libraries.ui
+
+interface AudioRecorder {
+    suspend fun startRecording(): Boolean
+    suspend fun stopRecording(): String?
+    fun isRecording(): Boolean
+    fun release()
+}
