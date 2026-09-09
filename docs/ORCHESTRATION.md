@@ -19,7 +19,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C2 · Theme + design system | **DONE** | `e6e95b3` + `546eb04`. All 9 steps |
 | C3 · `:features:game` | **DONE** | `f34279c`. Playable on device. 5x8 and the HUD settled (L25) |
 | C1c · Balance with a clock | **DONE** | `321070a`. 500ms opening (D9). See L27-L31 |
-| C4 · Persistence + stats | **IN PROGRESS** | Also deletes `AppData.bestScore` |
+| C4 · Persistence + stats | **DONE** | `run_record`, resume incl. mid-cascade, stats screen |
 | C2c · Design language + screenshot harness | **IN PROGRESS** | The handoff (D10) |
 | C1d · Cut hard drop and hold, add nudge | queued | Engine change, digest will move (D11) |
 | C1e · Re-measure pacing without hard drop | queued | Blocked on C1d. Every number assumed it existed |
@@ -237,6 +237,25 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D12 · What a "run" is, and what "playtime" counts
+
+SPEC 11 said "one row per completed run" and "duration" without defining either. C4 ruled both:
+
+- **Completed means stacked out.** A run abandoned via Restart or Quit is not recorded. Quit leaves
+  the save intact, so it resumes rather than dying.
+- **Duration is time spent in `Playing` or `Resolving` only.** End-minus-start would count a run
+  left on the lock screen overnight as eight hours of playtime, and SPEC 8.4 auto-pauses on
+  backgrounding, which is the pause players actually use.
+
+Also: the in-progress save is a **superset** of what SPEC 11 described. A `GameState` plus a
+"transcript in flight" flag is not enough to resume mid-cascade — that needs the transcript itself
+plus the board and score it started from. And a `GameState` alone loses the run's tallies, so a
+resumed run would write a false `run_record` with nothing on screen to say so.
+
+It is stored as a **JSON string**, not a typed field on `AppData`. A typed field creates a module
+cycle, and worse, one decode failure would take all of `AppData` with it — losing the install id
+and the onboarding flag over an abandoned run.
+
 ### D10 · The design handoff is canonical for visuals and interaction, and stale for gameplay
 
 `/Users/elijahdangerfield/Documents/design_handoff_drop2048/` is a high-fidelity handoff. Owner
@@ -340,6 +359,39 @@ live numbers are directly comparable.
 ## Learnings
 
 Things discovered while building. Each one should save the next session time.
+
+### L32 · A state copy that omits one field started an invisible game, and it shipped for two chunks
+
+`restart()` published a board **without a phase**. "Drop again" started a real run underneath the
+stacked-out sheet: invisible, and untouchable because the scrim is a genuine input barrier. It was
+also reachable from the pause menu's Restart from the day C3 landed.
+
+Nobody hit it. It took C4 writing a test to find a bug on the most-pressed button in the game.
+
+**The shape to watch: a `published()` helper that copies everything *except* one field.** That will
+do this again, and the symptom is not a crash — it is a screen that looks like it did nothing.
+
+This is the strongest argument yet for standing rule 11. A screenshot test of "tap Drop again"
+catches it instantly; two rounds of human play did not.
+
+### L33 · `fallbackToDestructiveMigration` is an unrecoverable wipe when there is no account
+
+The template shipped a blanket destructive fallback on `AppDatabase`, which is a reasonable default
+for an app whose data also lives on a server. **This app has no account and no server copy.** A
+failed migration would silently delete the player's entire history with nothing to restore from.
+
+C4 narrowed it to `fallbackToDestructiveMigrationFrom(1, 2, 3, 4)` with a
+`FIRST_PLAYER_DATA_VERSION = 6` constant marking where real player data begins. Versions before
+that held nothing worth keeping; from 6 onward a migration failure must be a crash, not a wipe.
+
+### L34 · A multibinding nothing reads is never validated
+
+`Set<ClearableDao>` had no consumer, so nothing proved the bindings were even wired. C4 added an
+accessor on `AppComponent` **and read the generated kotlin-inject code** to confirm both DAOs are
+actually in the set.
+
+Declaring a multibinding is not the same as having one. If nothing consumes it yet, expose it and
+assert on it, or you find out at the moment you first need it to work.
 
 ### L27 · A player's report of what is wrong is evidence about the symptom, not the cause
 

@@ -106,11 +106,23 @@ C0 deleted `HomeScenario` / `HomeScenarioTest` along with the profile they demon
 `OnboardingViewModelTest` for the ViewModel recipe with **no live example of the harness itself**.
 C3 is the natural place to regrow it, since the game screen is the one that most needs it.
 
-### Write the `Set<ClearableDao>` consumer (C11)
+### Call `deleteAll()` on `Set<ClearableDao>` from Settings (C11)
 
-The multibinding survived C0 specifically for Settings' "reset progress", and it currently has
-**zero consumers**. That is the exact shape of thing this repo has shipped before and not noticed
-(see the watch list). Either C11 uses it or C11 deletes it.
+C4 wired the multibinding and validated it — two DAOs are in the set, and `AppComponent` exposes a
+read accessor, checked against the generated kotlin-inject code. All C11 has left is the "reset
+progress" call site.
+
+### The saved run blob carries a full `EngineConfig` copy, ~3KB
+
+Correct for determinism: a seed only replays if the numbers it was played under travel with it
+(D5). But when C7 makes the config remote, the saved run should probably carry a config **version**
+rather than a copy. Not urgent; noting it before it becomes a surprise.
+
+### C6 needs a streak seam on the stats page
+
+`RunRecord.mode` already carries `DAILY`, but the stats screen has no streak row and the fold has no
+streak field. SPEC 15 lists it. C4 deliberately omitted it rather than drawing a zero, because a
+zero for an absent feature reads as a broken stat.
 
 ### Decide whether `SessionRejectionBus` and `AccessDenied` earn their keep
 
@@ -235,3 +247,13 @@ code lands.
   outbound link silently opens nothing with no error.
 - **Infinite animations hang preview and screenshot capture.** Anything looping forever returns a
   fixed value under `LocalInspectionMode`.
+- **A `published()` helper that copies everything except one field.** `restart()` omitted the phase
+  and started a real game underneath the game-over scrim: invisible, untouchable, live for two
+  chunks on the most-pressed button in the app (L32). The symptom is not a crash, it is a screen
+  that looks like it did nothing.
+- **A migration fallback that destroys data.** Reasonable when a server holds a copy,
+  unrecoverable here (L33). Anything added to `AppDatabase` from version 6 on must fail loudly
+  rather than wipe.
+- **A test that advances a full drop tick and then asserts on the falling block.** At 40ms/row a
+  full tick is twelve rows, so the block has landed and resolved and the assertion is really about
+  the next one. One such test passed at 700ms by luck and crashed at 500ms (L31).
