@@ -6,6 +6,82 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The tutorial's frozen clock is how the nudge gets taught
+
+**Decision:** during the guided run (SPEC 13) `GameViewModel` starts no drop
+ticker at all. Gravity never moves a block, so ▼ is the only input that brings
+one down, and a player finishes six drops having pressed it on every one of
+them.
+
+**Why:** SPEC 13 already froze the timer, and the reason given was that a
+scripted run should not be a race. That reason is fine and it is not the
+valuable one. C1c and C1e measured that whether a player reaches for the drop
+control is worth 223 seconds against 56 to reach level 4 (L29) — a bigger lever
+on the opening than the drop clock, the spawn table and every speed-curve change
+put together. The original script treated ▼ as one of three things a middle step
+mentions.
+
+A card that says "tap ▼" teaches a fact, and a fact is forgotten by drop seven.
+The frozen clock makes the control the only way to make progress, so the player
+leaves with it in their hands rather than in their notes. It also costs one line
+(`if (tutorial.isRunning) return` in `restartTicker`) rather than a lesson, a
+gate and a nag.
+
+**Alternatives rejected.** A blocking scrim that only lets ▼ through: it forces
+the same behaviour but it forces it by taking the controls away, and the first
+lesson asks the player to *drag the board*, which a tap-reporting scrim cannot
+express. A "you did not use ▼" nag after each drop: it teaches the player that
+the game will tell them off, which is a different lesson.
+
+**Consequence to know about:** soft drop is a hold on ▼ and soft drop is the
+ticker running faster, so soft drop does nothing during the tutorial. That is
+acceptable — SPEC 13 never taught it — but it is why the tutorial's ▼ is a tap
+and only a tap.
+
+## 2026-09-09 — A tutorial drop carries the columns it will accept
+
+**Decision:** each of the six scripted drops declares an `allowedColumns` range,
+and `GameViewModel` clamps steering to it while the script is running. Every
+column in the range was checked against SPEC 4.3's merge rules to resolve to the
+*same* board, and `TutorialTest` pins the resulting boards drop by drop.
+
+**Why:** a forced `GameState` fixes what is on the board and what is falling. It
+does not fix where the player puts it. Drop 5 is the three-step cascade the whole
+tutorial builds toward, and dropping its 4 into column 1 instead of 2 lands it
+inert on top of an 8 — no cascade, no spectacle, and the beat that exists to be
+watched is simply skipped. Drop 6 is worse: the 2048 burst is the moment SPEC 13
+is written around, and it is one mis-steer from not happening on a player's sixth
+ever drop.
+
+The clamp is a range rather than a single column on purpose. A single column is a
+rail, and a rail teaches nothing about steering; a range the player can be wrong
+inside teaches that placement is theirs while guaranteeing the payoff.
+
+**Rejected:** re-seeding the board when the player lands badly. It works, and it
+means the tutorial silently undoes a placement the player just made, which is the
+one thing a first lesson must never do.
+
+## 2026-09-09 — There is no onboarding screen; first launch is the game
+
+**Decision:** `:features:onboarding` and `:features:onboarding:impl` are deleted.
+`AppViewModel` returns `GameRoute()` for everybody, and `GameViewModel` reads
+`AppData.hasUserOnboarded` to decide whether the drop clock runs. Replay is
+`GameRoute(replayTutorial = true)`.
+
+**Why:** C3b noticed the app had two Play buttons — one on the game screen's
+start overlay, one on the onboarding screen — and SPEC 13 says first launch has
+no menus at all. Once the tutorial is "the game screen with the timer frozen",
+an onboarding module holds a welcome screen whose only job is to be dismissed
+before the real first screen appears.
+
+`docs/todos.md` asks whether the module should be renamed `:features:tutorial`.
+It should not: the tutorial has no screen of its own to put in it. Deleting is
+cheaper than renaming and it removes a module rather than moving one.
+
+The **flag keeps its name.** `hasUserOnboarded` is a persisted field in
+`AppData`; renaming it to `hasCompletedTutorial` would be a cache migration for
+a word, and every reader of it now means the same thing.
+
 ## 2026-09-09 — A fetched config takes effect at the start of the next run, never during one
 
 **Decision:** `RunFactory.newRun()` is the only reader of remote gameplay config.

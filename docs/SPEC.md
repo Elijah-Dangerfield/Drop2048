@@ -641,21 +641,38 @@ alive. Everything else here is negotiable. That is not.
 First launch drops straight into a scripted run. No menus, no video, no wall of text. The timer
 is frozen throughout.
 
-1. One 2 spawns, one 2 is already placed. "Drag to move." They merge it.
-2. Drops 2-4 introduce steering and the ▼ nudge. They build to 16. **C1c's finding applies
-   here**: whether a player uses the drop control was worth more to the opening than every
-   speed-curve change combined, so teaching ▼ is load-bearing rather than incidental.
+**The frozen timer is what teaches the nudge, and that is the whole design.** With gravity
+switched off, ▼ is the only thing that moves a block downward, so the player cannot reach the end
+of six drops without pressing it and never once watches a block come down on its own. C1c and C1e
+measured whether a player reaches for the drop control at 223 seconds against 56 to reach level 4
+(L29) — a bigger lever on the opening than the drop clock, the spawn table and every speed-curve
+change combined. A tutorial that *mentions* ▼ teaches a fact; one that cannot be finished without
+it teaches a habit, and the habit is what the number is about. Built in C5.
+
+1. One 2 spawns, one 2 is already placed. "Slide it over." They merge it — and the same drop
+   introduces ▼, because it is the only way to land it.
+2. Drops 2-4 are the nudge again, until it is a habit. They build to 16. **Amended in C5**: this
+   step used to introduce "the Next preview and hard drop", and D11 cut both. The nudge takes the
+   slot, and it is the most valuable slot in the script.
 3. Drop 5 is pre-seeded so a single placement triggers a 3-step cascade. Zero explanation. Let
    them watch it.
 4. Drop 6 is pre-seeded with a 1024 next to two 512s. They trigger a 2048 burst on their sixth
    ever drop. Full spectacle.
-5. Timer unfreezes. "Now for real." Endless begins at level 1.
+5. Timer unfreezes. "Now for real." Endless begins at level 1, at score zero. The scripted run is
+   never recorded and never written to the saved-run store.
 
-Skippable from drop 3. Replayable from Settings. Hold, powerups and specials each get one
-contextual tooltip the first time they become relevant, not during the tutorial.
+Skippable from drop 3. Replayable from `GameRoute(replayTutorial = true)`, which is Settings'
+entry point when C11 builds Settings. Powerups and specials each get one contextual tooltip the
+first time they become relevant, not during the tutorial. Hold is struck with D11.
 
 Because the engine is seeded and pure, the tutorial is a list of forced `GameState`s and asserted
-inputs, which makes it testable rather than a pile of UI flags.
+inputs, which makes it testable rather than a pile of UI flags. Each scripted drop also carries
+the **columns the block may occupy**, chosen so that every allowed placement resolves to the same
+board: without that, drop 5's showpiece cascade is one mis-steer away from never happening.
+
+There is no separate onboarding screen. C5 deleted `:features:onboarding` rather than renaming it
+— the tutorial is this screen with the clock off, so a welcome screen with a Play button in front
+of it was a second front door to one room.
 
 ## 14. Daily Challenge
 

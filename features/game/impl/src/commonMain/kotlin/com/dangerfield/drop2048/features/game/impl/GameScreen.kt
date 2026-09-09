@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +43,7 @@ import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.Screen
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardRadius
+import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
 import com.dangerfield.drop2048.libraries.ui.components.game.FixedWidthDigits
 import com.dangerfield.drop2048.libraries.ui.components.game.GameControlRow
 import com.dangerfield.drop2048.libraries.ui.components.game.GameOverlay
@@ -54,7 +57,13 @@ import com.dangerfield.drop2048.libraries.ui.components.game.WellPadding
 import com.dangerfield.drop2048.libraries.ui.components.game.Wordmark
 import com.dangerfield.drop2048.libraries.ui.components.game.gameBackdrop
 import com.dangerfield.drop2048.libraries.ui.components.game.groupThousands
+import com.dangerfield.drop2048.libraries.ui.system.FocusRegistry
+import com.dangerfield.drop2048.libraries.ui.system.FocusScrim
+import com.dangerfield.drop2048.libraries.ui.system.FocusTargetKey
+import com.dangerfield.drop2048.libraries.ui.system.LocalFocusRegistry
 import com.dangerfield.drop2048.libraries.ui.system.LocalReduceMotion
+import com.dangerfield.drop2048.libraries.ui.system.Spotlight
+import com.dangerfield.drop2048.libraries.ui.system.focusTarget
 import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
 import com.dangerfield.drop2048.system.thenIf
 import com.dangerfield.drop2048.system.typography.FredokaFontFamily
@@ -87,6 +96,27 @@ import drop2048.libraries.resources.generated.resources.game_stacked_out
 import drop2048.libraries.resources.generated.resources.game_start_body
 import drop2048.libraries.resources.generated.resources.game_stats
 import drop2048.libraries.resources.generated.resources.game_tap_to_resume
+import drop2048.libraries.resources.generated.resources.tutorial_begin
+import drop2048.libraries.resources.generated.resources.tutorial_burst_body
+import drop2048.libraries.resources.generated.resources.tutorial_burst_title
+import drop2048.libraries.resources.generated.resources.tutorial_first_merge_body
+import drop2048.libraries.resources.generated.resources.tutorial_first_merge_title
+import drop2048.libraries.resources.generated.resources.tutorial_first_nudge_body
+import drop2048.libraries.resources.generated.resources.tutorial_first_nudge_title
+import drop2048.libraries.resources.generated.resources.tutorial_got_it
+import drop2048.libraries.resources.generated.resources.tutorial_handoff_body
+import drop2048.libraries.resources.generated.resources.tutorial_handoff_title
+import drop2048.libraries.resources.generated.resources.tutorial_keep_nudging_body
+import drop2048.libraries.resources.generated.resources.tutorial_ok
+import drop2048.libraries.resources.generated.resources.tutorial_second_body
+import drop2048.libraries.resources.generated.resources.tutorial_second_title
+import drop2048.libraries.resources.generated.resources.tutorial_skip
+import drop2048.libraries.resources.generated.resources.tutorial_steer_body
+import drop2048.libraries.resources.generated.resources.tutorial_steer_title
+import drop2048.libraries.resources.generated.resources.tutorial_third_body
+import drop2048.libraries.resources.generated.resources.tutorial_third_title
+import drop2048.libraries.resources.generated.resources.tutorial_watch_body
+import drop2048.libraries.resources.generated.resources.tutorial_watch_title
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -128,47 +158,143 @@ fun GameScreen(
     val live = state.phase == GamePhase.Playing
     val covered = state.phase != GamePhase.Playing && state.phase != GamePhase.Resolving
 
-    Screen(contentWindowInsets = WindowInsets.systemBars) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .gameBackdrop()
-                .padding(padding)
-                .padding(horizontal = RootPaddingX, vertical = RootPaddingY),
-            verticalArrangement = Arrangement.spacedBy(RootGap),
-        ) {
-            GameHeader(
-                state = state,
-                onPause = { onAction(GameAction.Pause) },
-                enabled = state.phase == GamePhase.Playing || state.phase == GamePhase.Resolving,
-            )
+    val registry = remember { FocusRegistry() }
 
-            BoardArea(
-                state = state,
-                covered = covered,
-                onAction = onAction,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
+    CompositionLocalProvider(LocalFocusRegistry provides registry) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Screen(contentWindowInsets = WindowInsets.systemBars) { padding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .gameBackdrop()
+                        .padding(padding)
+                        .padding(horizontal = RootPaddingX, vertical = RootPaddingY),
+                    verticalArrangement = Arrangement.spacedBy(RootGap),
+                ) {
+                    GameHeader(
+                        state = state,
+                        onPause = { onAction(GameAction.Pause) },
+                        enabled = state.phase == GamePhase.Playing || state.phase == GamePhase.Resolving,
+                    )
 
-            GameControlRow(
-                onLeft = { onAction(GameAction.MoveLeft) },
-                onNudge = { onAction(GameAction.Nudge) },
-                onRight = { onAction(GameAction.MoveRight) },
-                leftDescription = stringResource(Res.string.game_move_left),
-                nudgeDescription = stringResource(Res.string.game_nudge),
-                rightDescription = stringResource(Res.string.game_move_right),
-                enabled = live,
-                mirrored = state.leftHanded,
-                nudgeModifier = Modifier.softDropOnHold(
-                    enabled = live,
-                    onStart = { onAction(GameAction.SoftDropStart) },
-                    onEnd = { onAction(GameAction.SoftDropEnd) },
-                ),
-                modifier = Modifier.align(Alignment.CenterHorizontally),
+                    BoardArea(
+                        state = state,
+                        covered = covered,
+                        onAction = onAction,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+
+                    GameControlRow(
+                        onLeft = { onAction(GameAction.MoveLeft) },
+                        onNudge = { onAction(GameAction.Nudge) },
+                        onRight = { onAction(GameAction.MoveRight) },
+                        leftDescription = stringResource(Res.string.game_move_left),
+                        nudgeDescription = stringResource(Res.string.game_nudge),
+                        rightDescription = stringResource(Res.string.game_move_right),
+                        enabled = live,
+                        mirrored = state.leftHanded,
+                        nudgeModifier = Modifier
+                            .softDropOnHold(
+                                enabled = live,
+                                onStart = { onAction(GameAction.SoftDropStart) },
+                                onEnd = { onAction(GameAction.SoftDropEnd) },
+                            )
+                            .focusTarget(NudgeFocusKey),
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
+
+            TutorialLayer(state = state, onAction = onAction)
+        }
+    }
+}
+
+/**
+ * The guided run's scrim and its card (SPEC 13), drawn over the whole screen.
+ *
+ * **The scrim takes no touches.** It dims and it points; every tap and every drag
+ * reaches the real control underneath, which is what lets the first lesson ask
+ * the player to drag the board while the board is the thing that is lit.
+ *
+ * A silent beat — the drops where the player is simply playing — draws nothing at
+ * all, so the board is never dimmed while somebody is aiming at it.
+ */
+@Composable
+private fun BoxScope.TutorialLayer(state: GameUiState, onAction: (GameAction) -> Unit) {
+    val frame = state.tutorial
+        ?.takeIf { state.phase == GamePhase.Playing || state.phase == GamePhase.Resolving }
+        ?.takeIf { it.speaks }
+
+    FocusScrim(spotlight = frame?.spotlight()) { anchor ->
+        if (frame != null) {
+            CoachMark(
+                anchor = anchor,
+                title = tutorialTitle(frame.step),
+                body = tutorialBody(frame.step),
+                confirmLabel = if (frame.awaitsTap) tutorialConfirm(frame.step) else null,
+                onConfirm = { onAction(GameAction.TutorialAdvance) },
+                skipLabel = if (frame.canSkip) stringResource(Res.string.tutorial_skip) else null,
+                onSkip = { onAction(GameAction.TutorialSkip) },
             )
         }
     }
 }
+
+/**
+ * The board is lit alongside ▼, not instead of it.
+ *
+ * A beat that lit the control alone would dim the one thing the player has to
+ * aim at while asking them to aim — every ▼ beat here also asks for a placement.
+ * The card still hangs off ▼, which is what `Spotlight.anchor` is for.
+ */
+private fun TutorialFrame.spotlight(): Spotlight = when (focus) {
+    TutorialFocus.None -> Spotlight(emptySet())
+    TutorialFocus.Board -> Spotlight(setOf(BoardFocusKey), anchor = BoardFocusKey)
+    TutorialFocus.Nudge -> Spotlight(setOf(BoardFocusKey, NudgeFocusKey), anchor = NudgeFocusKey)
+}
+
+@Composable
+private fun tutorialTitle(step: TutorialStep): String? = when (step) {
+    TutorialStep.Steer -> stringResource(Res.string.tutorial_steer_title)
+    TutorialStep.FirstNudge -> stringResource(Res.string.tutorial_first_nudge_title)
+    TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_first_merge_title)
+    TutorialStep.SecondDrop -> stringResource(Res.string.tutorial_second_title)
+    TutorialStep.ThirdDrop -> stringResource(Res.string.tutorial_third_title)
+    TutorialStep.WatchThis -> stringResource(Res.string.tutorial_watch_title)
+    TutorialStep.BurstIntro -> stringResource(Res.string.tutorial_burst_title)
+    TutorialStep.Handoff -> stringResource(Res.string.tutorial_handoff_title)
+    else -> null
+}
+
+@Composable
+private fun tutorialBody(step: TutorialStep): String = when (step) {
+    TutorialStep.Steer -> stringResource(Res.string.tutorial_steer_body)
+    TutorialStep.FirstNudge -> stringResource(Res.string.tutorial_first_nudge_body)
+    TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_first_merge_body)
+    TutorialStep.SecondDrop -> stringResource(Res.string.tutorial_second_body)
+    TutorialStep.ThirdDrop -> stringResource(Res.string.tutorial_third_body)
+    TutorialStep.WatchThis -> stringResource(Res.string.tutorial_watch_body)
+    TutorialStep.BurstIntro -> stringResource(Res.string.tutorial_burst_body)
+    TutorialStep.Handoff -> stringResource(Res.string.tutorial_handoff_body)
+    else -> stringResource(Res.string.tutorial_keep_nudging_body)
+}
+
+@Composable
+private fun tutorialConfirm(step: TutorialStep): String = when (step) {
+    TutorialStep.Handoff -> stringResource(Res.string.tutorial_begin)
+    TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_got_it)
+    else -> stringResource(Res.string.tutorial_ok)
+}
+
+/**
+ * The two things a lesson can point at, keyed as strings.
+ *
+ * Minted here rather than in `:libraries:ui` on purpose: the design system knows
+ * how to light a rectangle and nothing about what a board or a nudge button is.
+ */
+private val BoardFocusKey = FocusTargetKey("game-board")
+private val NudgeFocusKey = FocusTargetKey("game-nudge")
 
 /**
  * The board, the flex spacer under it, and whichever overlay is up.
@@ -194,7 +320,12 @@ private fun BoardArea(
             val fromHeight = (maxHeight - WellPadding * 2) * cols / rows + WellPadding * 2
             val width = minOf(maxWidth, BoardMaxWidth, fromHeight)
 
-            Box(modifier = Modifier.width(width).align(Alignment.TopCenter)) {
+            Box(
+                modifier = Modifier
+                    .width(width)
+                    .align(Alignment.TopCenter)
+                    .focusTarget(BoardFocusKey),
+            ) {
                 GameBoard(
                     state = state,
                     boardDescription = stringResource(Res.string.game_board, cols, rows),

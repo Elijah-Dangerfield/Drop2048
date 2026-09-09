@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardScale
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardWell
+import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
 import com.dangerfield.drop2048.libraries.ui.components.game.GameControlRow
 import com.dangerfield.drop2048.libraries.ui.components.game.GameOverlay
 import com.dangerfield.drop2048.libraries.ui.components.game.GamePrimaryButton
@@ -52,6 +55,24 @@ class GameSurfaceScreenshotTest : ScreenshotTest() {
 
     @get:Rule
     val compose = createComposeRule()
+
+    /**
+     * The coach mark, in both placements it has.
+     *
+     * The flip is the whole reason this has a golden. A card that always sits
+     * below its anchor runs off the bottom of the screen the moment a lesson
+     * points at the control row, which is where most of them point, and nothing
+     * that is not a picture notices.
+     */
+    @Test
+    fun coachMarkBelowAnchor() = compose.capture("coach-mark") {
+        CoachMarkFrame(anchor = Rect(60f, 180f, 300f, 260f))
+    }
+
+    @Test
+    fun coachMarkFlippedAboveAnchor() = compose.capture("coach-mark-flipped") {
+        CoachMarkFrame(anchor = Rect(60f, 1180f, 300f, 1260f))
+    }
 
     @Test
     fun tileRamp() = compose.capture("tile-ramp") {
@@ -245,3 +266,24 @@ private val MiniBoardContents = listOf(
     listOf(32, 0, 64, 128, 256),
     listOf(512, 1024, 2048, 4, 2),
 )
+
+
+/**
+ * The card needs a frame to place itself in, because placement is the thing
+ * under test. The size is the harness's own short phone.
+ */
+@Composable
+private fun CoachMarkFrame(anchor: Rect) {
+    Box(modifier = Modifier.width(CoachFrameWidth).height(CoachFrameHeight)) {
+        CoachMark(
+            anchor = anchor,
+            title = "Bring it down",
+            body = "Nothing falls on its own yet. Tap the arrow.",
+            confirmLabel = "Got it",
+            skipLabel = "Skip tutorial",
+        )
+    }
+}
+
+private val CoachFrameWidth = 328.dp
+private val CoachFrameHeight = 560.dp

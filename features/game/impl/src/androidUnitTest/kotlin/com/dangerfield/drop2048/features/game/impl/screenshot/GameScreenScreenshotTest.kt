@@ -15,6 +15,9 @@ import com.dangerfield.drop2048.features.game.impl.GameCallout
 import com.dangerfield.drop2048.features.game.impl.GamePhase
 import com.dangerfield.drop2048.features.game.impl.GameScreen
 import com.dangerfield.drop2048.features.game.impl.GameUiState
+import com.dangerfield.drop2048.features.game.impl.TutorialFocus
+import com.dangerfield.drop2048.features.game.impl.TutorialFrame
+import com.dangerfield.drop2048.features.game.impl.TutorialStep
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
@@ -148,6 +151,47 @@ class GameScreenScreenshotTest {
     fun leftHanded() = compose.captureScreen("game-left-handed") {
         playingState().copy(leftHanded = true)
     }
+
+    /**
+     * The guided run (SPEC 13), in the two shapes its scrim has.
+     *
+     * The spotlight one is the more valuable of the two. Its hole is punched with
+     * `BlendMode.Clear` into an offscreen layer, which is the kind of drawing
+     * that fails by producing a plausible-looking rectangle in the wrong place,
+     * and no test that is not a picture can tell.
+     */
+    @Test
+    fun tutorialCoachMark() = compose.captureScreen("tutorial-coach") {
+        tutorialState(TutorialStep.FirstNudge, TutorialFocus.Nudge, awaitsTap = false)
+    }
+
+    @Test
+    fun tutorialSpotlight() = compose.captureScreen("tutorial-spotlight") {
+        tutorialState(TutorialStep.Steer, TutorialFocus.Board, awaitsTap = false).copy(
+            board = Board.empty(COLS, ROWS).with(Cell(1, 7), NumberBlock(BlockValue.V2)),
+            falling = FallingBlock(NumberBlock(BlockValue.V2), Cell(2, 0)),
+            ghost = Cell(2, 7),
+            score = 0,
+            level = 1,
+            levelFraction = 0f,
+            biggestTier = 2,
+        )
+    }
+
+    /** Drop six: the 2048 has just cleared its row (SPEC 13 step 4). */
+    @Test
+    fun tutorialBurst() = compose.captureScreen("tutorial-burst") {
+        playingState().copy(
+            phase = GamePhase.Resolving,
+            board = Board.empty(COLS, ROWS),
+            falling = null,
+            ghost = null,
+            score = 12_500,
+            biggestTier = 2048,
+            callout = GameCallout.RowBust,
+            calloutNonce = 1,
+        )
+    }
 }
 
 /**
@@ -180,6 +224,32 @@ private fun ComposeContentTestRule.captureScreen(
     }
     onNodeWithTag(CaptureTag).captureRoboImage(File(GoldenDirectory, "$name.png"))
 }
+
+/**
+ * A tutorial beat over a mid-tutorial board. The frame is what the screen draws
+ * the scrim and the card from; the copy itself is resolved from [TutorialStep].
+ */
+private fun tutorialState(
+    step: TutorialStep,
+    focus: TutorialFocus,
+    awaitsTap: Boolean,
+) = playingState().copy(
+    board = Board.empty(COLS, ROWS).with(Cell(1, 7), NumberBlock(BlockValue.V4)),
+    falling = FallingBlock(NumberBlock(BlockValue.V4), Cell(2, 2)),
+    ghost = Cell(2, 7),
+    score = 12,
+    best = 0,
+    level = 1,
+    levelFraction = 0f,
+    biggestTier = 4,
+    tutorial = TutorialFrame(
+        step = step,
+        focus = focus,
+        speaks = true,
+        awaitsTap = awaitsTap,
+        canSkip = false,
+    ),
+)
 
 private fun playingState() = GameUiState(
     board = restingBoard(),

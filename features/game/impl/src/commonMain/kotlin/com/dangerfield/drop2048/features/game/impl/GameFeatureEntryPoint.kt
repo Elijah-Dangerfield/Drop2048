@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
@@ -9,6 +10,7 @@ import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.Router
 import com.dangerfield.drop2048.libraries.navigation.screen
+import com.dangerfield.drop2048.libraries.navigation.toRouteOrNull
 import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -29,10 +31,15 @@ class GameFeatureEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<GameRoute> {
+        screen<GameRoute> { backStackEntry ->
             val viewModel: GameViewModel = viewModel { gameViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
             val cues = LocalCues.current
+            val replay = backStackEntry.toRouteOrNull<GameRoute>()?.replayTutorial == true
+
+            LaunchedEffect(replay) {
+                if (replay) viewModel.takeAction(GameAction.ReplayTutorial)
+            }
 
             viewModel.ObserveEvents { effect ->
                 when (effect) {

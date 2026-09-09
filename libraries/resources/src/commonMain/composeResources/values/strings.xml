@@ -1,8 +1,32 @@
 <resources>
     <string name="app_name">Drop 2048</string>
 
-    <string name="onboarding_tagline">A block falls. Steer it onto its match and the two double. Chains trigger chains. Fill the grid and you are stacked out.</string>
-    <string name="onboarding_start">Play</string>
+    <!--
+        The guided run (SPEC 13). Every drop of it is landed with the nudge,
+        because the drop clock is frozen and ▼ is the only thing that moves a
+        block downward. The copy says so plainly rather than hinting.
+    -->
+    <string name="tutorial_steer_title">Slide it over</string>
+    <string name="tutorial_steer_body">Drag the block onto the other 2.</string>
+    <string name="tutorial_first_nudge_title">Bring it down</string>
+    <string name="tutorial_first_nudge_body">Nothing falls on its own. Tap ▼.</string>
+    <string name="tutorial_keep_nudging_body">Keep tapping ▼ until it lands.</string>
+    <string name="tutorial_first_merge_title">Four</string>
+    <string name="tutorial_first_merge_body">Two matching numbers become one that is twice as big. That is the whole game.</string>
+    <string name="tutorial_second_title">Again</string>
+    <string name="tutorial_second_body">Steer it, then ▼ all the way down.</string>
+    <string name="tutorial_third_title">You will use ▼ a lot</string>
+    <string name="tutorial_third_body">It is how you set the pace instead of waiting for one.</string>
+    <string name="tutorial_watch_title">Watch this one</string>
+    <string name="tutorial_watch_body">Drop it wherever it fits.</string>
+    <string name="tutorial_burst_title">Last one</string>
+    <string name="tutorial_burst_body">512 onto 512 makes 1024. You can see what that makes.</string>
+    <string name="tutorial_handoff_title">Now for real</string>
+    <string name="tutorial_handoff_body">The clock starts. Blocks fall on their own from here.</string>
+    <string name="tutorial_got_it">Got it</string>
+    <string name="tutorial_ok">OK</string>
+    <string name="tutorial_begin">Play</string>
+    <string name="tutorial_skip">Skip tutorial</string>
 
     <string name="game_score">Score</string>
     <string name="game_pause">Pause</string>

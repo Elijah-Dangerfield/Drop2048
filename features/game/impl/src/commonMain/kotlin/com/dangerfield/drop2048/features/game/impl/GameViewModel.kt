@@ -95,6 +95,17 @@ class GameViewModel(
     private var engine: GameState = started.state
     private var tally: RunTally = RunTally()
 
+    /**
+     * The guided run (SPEC 13), which lives here rather than in its own screen
+     * because it is the game screen with the clock switched off.
+     *
+     * It takes the config the run factory resolved rather than
+     * `EngineConfig.Default`, so a remote change to `board.rows` moves the
+     * scripted boards with it instead of leaving the tutorial playing on a board
+     * shape the game no longer has.
+     */
+    private val tutorial = TutorialRunner(started.state.config)
+
     /** Epoch millis the current stretch of play began, null while not playing. */
     private var playingSince: Long? = null
 
@@ -177,6 +188,9 @@ class GameViewModel(
             GameAction.Pause -> action.pause()
             GameAction.Resume -> action.resume()
             GameAction.Restart -> action.restart()
+            GameAction.TutorialAdvance -> action.tutorialAdvance()
+            GameAction.TutorialSkip -> action.tutorialSkip()
+            GameAction.ReplayTutorial -> action.replayTutorial()
             GameAction.Quit -> sendEvent(GameEffect.Leave)
             GameAction.ShowStats -> sendEvent(GameEffect.OpenStats)
             GameAction.ToggleHandedness -> action.toggleHandedness()
@@ -197,10 +211,13 @@ class GameViewModel(
     private suspend fun GameAction.enter() {
         val cached = Catching { appCache.get() }.logOnFailure { "Could not read app data" }.getOrNull()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }.getOrNull()
-        val saved = savedRunStore.load()?.takeUnless { it.state.isOver }
+        val teach = cached?.hasUserOnboarded != true
+        val saved = if (teach) null else savedRunStore.load()?.takeUnless { it.state.isOver }
         bestBeforeRun = best ?: 0
 
-        if (saved != null) {
+        if (teach) {
+            beginTutorial()
+        } else if (saved != null) {
             started = StartedRun(state = saved.state, seed = saved.seed, mode = saved.mode)
             engine = saved.state
             tally = saved.tally
@@ -219,6 +236,8 @@ class GameViewModel(
 
         val resolution = saved?.resolution
         when {
+            teach -> updateState { it.copy(phase = GamePhase.Playing, tutorial = tutorial.frame) }
+
             resolution != null -> restoreResolution(resolution)
 
             saved != null -> {
@@ -231,6 +250,118 @@ class GameViewModel(
                 saveRun()
             }
         }
+    }
+
+    /**
+     * SPEC 13: first launch drops straight into a scripted run. No menus, no
+     * video, no wall of text, and **no start overlay** — the phase goes to
+     * `Playing` directly, because a Play button in front of a tutorial is the
+     * menu SPEC 13 says the app does not have.
+     *
+     * Any saved run is cleared rather than resumed. A player who has not been
+     * taught the game cannot have a run worth keeping, and a half-finished
+     * tutorial is not something to restore into.
+     */
+    private suspend fun beginTutorial() {
+        tickerJob?.cancel()
+        lockJob?.cancel()
+        playbackJob?.cancel()
+        savedRunStore.clear()
+        engine = tutorial.begin()
+        started = StartedRun(state = engine, seed = started.seed, mode = started.mode)
+        tally = RunTally()
+        frames = emptyList()
+        frameIndex = 0
+        resolutionSnapshot = null
+        lockPending = false
+        lockResetUsed = false
+        softDropping = false
+        bufferedMove = null
+        playingSince = null
+        logger.logEvent("tutorial.started")
+    }
+
+    /** The card's button: "Got it", "OK", "Play". */
+    private suspend fun GameAction.tutorialAdvance() {
+        if (!tutorial.isRunning) return
+        sendEvent(GameEffect.Play(Cue.UiTap))
+        tutorial.observe(TutorialAwait.Tapped)
+        if (!tutorial.isRunning) {
+            finishTutorial()
+            return
+        }
+        tutorial.stateForCurrentLesson(engine.score)?.let { engine = it }
+        updateState { it.copy(tutorial = tutorial.frame).published() }
+    }
+
+    /** SPEC 13's escape hatch, offered from drop 3 onward. */
+    private suspend fun GameAction.tutorialSkip() {
+        if (!tutorial.isRunning) return
+        sendEvent(GameEffect.Play(Cue.UiTap))
+        logger.logEvent("tutorial.skipped", "drop" to tutorial.currentDrop)
+        finishTutorial()
+    }
+
+    /**
+     * Replays the tutorial, which is the entry point SPEC 13 says lives in
+     * Settings. There is no Settings screen yet (C11), so the route argument
+     * `GameRoute(replayTutorial = true)` is the whole of it for now.
+     */
+    private suspend fun GameAction.replayTutorial() {
+        beginTutorial()
+        updateState {
+            it.copy(
+                phase = GamePhase.Playing,
+                tutorial = tutorial.frame,
+                callout = null,
+                chainStep = 0,
+                chainCell = null,
+                newBest = false,
+            ).published()
+        }
+    }
+
+    /**
+     * SPEC 13 step 5: "Now for real." The scripted run is thrown away and a real
+     * endless run starts at level 1, on the clock.
+     *
+     * The persisted flag is written here and only here, so a player who quits
+     * halfway through gets the tutorial again rather than a game nobody
+     * explained.
+     */
+    private suspend fun GameAction.finishTutorial() {
+        logger.logEvent("tutorial.completed", "drop" to tutorial.currentDrop)
+        tutorial.stop()
+        Catching { appCache.update { data -> data.copy(hasUserOnboarded = true) } }
+            .logOnFailure { "Could not persist tutorial completion" }
+        resetToNewRun()
+    }
+
+    /**
+     * The next scripted drop, installed the moment the last one finished playing.
+     *
+     * The engine has already spawned a block of its own by this point — a lock
+     * always spawns — and it is replaced rather than suppressed, because
+     * suppressing it would mean a second spawn path in the engine for the benefit
+     * of six drops. The player never sees it: the phase is `Resolving` for the
+     * whole of playback and `GameUiState.falling` is null throughout.
+     */
+    private suspend fun GameAction.advanceTutorialDrop() {
+        tutorial.observe(TutorialAwait.Dropped)
+        if (!tutorial.isRunning) {
+            finishTutorial()
+            return
+        }
+        engine = tutorial.stateForCurrentLesson(engine.score) ?: engine.copy(falling = null)
+        updateState { it.copy(phase = GamePhase.Playing, tutorial = tutorial.frame).published() }
+    }
+
+    /** Tells the current beat what the player just did, and republishes if it moved. */
+    private suspend fun GameAction.noteTutorial(signal: TutorialAwait) {
+        if (!tutorial.isRunning) return
+        if (!tutorial.observe(signal)) return
+        tutorial.stateForCurrentLesson(engine.score)?.let { engine = it }
+        updateState { it.copy(tutorial = tutorial.frame).published() }
     }
 
     /**
@@ -359,16 +490,28 @@ class GameViewModel(
             return
         }
         if (state.phase != GamePhase.Playing) return
+        val step = if (input == Input.MoveLeft) -1 else 1
+        val target = (engine.falling?.cell?.col ?: return) + step
+        if (!tutorialAllows(target)) return
         val transition = Cascade.apply(engine, input)
         if (transition.isRejected) return
         engine = transition.state
         sendEvent(GameEffect.Play(Cue.Move))
         updateState { it.published() }
+        noteTutorial(TutorialAwait.Steered)
         if (lockPending && !lockResetUsed) {
             lockResetUsed = true
             scheduleLock()
         }
     }
+
+    /**
+     * Whether the guided run will let the block into [col].
+     *
+     * True whenever no script is running, so this is a no-op for every real run.
+     * See [TutorialDrop.allowedColumns] for why a scripted drop clamps at all.
+     */
+    private fun tutorialAllows(col: Int): Boolean = tutorial.allowedColumns?.contains(col) ?: true
 
     /**
      * Drag steering (decision D11): put the block in column [col] if it can get
@@ -394,7 +537,8 @@ class GameViewModel(
      */
     private suspend fun GameAction.steerTo(col: Int) {
         if (state.phase != GamePhase.Playing) return
-        val target = col.coerceIn(0, engine.board.cols - 1)
+        val limits = tutorial.allowedColumns
+        val target = if (limits != null) col.coerceIn(limits) else col.coerceIn(0, engine.board.cols - 1)
         var moved = false
         var steps = 0
         while (steps++ < engine.board.cols) {
@@ -409,6 +553,7 @@ class GameViewModel(
         if (!moved) return
         sendEvent(GameEffect.Play(Cue.Move))
         updateState { it.published() }
+        noteTutorial(TutorialAwait.Steered)
         if (lockPending && !lockResetUsed) {
             lockResetUsed = true
             scheduleLock()
@@ -437,6 +582,7 @@ class GameViewModel(
         engine = transition.state
         sendEvent(GameEffect.Play(Cue.Move))
         updateState { it.published() }
+        noteTutorial(TutorialAwait.Nudged)
 
         val falling = engine.falling ?: return
         if (!engine.board.isEmpty(falling.cell + Direction.DOWN) && !lockPending) {
@@ -489,7 +635,16 @@ class GameViewModel(
      * launched it — on device, "Drop again" started a run the player could not
      * see and could not touch, because the scrim is a real input barrier.
      */
-    private suspend fun GameAction.restart() {
+    private suspend fun GameAction.restart() = resetToNewRun()
+
+    /**
+     * Everything a fresh run has to forget, and the one place it is written down.
+     *
+     * Shared by "Drop again", the pause menu's Restart and the end of the
+     * tutorial, because all three are the same event: throw away what is on
+     * screen and start a run at level 1.
+     */
+    private suspend fun GameAction.resetToNewRun() {
         tickerJob?.cancel()
         lockJob?.cancel()
         playbackJob?.cancel()
@@ -509,6 +664,7 @@ class GameViewModel(
                 newBest = false,
                 chainStep = 0,
                 chainCell = null,
+                tutorial = null,
             ).published()
         }
         saveRun()
@@ -545,6 +701,10 @@ class GameViewModel(
         resolutionSnapshot = null
         if (engine.isOver) {
             endRun()
+            return
+        }
+        if (tutorial.isRunning) {
+            advanceTutorialDrop()
             return
         }
         updateState { it.copy(phase = GamePhase.Playing).published() }
@@ -669,8 +829,19 @@ class GameViewModel(
         }
     }
 
+    /**
+     * The drop timer, and the one line that implements SPEC 13's frozen clock.
+     *
+     * **A tutorial run has no ticker at all**, which means gravity never moves a
+     * block and ▼ is the only way to make one land. That is not a side effect of
+     * freezing the timer, it is the reason to freeze it: the player finishes six
+     * drops having pressed ▼ on every one of them and having never watched a
+     * block come down on its own. L29 measured that habit at 223 seconds against
+     * 56 to reach level 4.
+     */
     private fun restartTicker() {
         tickerJob?.cancel()
+        if (tutorial.isRunning) return
         tickerJob = viewModelScope.launch {
             while (isActive) {
                 delay(intervalMillis())
@@ -737,6 +908,7 @@ class GameViewModel(
      */
     private suspend fun saveRun() {
         if (engine.isOver) return
+        if (tutorial.isRunning) return
         savedRunStore.save(
             SavedRun(
                 version = SAVE_FORMAT_VERSION,
@@ -845,6 +1017,16 @@ data class GameUiState(
     val newBest: Boolean = false,
     val leftHanded: Boolean = false,
     val ghostEnabled: Boolean = true,
+
+    /**
+     * The beat of the guided run the board is waiting on, null in a real run
+     * (SPEC 13).
+     *
+     * The copy is not in here. The screen resolves it from
+     * [TutorialFrame.step], exactly as it does for [GameCallout], because a
+     * `stringResource` needs a composition and this class has none.
+     */
+    val tutorial: TutorialFrame? = null,
 )
 
 sealed interface GameEffect {
@@ -884,6 +1066,21 @@ sealed interface GameAction {
     data object Pause : GameAction
     data object Resume : GameAction
     data object Restart : GameAction
+
+    /** The coach mark's button, on the beats that wait for one (SPEC 13). */
+    data object TutorialAdvance : GameAction
+
+    /** SPEC 13's skip, offered from drop 3. */
+    data object TutorialSkip : GameAction
+
+    /**
+     * Run the tutorial again, from `GameRoute(replayTutorial = true)`.
+     *
+     * SPEC 13 puts this in Settings. Settings is C11, so the route argument is
+     * the entry point until then.
+     */
+    data object ReplayTutorial : GameAction
+
     data object Quit : GameAction
     data object ShowStats : GameAction
     data object ToggleHandedness : GameAction

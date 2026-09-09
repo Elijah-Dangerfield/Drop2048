@@ -200,6 +200,17 @@ internal class GameScenario private constructor(
              * than unconditional so the overlay itself can be tested.
              */
             pressPlay: Boolean = true,
+            /**
+             * Whether this device has never been taught the game, which is what
+             * puts `GameViewModel` into SPEC 13's guided run.
+             *
+             * Defaults to false — an already-onboarded device — because every
+             * other scenario in this file is about a real run, and a fresh
+             * `AppData` says `hasUserOnboarded = false`. Without this the
+             * tutorial would open in front of forty tests that have nothing to
+             * do with it.
+             */
+            teach: Boolean = false,
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -215,7 +226,7 @@ internal class GameScenario private constructor(
             val scenario = GameScenario(
                 scope = this,
                 start = start,
-                cache = FakeAppCache(),
+                cache = FakeAppCache(AppData(hasUserOnboarded = !teach)),
                 progress = FakeProgressRepository(best = best),
                 savedRuns = FakeSavedRunStore(resume),
                 lifecycle = FakeAppLifecycle(),

@@ -3,7 +3,6 @@ package com.dangerfield.drop2048
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dangerfield.drop2048.features.game.GameRoute
-import com.dangerfield.drop2048.features.onboarding.OnboardingRoute
 import com.dangerfield.drop2048.libraries.config.EnsureAppConfigLoaded
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.navigation.Route
@@ -30,11 +29,15 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 private const val BootConfigTimeoutMillis = 8_000L
 
 /**
- * App-level ViewModel. Resolves the start destination by reading the persistent
- * `AppData` cache — returning players land straight on [GameRoute]; first-launch
- * players land on [OnboardingRoute].
+ * App-level ViewModel. The start destination is [GameRoute] for everybody.
  *
- * There is no menu in between on purpose. SPEC 13 opens the app in a run, and
+ * There is no menu, and since C5 there is no first-launch screen either. SPEC 13
+ * says first launch drops straight into a scripted run, so the fork on
+ * `hasUserOnboarded` moved *inside* `GameViewModel`: the same route opens the
+ * same board, and the flag decides whether the drop clock is running. A welcome
+ * screen with a Play button in front of a tutorial that opens with its own board
+ * was two front doors to one room.
+ *
  * `HomeRoute` is still the template's placeholder screen; it stays registered
  * for the bug-report and feedback flows that hang off it.
  *
@@ -100,11 +103,8 @@ class AppViewModel(
     init {
         viewModelScope.launch {
             val onboarded = appCache.get().hasUserOnboarded
-            logger.d {
-                "Resolving start destination: hasUserOnboarded=$onboarded → " +
-                    if (onboarded) "Game" else "Onboarding"
-            }
-            _startDestination.value = if (onboarded) GameRoute() else OnboardingRoute()
+            logger.d { "Resolving start destination: Game, tutorial=${!onboarded}" }
+            _startDestination.value = GameRoute()
             // Start destination resolved — release the platform splash; the
             // Compose boot gate now covers the rest of the wait.
             _isReady.value = true
