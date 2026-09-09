@@ -23,11 +23,11 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C2c · Design language + screenshot harness | **DONE** | `0f843f2`. 15 goldens. See D14, D15, L38-L39 |
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
-| C3b · Game screen to handoff fidelity | **IN PROGRESS** | Restyle + D15 + C2c's visual deltas |
+| C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
 | C3a · Feel | not started | Needs audio assets from the owner |
-| C5 · Tutorial | not started | |
+| C5 · Tutorial | **IN PROGRESS** | Teaching ▼ is worth 223s→56s (L29, C1e) |
 | C6 · Daily Challenge | not started | |
-| C7 · Remote config | not started | |
+| C7 · Remote config | **IN PROGRESS** | Fly deploy is owner-blocked; code is not |
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | not started | |
 | C10 · Ads + billing | not started | |
@@ -250,6 +250,33 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D16 · The danger ring arms on row 1, at any board height
+
+C3b's ruling, and the reasoning is why it holds: **the threshold is defined by the death rule, not
+by the board.** Row 0 occupied after a resolution ends the run, so anything in row 1 is one
+non-merging landing from death. That sentence is height-independent, so 5x8 does not change it.
+
+L25's extra row is spent on **reaction time after the ring turns red**, which is what was actually
+short. The warning does not arrive earlier; it lasts longer.
+
+### D17 · The three specials' landing ghosts
+
+Undesigned in the handoff, which only knows will-merge and will-not. C3b's designs:
+
+- **Stone:** always plain, never bright. It has no value and never merges, and a bright ghost
+  would be a lie the first time a player meets one.
+- **Wildcard:** the bright cell is the **neighbour that doubles**, labelled `×2`, with a plain
+  outline on the landing cell. The neighbour is the cell that changes, and *which* of four it picks
+  is the actual question the player is asking.
+- **Bomb:** all five cells bright, **no label on any**. The footprint is the message, and a `×5`
+  would read as a multiplier on a board where every other mark is one. Only *occupied* neighbours
+  are outlined, because SPEC 18.4 pays per block destroyed and an empty cell promises a bang that
+  never comes.
+
+Three new toasts came with them: `BOOM!`, `WILD!`, `SWEPT!`. Precedence is **structural rather than
+a rule** — one callout per playback frame, later frames replace earlier ones, so `ROW BUST!` beats
+`CHAIN ×N` because the burst is the later frame.
 
 ### D14 · The design ramp ships as drawn, and its three failed floors are accepted
 
@@ -484,6 +511,33 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L43 · `Modifier.blur` clips to bounds at **any** radius, including zero
+
+Applying `blur(0.dp)` as a no-op is not a no-op. It was silently shaving the board well's 4dp ring
+and its danger glow off three sides. Apply the modifier **conditionally** rather than passing zero.
+
+**Caught by a screenshot golden**, not by review, and it is exactly the class of bug that has no
+symptom in code and no crash — the ring just quietly is not there.
+
+### L44 · A derived "best" that already includes the current score can never detect a new best
+
+`GameUiState.best` is `maxOf(best, score)` on every publish, so by the time a run ends it **equals**
+the score. Comparing against it to light "new best!" would have fired on every single run,
+forever.
+
+C3b added `bestBeforeRun` for the comparison. The general shape: **a value derived to always
+include the current one cannot also be the baseline you compare the current one against.** Worth
+suspicion anywhere a `max` is folded into display state.
+
+### L45 · Screenshot goldens are captured at 360x640 on purpose
+
+The tightest frame the app ships to, not the roomiest. A golden taken on a tall phone agrees with
+the design and disagrees with the player.
+
+C3b found a real layout bug this way: the handoff hardcodes `max-width: 370px` against a 5x7
+aspect, and at 5x8 the board is taller, so on a short screen it overflowed and the flex spacer
+collapsed. The board is now bounded by height as well as width, and the goldens pin it.
 
 ### L40 · Vertical position is not an input to the engine, so every drop control is pure pacing
 
