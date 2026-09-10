@@ -41,7 +41,8 @@ import java.io.File
  * earned outline and the lit glyph on it, so the two states can be compared side
  * by side rather than described. [badgeDetail] is the dialog, which draws over
  * the whole window through the design system's host rather than inside the
- * screen's content slot.
+ * screen's content slot, and [badgeDetailWithoutANumber] is the same dialog on a
+ * badge whose copy quotes no number.
  *
  * The toast has its own frame because it renders over the *game*, not here, and
  * a golden of it in `:libraries:ui` would have meant re-recording that module's
@@ -81,6 +82,22 @@ class AchievementsScreenshotTest {
     fun badgeDetail() = compose.capture("achievements-detail") {
         AchievementsScreen(
             state = previewState(earned = WellPlayed).copy(selectedId = AchievementId.ChainOfFive),
+            onAction = {},
+        )
+    }
+
+    /**
+     * A badge whose description quotes no number.
+     *
+     * Every description is resolved with the achievement's own target as a
+     * format argument, and most of them have nowhere to put it. This frame is
+     * the one that proves an unused argument renders rather than throwing —
+     * which is a runtime question a compiler cannot answer.
+     */
+    @Test
+    fun badgeDetailWithoutANumber() = compose.capture("achievements-detail-plain") {
+        AchievementsScreen(
+            state = previewState(earned = WellPlayed).copy(selectedId = AchievementId.CleanSweep),
             onAction = {},
         )
     }
