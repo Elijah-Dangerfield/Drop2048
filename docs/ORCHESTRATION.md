@@ -24,12 +24,13 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
-| C3a · Feel | not started | Needs audio assets from the owner |
+| C3c · One product + player bugs | **IN PROGRESS** | Dark theme everywhere, save slot, control scheme |
+| C3a · Feel | queued | Haptics/motion can land; audio needs owner assets |
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
-| C9 · Achievements, leaderboards, sharing | not started | |
+| C9 · Achievements, leaderboards, sharing | **IN PROGRESS** | Submit call site ships with a test |
 | C10 · Ads + billing | not started | |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C12 · Debug menu | not started | |
