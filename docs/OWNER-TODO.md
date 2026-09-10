@@ -1,305 +1,150 @@
 # Owner TODO
 
-Things only a human with credentials, a password, a store account or an opinion can do. Agents
-add to this list; they cannot clear it.
+Things only a human with credentials, a password, a store account or an opinion can do. Agents add
+to this list; they cannot clear it.
 
-Ordered roughly by when it starts blocking. Nothing here blocks C0 through C3, which is
-deliberate: the loop gets built and proven before anyone has to open an account.
+Ordered by when it starts blocking. Last pruned 2026-09-09 after C7.
 
 ---
 
-## Blocking soon
+## Blocking now
 
-### Xcode toolchain — confirmed needed, and the symptom is not what you would guess
+### Xcode: create the `xcode_select_link`
 
 `xcode-select -p` already returns the right path, **but `/var/db/xcode_select_link` does not
-exist**, which is what the iOS Simulator tooling checks. It refuses with "Xcode is installed but
-not selected", so an agent cannot attach, launch, tap or screenshot. C3 fell back to `xcrun simctl`
-plus driving the Simulator window directly — it worked, and it was slow and had to target taps by
-accessibility index rather than coordinate.
+exist**, and that is what the iOS Simulator tooling actually checks. It refuses with "Xcode is
+installed but not selected", so an agent cannot attach, launch, tap or screenshot.
 
-Running the command below creates the link. It needs your password, so it is yours.
-
-### Xcode toolchain
-
-Sodogku hit this and could not run anything on an iOS simulator: `xcode-select` pointed somewhere
-that was not Xcode. Needs your password, so it cannot be automated.
+C3 worked around it with `xcrun simctl` and by driving the Simulator window directly. It was slow
+and had to target taps by accessibility index rather than coordinate.
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
-Verify with `xcode-select -p`. Until this is right, iOS is compile-verified only and no agent can
-confirm anything actually runs on a phone.
-
-**Blocks:** any "does it feel right on iOS" judgement, so effectively C3.
-
-### Docker running, and one command to run once it is
-
-C0 rewrote the integration harness onto the remote-config endpoint and **it has never actually
-run**. Docker was down, so all 5 of the suite's skipped tests self-skipped, and a skipped test
-reads exactly like a passing one in the summary.
-
-Start Docker Desktop, then:
-
-```bash
-./gradlew :apps:integration:testDebugUnitTest :apps:server:test
-```
-
-That covers `HarnessSmokeTest` plus the four Testcontainers Postgres tests
-(`PostgresAppConfigSourceTest`, `PostgresAppConfigAdminRepositoryTest`,
-`PostgresAppConfigManifestRepositoryTest`, `DatabaseSchemaTest`).
-
-**Blocks:** trusting C7's config path. Worth doing before C7 rather than during it.
-
-### Revoke the now-dead Supabase credentials
-
-C0 deleted the entire Supabase auth stack. If a Supabase project exists for this app, these are
-now dead and should be revoked rather than left live:
-
-- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Fly secrets
-- The same two as GitHub Actions secrets
-
-**Keep `DATABASE_URL`.** The Postgres itself is still in use by the config server.
-
-### Install an iPhone SE runtime (optional)
-
-The smallest simulator on this Mac is an iPhone 16e. The 5x8 board ruling gets *stronger* on a
-narrower phone, not weaker, so the conclusion is safe. But the smallest screen the app will ship to
-has still never been looked at.
-
-### Play the 500ms opening and rule on the feel
-
-C3 said the first two minutes were a cutscene. C1c measured it and found C3 was **right about the
-symptom and wrong about the cause**: not one block in 600,000 opening drops was placed by the
-timer instead of the player. The problem is dead time waiting for the block to arrive, not a lack
-of pressure.
-
-The opening curve is now 500ms instead of 700ms. Three candidate curves produced **identical**
-outcomes to the digit — same median level, same tier distribution — so this is a pacing change
-whose measured risk is zero. It cuts level-1 dead time by 28%.
-
-**Nobody has felt it.** It is a feel change justified by a risk measurement, which is exactly the
-kind that needs a human before it ships.
-
-Worth knowing while you play: whether you use the drop control is worth more than every speed-curve
-change combined. Hard-dropping reaches level 4 in 34 seconds; patient play takes 289.
-
-### Play both control schemes and pick (C3a)
-
-Not a credential, an opinion, and it is yours. Buttons ship first because they are testable. Once
-Drag exists, play both for a day and say which is the default.
-
-**Blocks:** C3a closing.
-
-### Settle 5x7 vs 5x8 on a real phone (C3)
-
-Same deal. 8 rows buys a row of reaction time in the danger state, 7 draws bigger blocks. An
-agent cannot hold a phone.
-
-**Blocks:** C3 closing. Everything downstream works either way, so this is not urgent, but it
-gets more expensive to change after art is final.
-
----
-
-## Needed before the relevant chunk
-
-### Two telemetry constants that set the size of every balance number
-
-Every clocked balance figure rests on a modelled player who takes 250ms to decide and 120ms
-between taps. **Those are assumptions, not measurements**, and they move the answer as much as the
-clock itself did: Greedy's median level is 21 / 19 / 17 across quick, average and deliberate
-players.
-
-C8 should instrument two things: time from block spawn to first sideways input, and inter-tap
-interval. That converts the whole balance model from reasoned to measured. Noted here rather than
-in the agent queue because it is a decision about what to collect from real people.
-
-**Needed by:** C8.
-
-### Sentry DSN
-
-The template wires Sentry (`SentryLogTree`). It needs a real DSN per environment.
-
-**Needed by:** C8.
-
-### Grafana / OTel credentials
-
-`:libraries:telemetry:impl` ships the Grafana log tree. Needs an endpoint and a token.
-
-**Needed by:** C8. The two dashboards that matter are median level reached and highest-tier
-distribution at run end.
-
-### Fly.io app for the server
-
-Remote config is server-driven and the admin console is served from the same app. Needs a Fly app
-and a Postgres.
-
-**Needed by:** C7.
-
-### App Store Connect and Play Console apps
-
-Bundle IDs, an app record on each store, and a signing setup.
-
-**Needed by:** C9 (Game Center and Play Games leaderboards are configured store-side before any
-code can submit to them), C10 (the IAP product has to exist before billing can query it).
-
-### Game Center leaderboard + achievement IDs
-
-Created in App Store Connect, mirrored in Play Games. The 24 achievements in SPEC 15 and the
-three leaderboards in SPEC 15 each need an ID.
-
-**Needed by:** C9.
-
-### AdMob account, app IDs and ad unit IDs
-
-One app ID and one ad unit per placement per platform. Test IDs work until then, which is why
-this is not earlier.
-
-**Needed by:** C10.
-
-### Pro IAP product
-
-A non-consumable, `$2.99` at current v1 scope (see SPEC 2, the price is thinner than the original
-spec's $3.99 because coins, powerups and Zen are cut). Created in both stores.
-
-**Needed by:** C10.
-
----
-
-### Confirm the three special block colours
-
-Electric violet Wildcard, near-black plum Bomb, neutral grey Stone. They clear every measured
-floor, and Stone's worst case anywhere is ΔE 26.1 against the tritanopia ramp's 2.
-
-Worth your eye because these are the first three colours in the game chosen for **where they
-aren't** rather than for what they look like. The Bomb in particular is nearly black.
-
-`BlockSpecialPreview` in `DesignSystemPreview.kt`.
-
-### Look at the five block palettes rendered
-
-They are numerically sound and **nobody has seen them.** C2 authored them by hill-climbing against
-a constraint set rather than by eye, and every one clears its contrast, ΔE and luminance floors.
-That guarantees they are distinguishable. It does not guarantee they are nice.
-
-Open `BlockTierPreview` in `libraries/ui/.../catalog/DesignSystemPreview.kt`. It lays the ramp out
-as a matrix, one row per tier and one column per palette, so a collision shows up as two adjacent
-cells rather than needing five previews compared from memory.
-
-Specifically worth your eye: **the Protanopia ramp is five yellow-greens and one blue family.** It
-passes every floor and may still read as drab.
-
-### Decide whether "high contrast" should look loud
-
-That palette is all pale faces with dark numerals, which is what maximises measured contrast
-(6.31:1, the highest of the five) and is the opposite of what most people picture when they read
-"high contrast". The rationale is in its KDoc. It is defensible and it may still be wrong for what
-players expect from the setting name.
-
-### Feel the haptics on a real iPhone and a real Android
-
-Nothing about the haptic engine is tested or observed — both platform implementations compile and
-that is the entire guarantee. The Android `VibrationEffect` waveform envelopes, the
-amplitude-control fallback, the pre-Oreo path, and the whole iOS Core Haptics path are unexercised.
-
-**The burst envelope and the stacked-out double are guesses.** SPEC 21 puts the burst at half of
-what makes this game feel good, so these need hands on hardware, not a code review.
-
-### `SAVE_FORMAT_VERSION` needs an owner, or it will be forgotten silently
-
-C1d added `SAVE_FORMAT_VERSION` so a saved run from an older build is refused rather than restored
-into rules it was not played under. It must be bumped whenever `GameState`, `RunTally` or
-`SavedResolution` change shape.
-
-**Nothing enforces that.** If it is forgotten, the failure is silent and only appears on a real
-upgrade, on a real player's device, with their run in it.
-
-Decide whether this becomes a checklist item on every engine chunk, or whether something in the
-build should assert it.
-
-### Write the policy for changing `PINNED_DIGEST`, before C6 not after
-
-The engine pins a determinism digest that proves a seed replays identically on every platform. It
-was re-pinned once already, when the merge-position ruling changed outcomes, and that was free
-**because no scores exist yet**.
-
-The moment Daily Challenge ships (C6), it stops being free: changing the digest silently
-invalidates every posted score, because players were competing on a different sequence. There
-should be a written rule before that, and the obvious one is *the digest is versioned alongside
-the leaderboard, and changing it retires the old board.*
-
-Cheap to decide now. Expensive to decide after the first player complains.
-
-## Decisions I need from you
+Needs your password, so it is yours. Until then iOS is compile-verified only, and **nothing has
+ever been rendered on iOS** — the screenshot harness is Robolectric, so all 26 goldens are Android.
+
+### Play it, and rule on three feel questions
+
+The game is playable, persisted, and now looks like the handoff. Nobody but an agent has played it.
+
+1. **The 500ms opening.** Three candidate curves produced outcomes identical to the digit, so the
+   change is measurably risk-free — and no human has felt it. Worth knowing while you play:
+   whether you use the ▼ nudge is worth more than every curve change combined (223s to level 4
+   without it, 56s with).
+2. **Does ▼ feel decisive?** It recovers 88% of the wall clock that hard drop gave. C1e's own
+   caveat: 88% of the clock is not 88% of the *decisiveness*, and no harness can measure the
+   difference.
+3. **Does drag steering read as locked to the finger?** It is absolute-from-grab-point per the
+   handoff. The flick thresholds (30dp, 450ms) are unvalidated guesses.
+
+## Decide before the chunk that needs it
 
 ### Kids theming / age rating
 
-Sodogku flagged this as needing resolution *before* ads are wired, and it is the same here.
-Whether the app is directed at children changes the ad SDK configuration, the consent flow, and
-the store questionnaire. Getting it wrong is a policy problem, not a bug.
+Changes the ad SDK configuration, the consent flow and the store questionnaire. Getting it wrong
+is a policy problem, not a bug. **Cheaper to answer now than at C10.**
 
-**Needed by:** C10, and it is genuinely cheaper to answer now.
+### The digest freeze date
+
+`PINNED_DIGEST` has moved twice, and both times were free because no scores exist. Once Daily
+Challenge ships (C6), changing it silently invalidates every posted score.
+
+Also frozen at that moment: **`level.blocksPerLevel`**, which is now remote-configurable and moves
+the digest. The admin console warns loudly and requires a typed confirmation in prod, but **nothing
+enforces it server-side.**
+
+Safe to keep tuning live, measured: the speed curve, `nudgeRows`, the spawn table.
+
+### `SAVE_FORMAT_VERSION` ownership
+
+Must be bumped whenever `GameState`, `RunTally` or `SavedResolution` change shape. Nothing enforces
+it. If forgotten, the failure is silent and appears on a real player's device with their run in it.
+Decide whether it becomes a checklist item or a build assertion.
 
 ### App name and store identity
 
-"Drop 2048" is the repo name. Is it the store name? "2048" is heavily squatted on both stores and
-a search-result problem, not a legal one.
+"Drop 2048" is the repo name. Is it the store name? "2048" is heavily squatted on both stores — a
+search-results problem, not a legal one. The bundle ID is set much earlier and is painful to change.
 
-**Needed by:** C13, but the bundle ID is set much earlier and is painful to change.
+## Look at these when convenient
 
-### Privacy policy and terms
+### The five block palettes, rendered
 
-Hosted somewhere with a stable URL. The template's gate feature does legal re-accept, so the
-version matters, not just the text.
+`BlockTierPreview` in `libraries/ui/.../catalog/DesignSystemPreview.kt`, laid out as a matrix so a
+collision shows as two adjacent cells. **The protanopia ramp is five yellow-greens and one blue
+family** — it clears every floor and may still read as drab.
 
-**Needed by:** C11.
+The default ramp is the handoff's and its three failed floors are accepted per your ruling (D14).
 
----
+### The three special block colours
+
+`BlockSpecialPreview`. Electric violet Wildcard, near-black plum Bomb, neutral grey Stone. These
+are the first three colours in the game chosen for **where they aren't** rather than for what they
+look like, and the Bomb is nearly black.
+
+### Whether "high contrast" should look loud
+
+That palette is pale faces with dark numerals, which maximises measured contrast (6.31:1, highest
+of the five) and is the opposite of what most people picture. Defensible, and possibly still wrong
+for what players expect from the setting name.
+
+### Glyphs versus a platform icon set
+
+`◀ ▶ ▼ II` are text characters. The handoff explicitly leaves this open and says to swap for the
+platform icon set if it reads better natively.
+
+## Credentials, by chunk
+
+| Needed | For | Notes |
+|---|---|---|
+| **Fly app + Postgres + `ADMIN_API_TOKEN`** | C7's last mile | Everything else in C7 is built and green. Nothing has run against a deployed server. |
+| **Sentry DSN** | C8 | Per environment. |
+| **Grafana / OTel endpoint + token** | C8 | The two dashboards that matter: median level reached, and highest-tier-reached distribution. |
+| **App Store Connect + Play Console apps** | C9, C10 | Bundle IDs and signing. Leaderboards are configured store-side before any code can submit. |
+| **Game Center + Play Games IDs** | C9 | 24 achievements, 3 leaderboards. |
+| **AdMob account, app + unit IDs** | C10 | Test IDs work until then. |
+| **Pro IAP product** | C10 | Non-consumable, $2.99 at current scope (SPEC 2 — thinner than the original $3.99 because coins, powerups and Zen are cut). |
+| **Privacy policy + terms, hosted** | C11 | The gate does legal re-accept, so the version matters, not just the text. |
+| **Revoke dead Supabase secrets** | Housekeeping | `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on Fly and in GitHub Actions. **Keep `DATABASE_URL`** — the config server still uses that Postgres. |
+
+## Telemetry: the one decision that matters most
+
+**Instrument the player's decision time and tap rate** (time from spawn to first sideways input,
+and inter-tap interval).
+
+Every clocked balance number in this project rests on a modelled 250ms decision time that nobody
+has measured, and it is worth **five levels of median** and a 3x swing in the 1024 rate — more than
+the drop clock, the spawn table and every curve change put together. Until it is measured, every
+tuning conversation is conditional on a guess.
+
+**Needed by:** C8.
 
 ## Art and audio
 
-The biggest external dependency in the project and the one with the longest lead time.
+The longest lead time in the project.
 
 ### Audio, and this is the important one
 
 SPEC 21 says the cascade-step pitched merge sound is one of two things to keep if everything else
 is cut. It cannot be faked with a generic pop.
 
-- A merge sample that survives being pitched across ten semitones without sounding like a
-  pitch-shifted sample.
+- A merge sample that survives being pitched across ten semitones without sounding pitch-shifted.
 - The row burst: the longest, most cinematic sample in the game.
-- Spawn, move click, hard drop thud, lock, heavy merge (256+), bomb, danger enter/exit, stacked
-  out, level up, UI tap, UI back.
-- One music track with three intensity layers plus a filtered danger variant.
+- Spawn, move click, lock, heavy merge (256+), bomb, danger enter/exit, stacked out, level up, UI
+  tap, UI back. Plus `BOOM!`, `WILD!` and `SWEPT!` now have callouts and no sounds.
+- One music track, three intensity layers, plus a filtered danger variant.
 
-**Needed by:** C3a. Placeholder audio is fine for C3, but C3a is where the game either feels good
-or does not, and it cannot close on placeholders.
+**Blocks C3a**, which is the chunk where the game either feels good or does not. The seam exists
+and defaults to silent; placeholders will not close it.
 
-### Two font choices, and one of them is load-bearing
+### Haptics need hands on hardware
 
-Drop 2048 has `Brand`, `SansSerif` and `Serif`. Sodogku added a fourth, a rounded family (Fredoka),
-and that single choice is most of why it reads as a game rather than a utility. Drop 2048 needs an
-equivalent, and it is a taste call.
-
-The second one is not taste and it is now **blocking two visible things**: block faces jitter as
-values change, and the score visibly wobbles while it counts. Both need a face with **tabular
-(monospaced) digits**. No sibling repo has one.
-
-Every number in the game already routes through one token, so **the swap is a single declaration**
-in `libraries/ui/.../system/typography/FontFamily.kt`. Pick a family with a real tabular figure
-set and check the licence covers app embedding. Open-licence candidates: Roboto Mono, JetBrains
-Mono, Inter (has `tnum`), Nunito Sans.
-
-**Needed by:** C3, where it becomes visible for the first time.
+Nothing about the haptic engine is tested or observed — both platform implementations compile and
+that is the entire guarantee. The burst envelope and the stacked-out double are guesses.
 
 ### Art
 
-- App icon.
-- The three special block faces: wildcard star, bomb fuse, cracked stone.
-- Store screenshots and feature graphic.
-
-The tier block faces are the design system's job, not an illustrator's: they are a color ramp plus
-a number, per SPEC 5.1.
-
-**Needed by:** C13, except the special faces which C3 needs in some form.
+App icon, launch screen, store screenshots, feature graphic. The tier block faces are the design
+system's job, not an illustrator's.

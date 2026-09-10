@@ -27,7 +27,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C3a · Feel | not started | Needs audio assets from the owner |
 | C5 · Tutorial | **IN PROGRESS** | Teaching ▼ is worth 223s→56s (L29, C1e) |
 | C6 · Daily Challenge | not started | |
-| C7 · Remote config | **IN PROGRESS** | Fly deploy is owner-blocked; code is not |
+| C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | not started | |
 | C10 · Ads + billing | not started | |
@@ -58,9 +58,13 @@ These are not suggestions. A change that violates one gets reverted, not debated
 8. **Never read an animated value during composition.** `val x by animateFloatAsState(...)` read
    in a composable body is enforced against by a detekt rule that fails the build. Read it inside
    `graphicsLayer` / `drawBehind`.
-9. **Verify before claiming done:** `./gradlew testDebugUnitTest :apps:compose:assembleDebug
-   :apps:compose:compileKotlinIosSimulatorArm64 detekt`. Report what actually ran and what
-   failed. Do not report green without running it.
+9. **Verify before claiming done:** `./gradlew testDebugUnitTest :apps:server:test
+   :apps:compose:assembleDebug :apps:compose:compileKotlinIosSimulatorArm64 detekt`. Report what
+   actually ran and what failed. Do not report green without running it.
+   **The gate now expects 0 skips.** Docker was down for the project's first eight chunks and the
+   5 skips that produced were quoted as a baseline; C7 started Docker and found one of those tests
+   had been wrong since the day it landed (L46). If something skips, that is a finding. Start
+   Docker Desktop rather than accepting it.
 10. **Say what you did not verify.** Skipped tests, untested platforms, environment gaps get
     written down. A subagent that glosses a gap costs more than one that fails loudly.
 11. **Prefer an automated test to driving a simulator.** Owner instruction, 2026-09-09. A
@@ -511,6 +515,46 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L46 · A test that has never run can be wrong for months and look green
+
+`:apps:server`'s `DatabaseSchemaTest` asserted `app_config_values` was empty. Migration V4's own
+seed made that false **the day it landed**. It never failed, because Docker had been down for the
+entire project and it had never once executed.
+
+C7 started Docker Desktop and ran it. Every Testcontainers test passed after that one fix, and
+`:apps:integration`'s `HarnessSmokeTest` — the real config data source over real TCP against the
+real Ktor server on a real Postgres — **passed for the first time.**
+
+The watch list said "skipped tests read as passing". This is the sharper version: **a skipped test
+also stops being maintained**, and it rots silently against the code it is supposed to guard. The
+5-skip baseline this project quoted for eight chunks was never a baseline, it was a blind spot.
+
+**The gate now expects 0 skips.** Anything skipping is a finding.
+
+### L47 · A console that warns about everything is a console nobody reads
+
+C7 wired `blocksPerLevel` to remote config despite it moving the determinism digest, and made the
+admin surface warn loudly on it — red banner, typed confirmation in prod, warning on revert too.
+
+The half that makes it work is the other test: **`DangerousWarningTest` pins that the ten keys
+measured safe do *not* warn.** The speed curve (L28), `nudgeRows` (L40) and the spawn table (L19)
+are all known-safe by measurement, so warning about them would train the operator to click through
+the one warning that matters.
+
+A warning's value is set by how often it is absent.
+
+### L48 · A malformed boolean silently reads `false` instead of falling back
+
+`getValueRecursive` coerces any garbage to `false` via `toString().toBoolean()`. So a corrupted
+`ads.enabled` reads as **off** rather than falling back to its compiled default of on.
+
+For ads that is arguably the safe direction. For `feature.dailyChallenge` or
+`feature.leaderboards` it silently removes a feature with no error anywhere, which is the exact
+failure mode SPEC 10's "a malformed remote value falls back to the compiled default" was written
+to prevent.
+
+Pre-existing template behaviour. It matters before C10 leans on these keys.
 
 ### L43 · `Modifier.blur` clips to bounds at **any** radius, including zero
 
