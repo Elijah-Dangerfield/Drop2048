@@ -30,7 +30,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
-| C9 · Achievements, leaderboards, sharing | **IN PROGRESS** | Submit call site ships with a test |
+| C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
 | C10 · Ads + billing | not started | |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C12 · Debug menu | not started | |
@@ -527,6 +527,15 @@ a temp path, or read `git log -p` — do not move the working tree out from unde
 This is L10's lesson generalised: the failure mode is not "editing a shared doc", it is **any
 repo-wide operation** in a checkout more than one agent is writing to.
 
+### L39a · The goldens keep catching bugs on the change that introduced them
+
+Running tally, because it is the argument for the harness: C2c found two constraint-propagation
+bugs in its own components; C3b found `Modifier.blur` shaving the board ring (L43) and a layout
+overflow at 360x640 (L45); C9 found `Modifier.border(Border)` drawing a **rectangle across a pill**,
+leaving four accent stubs at the corners.
+
+Every one was invisible in code review, and none would have crashed.
+
 ### L39 · A screenshot harness that captures nothing passes every test
 
 Roborazzi's `captureRoboImage` is a **no-op unless a flag is set.** A plain `testDebugUnitTest` runs
@@ -555,6 +564,46 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L53 · Derive a constant from the system that owns it, or it strands the feature built on it
+
+SPEC 15's tiered score achievements needed five score targets. C9 did not type five numbers: it
+derived each rung as the score a run is **guaranteed** to have banked reaching level 5/10/15/20/25
+(survival plus level-up, straight out of SPEC 7), floored to two significant figures — 3,400 /
+14,000 / 32,000 / 58,000 / 92,000.
+
+The reason is a scar from the sibling repo: **Sodogku stranded three badges behind a scoring
+rescale, twice.** A typed target silently becomes unreachable the moment a coefficient moves, and
+nothing fails.
+
+Same shape as D5 (config travels with the seed) and the `BlockPalette` ink derivation (L2): when a
+number is a *consequence* of another number, compute it.
+
+### L54 · An achievement can be made unearnable by a rule three sections away
+
+"Burst a row containing three Stones" is only earnable **because SPEC 18.5 says a burst clears
+Stones too.** Five columns wide, the 2048 takes one cell, so three of the remaining four can be
+Stones — and if 18.5 were ever reversed, the badge would become impossible with nothing else in the
+game visibly changing.
+
+C9's reachability test records that coupling in a KDoc, which is the only thing that would tell the
+person who reverses 18.5 what they just broke.
+
+The test itself is worth copying: every achievement stat is answered through an exhaustive `when`
+with no `else`, one of three ways — **measured** over 40 fixed-seed greedy runs, **witnessed** on a
+posed board, or explicitly **off the board** (wall clock, calendar). The witnessed cases exist
+because a 10-step cascade occurs roughly 4 times in 740,000 drops, so no affordable number of
+played runs would ever find one.
+
+### L55 · Prove a call site by deleting it and checking *which* test goes red
+
+`BUILD-PLAN.md` warned that Sodogku shipped `Leaderboards.submit` with zero production callers.
+C9 deleted its `postToLeaderboards(score)` line and confirmed the two **ViewModel** tests failed
+while `RealLeaderboardsTest` **stayed green**.
+
+That distinction is the whole lesson. A unit test of the API passes happily whether or not anything
+calls it — it is exactly what made the original bug invisible. The test that guards a call site has
+to live at the caller.
 
 ### L51 · Assert on outputs, not on the inputs you think produce them
 
