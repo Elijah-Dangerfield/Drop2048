@@ -6,6 +6,120 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-09 — The Daily Challenge pins the compiled-in `EngineConfig` and ignores remote config
+
+**Decision:** `RunFactory.dailyRun()` builds its `GameState` with
+`EngineConfig.Default` and never calls `RemoteEngineConfig.current()`. Endless is
+unchanged and still samples the fetched config at the start of every run.
+
+**Why:** SPEC 14's whole promise is that everyone played the same game. D5 puts
+`EngineConfig` inside `GameState` and C7 ruled that a fetched config is sampled
+once at the start of a run and never mid-run. That is enough to keep one run
+coherent and it is not enough here. Two players opening the same day's seed ten
+minutes apart, one before a config push and one after, would each get an
+internally coherent run and a different board. The seed would match, the scores
+would not be comparable, and nothing anywhere would say so — the expensive kind
+of wrong, the kind that looks right.
+
+**Alternatives rejected.** *Use whatever config the player has*: rejected above.
+*A separately frozen `EngineConfig.Daily` with its own literals*: it decouples the
+Daily from the balance work, so the mode would permanently play a worse-tuned
+game than Endless and the two constants would drift under maintenance. *A config
+version stamped into the seed*: everyone on a given fetch would agree, but the
+population would fragment into cohorts nobody can see, which is the same failure
+with more machinery.
+
+**The cost, accepted:** the Daily plays on whatever balance the binary shipped
+with, so a live spawn-table fix does not reach it until the next release. That is
+the right boundary. A remote push is invisible, instant and can be
+segment-targeted; a release is versioned, staged and something the owner decides
+to do.
+
+**What this makes immovable.** From the first recorded Daily score,
+`EngineConfig.Default` is a leaderboard-visible constant: moving any field of it
+in a release splits that day's board between app versions, exactly as a remote
+push would have. `PINNED_DIGEST` in `DeterminismTest` and `level.blocksPerLevel`
+(D9) are in the same position and were already flagged as such — the difference
+is that the flag is now real rather than theoretical.
+
+**Enforced by** `DailyConfigPinningTest`, which plays two runs on the same seed
+under configs that differ in every gameplay key and asserts the block sequences
+are identical, with a positive control (L35) proving the same config really does
+change an Endless run.
+
+---
+
+## 2026-09-09 — The Daily day is UTC everywhere; the player's zone renders the countdown only
+
+**Decision:** `daily_result` is keyed on the UTC date, the seed is derived from
+the UTC date, the attempt allowance is per UTC day and the streak folds over UTC
+days. `DeviceTimeZone` is used for one thing: rendering "new board in 4h 12m"
+against the player's own clock.
+
+**Why:** SPEC 14 rotates the seed at 00:00 UTC and SPEC 11 keys the row on a UTC
+date. Keying the streak on the player's *local* day over a ledger keyed on UTC
+days is two clocks: a player in UTC-5 who plays at 19:00 and again at 20:00 would
+spend two boards in one of their evenings and none in another, so a local day
+would sometimes hold two rows and sometimes none, and every count over that table
+would have to decide which of the two days it meant. One clock is the only
+version a fold can be right about.
+
+**The fairness problem is real and is answered in the UI rather than the schema.**
+A player whose habit sits near their local equivalent of midnight UTC can lose a
+day they feel they played. The answer is that the screen always says when the
+next board arrives, in their time, so the boundary is a visible fact rather than
+something discovered by losing a streak.
+
+**Alternatives rejected.** *A local-day ledger*: two clocks, above. *A grace
+window either side of the boundary*: it moves the surprise rather than removing
+it, and it makes "did I play today" unanswerable from the rows.
+
+---
+
+## 2026-09-09 — A Daily attempt is spent when it starts, and Restart is refused
+
+**Decision:** `DailyRepository.startAttempt()` increments `attemptsUsed` before a
+block has fallen. `GameViewModel` refuses `Restart` during a Daily run and the
+pause menu hides the control.
+
+**Why:** spending the attempt on *completion* would make force-quitting a bad run
+a free reroll, and Restart would be the same reroll with a button. The run is
+resumable from the saved run store, so a player who leaves mid-attempt comes back
+to the same attempt rather than losing it — the reservation is what makes that
+safe.
+
+**The cost, accepted and worth naming:** the saved run store holds exactly one
+run. A Daily attempt that is abandoned and then overwritten by starting an
+Endless run is gone, and the day is spent. Recorded in the report as an owner
+item rather than fixed here, because the fix is a second save slot and that is a
+`SavedRunStore` change with its own format version.
+
+---
+
+## 2026-09-09 — `daily_result` carries one column SPEC 11 does not list
+
+**Decision:** the table is
+`(date PK, seed, score, attemptsUsed, completed, retriesUsed)`.
+
+SPEC 11 lists the first five. `retriesUsed` is added because SPEC 12 caps
+rewarded Daily retries per day, and a cap that is not counted on disk is a cap a
+force-quit resets. Attempts allowed is `(Pro ? 2 : 1) + retriesUsed`, so it is
+also the only reason the allowance survives a restart.
+
+Unlike `run_record`, this table is **updated in place**. A `run_record` row is a
+finished fact; a `daily_result` row is the running state of one day and changes
+twice per attempt. Two rows per attempt would make "attempts used" a `COUNT` and
+"the day's score" a `MAX` over a table that also has to answer "has today been
+completed", and each of those questions would then have its own way of being
+wrong.
+
+`score` is the **best** of the day's attempts. SPEC 14 says the mode is scored on
+final score, meaning the score a run ends on rather than some other in-run
+measure; it does not say which of two attempts counts, and taking the better one
+is the only reading under which paying for a retry is worth anything.
+
+---
+
 ## 2026-09-09 — The tutorial's frozen clock is how the nudge gets taught
 
 **Decision:** during the guided run (SPEC 13) `GameViewModel` starts no drop

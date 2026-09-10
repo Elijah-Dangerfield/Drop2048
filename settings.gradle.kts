@@ -67,6 +67,10 @@ if (!serverOnly) {
     include(":apps:admin")
 
     // Features
+    // SPEC 14's Daily Challenge screen. The board it opens is :features:game
+    // with a mode argument, not a second game screen.
+    include(":features:daily")
+    include(":features:daily:impl")
     include(":features:game")
     include(":features:game:impl")
     include(":features:home")

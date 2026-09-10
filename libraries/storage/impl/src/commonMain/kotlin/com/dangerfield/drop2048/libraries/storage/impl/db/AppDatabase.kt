@@ -8,6 +8,8 @@ import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ExampleUserDataDao
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ExampleUserDataEntity
+import com.dangerfield.drop2048.libraries.progress.db.DailyResultDao
+import com.dangerfield.drop2048.libraries.progress.db.DailyResultEntity
 import com.dangerfield.drop2048.libraries.progress.db.RunRecordDao
 import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
 
@@ -15,8 +17,9 @@ import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
     entities = [
         ExampleUserDataEntity::class,
         RunRecordEntity::class,
+        DailyResultEntity::class,
     ],
-    version = 6,
+    version = 7,
     /**
      * Every bump from [AppDatabase.FIRST_PLAYER_DATA_VERSION] on has to be listed
      * here.
@@ -26,12 +29,18 @@ import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
      * destructive fallback is a silent, unrecoverable wipe on the next release
      * that happens to add a column, and the player's best score goes with it.
      *
-     * The addition here is a new table, which Room migrates on its own. A change
-     * it cannot migrate — a renamed or retyped column — fails the build at this
-     * line rather than on a player's device, which is the point.
+     * Both additions so far are new tables, which Room migrates on its own. A
+     * change it cannot migrate — a renamed or retyped column — fails the build at
+     * this line rather than on a player's device, which is the point.
+     *
+     * 6 to 7 adds `daily_result`. It is the first table whose loss would cost the
+     * player something they cannot replay: a run history can at least be re-earned
+     * by playing, and a Daily streak cannot, because the boards it was built on
+     * are in the past.
      */
     autoMigrations = [
         AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7),
     ],
     exportSchema = true
 )
@@ -40,6 +49,7 @@ import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
 abstract class AppDatabase : RoomDatabase() {
     abstract fun exampleUserDataDao(): ExampleUserDataDao
     abstract fun runRecordDao(): RunRecordDao
+    abstract fun dailyResultDao(): DailyResultDao
 
     companion object {
         /**

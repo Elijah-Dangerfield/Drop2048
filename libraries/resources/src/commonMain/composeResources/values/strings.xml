@@ -70,6 +70,7 @@
     <string name="game_stacked_out">Stacked out</string>
     <string name="game_biggest">Biggest</string>
     <string name="game_drop_again">Drop again</string>
+    <string name="game_daily_done">Done</string>
     <string name="game_stats">Stats</string>
 
     <string name="stats_title">Stats</string>
@@ -86,9 +87,39 @@
     <string name="stats_most_bursts">Most bursts in a run</string>
     <string name="stats_lifetime_bursts">Lifetime bursts</string>
     <string name="stats_playtime">Total playtime</string>
+    <string name="stats_daily_streak">Daily streak</string>
+    <string name="stats_daily_best_streak">Best daily streak</string>
+    <string name="stats_days">%1$d days</string>
+    <string name="stats_one_day">1 day</string>
 
     <!-- Playtime, in the largest unit that says anything. See Playtime.kt. -->
     <string name="stats_duration_hours">%1$dh %2$dm</string>
     <string name="stats_duration_minutes">%1$dm</string>
     <string name="stats_duration_seconds">%1$ds</string>
+    <!-- SPEC 14. The day is UTC everywhere; the countdown is the only thing
+         rendered against the player's own clock, which is what stops the
+         boundary being a surprise. See DailySeed.kt. -->
+    <string name="daily_title">Daily Challenge</string>
+    <string name="daily_subtitle">One board. Everyone plays the same one.</string>
+    <string name="daily_play">Play today</string>
+    <string name="daily_resume">Back to today</string>
+    <string name="daily_disabled">The Daily Challenge is off right now. Endless is unaffected.</string>
+    <string name="daily_completed">Today is done</string>
+    <string name="daily_your_score">Your score</string>
+    <string name="daily_attempts_remaining">%1$d of %2$d attempts left</string>
+    <string name="daily_no_attempts">No attempts left today</string>
+    <string name="daily_resets_in">New board in %1$s</string>
+    <string name="daily_resets_hours">%1$dh %2$dm</string>
+    <string name="daily_resets_minutes">%1$dm</string>
+    <string name="daily_streak">Streak</string>
+    <string name="daily_streak_best">Best streak</string>
+    <string name="daily_streak_days">%1$d days</string>
+    <string name="daily_streak_one_day">1 day</string>
+    <string name="daily_streak_none">No streak yet. Finish today and it starts.</string>
+    <string name="daily_streak_next">%1$d more for the next reward</string>
+    <string name="daily_streak_milestone">%1$d day streak</string>
+    <string name="daily_retry">Watch an ad for one more try</string>
+    <string name="daily_retry_unavailable">No ad available right now</string>
+    <string name="daily_leaderboard">Leaderboard</string>
+    <string name="daily_leaderboard_soon">Global and friends boards arrive with leaderboards.</string>
 </resources>

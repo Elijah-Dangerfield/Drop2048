@@ -821,6 +821,38 @@ solved there.
 **Done when** the date-rollover tests pass across timezone changes and a device clock moved
 backwards, and two devices on the same UTC day produce identical block sequences.
 
+**Outcome.** `daily_result` in `:libraries:progress`, keyed on the UTC date as its primary key and
+carrying seed, score, attempts used, completed and retries used. `AppDatabase` is version 7 with
+an `AutoMigration(6, 7)`; the destructive fallback stays narrowed to the pre-game schemas (L33),
+which matters more here than it did for `run_record` — a run history can be re-earned by playing
+and a streak cannot, because the boards it was built on are in the past.
+
+The streak is a fold over the rows, never a counter, ported in shape from Sodogku's
+`DailyStreak.kt` with the freeze and restore mechanics stripped: Drop 2048 has neither, so the
+walk is a straight run of completed days. Both the current and the best number ignore future-dated
+rows, which is what a device clock pushed forward and pulled back leaves on disk.
+
+`:features:daily` is the screen — today's state, attempts remaining, the streak with SPEC 14's
+3/7/14/30 track, and a leaderboard placeholder that says in words that C9 owns it. The board it
+opens is `:features:game` with a `mode` route argument rather than a second game screen.
+`StreakTrack` is the one new `:libraries:ui` primitive: a milestone track rather than Sodogku's
+month calendar, because a calendar answers "which days did I play" and the mechanic is asking "how
+far to the next reward".
+
+**The ruling that mattered: a Daily run pins `EngineConfig.Default` and never reads remote
+config.** C7's start-of-run sampling keeps one run coherent and does not make two players' runs
+comparable. `DailyConfigPinningTest` moves every gameplay key and asserts the block sequence does
+not budge, with a positive control (L35). See `decisions.md` for the alternatives and for what this
+makes immovable.
+
+Full detail of the other four rulings — UTC everywhere, the attempt spent at start, best-of-the-day
+scoring, and the `retriesUsed` column SPEC 11 does not list — is in `decisions.md`.
+
+**Not verified.** The app was not launched on either simulator, and no ad or billing path exists to
+exercise (C10): `ProEntitlement` and `DailyRetryAd` are seams with shipped bindings that answer
+"not Pro" and "unavailable", and both are covered by tests on the seam rather than through a real
+network.
+
 ---
 
 ## C7 · Remote config

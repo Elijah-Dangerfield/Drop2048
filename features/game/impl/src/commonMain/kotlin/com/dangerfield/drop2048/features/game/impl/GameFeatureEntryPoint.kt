@@ -4,13 +4,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
+import com.dangerfield.drop2048.features.daily.DailyRoute
 import com.dangerfield.drop2048.features.game.GameRoute
+import com.dangerfield.drop2048.features.game.GameRouteTypeMap
 import com.dangerfield.drop2048.features.stats.StatsRoute
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.Router
 import com.dangerfield.drop2048.libraries.navigation.screen
 import com.dangerfield.drop2048.libraries.navigation.toRouteOrNull
+import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -31,14 +34,20 @@ class GameFeatureEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<GameRoute> { backStackEntry ->
+        screen<GameRoute>(typeMap = GameRouteTypeMap) { backStackEntry ->
             val viewModel: GameViewModel = viewModel { gameViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
             val cues = LocalCues.current
-            val replay = backStackEntry.toRouteOrNull<GameRoute>()?.replayTutorial == true
+            val route = backStackEntry.toRouteOrNull<GameRoute>()
+            val replay = route?.replayTutorial == true
+            val daily = route?.mode == GameMode.DAILY
 
             LaunchedEffect(replay) {
                 if (replay) viewModel.takeAction(GameAction.ReplayTutorial)
+            }
+
+            LaunchedEffect(daily) {
+                if (daily) viewModel.takeAction(GameAction.StartDaily)
             }
 
             viewModel.ObserveEvents { effect ->
@@ -46,6 +55,7 @@ class GameFeatureEntryPoint(
                     is GameEffect.Play -> cues.play(effect.cue)
                     GameEffect.Leave -> router.goBack()
                     GameEffect.OpenStats -> router.navigate(StatsRoute())
+                    GameEffect.OpenDaily -> router.navigate(DailyRoute())
                 }
             }
 

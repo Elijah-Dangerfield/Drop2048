@@ -88,11 +88,32 @@ data class SavedRun(
     val seed: Long,
     val mode: GameMode,
     val resolution: SavedResolution? = null,
+    /**
+     * The UTC day a [GameMode.DAILY] run belongs to, ISO-formatted, null in
+     * Endless.
+     *
+     * Carried rather than recomputed on resume for the reason
+     * `DailyRepository.recordAttempt` takes it as a parameter: an attempt started
+     * at 23:58 UTC and finished after midnight belongs to the board it began on,
+     * and a run restored from disk has no other way to know which that was. A
+     * string rather than a `LocalDate` so the blob stays serializer-free, and the
+     * same shape the `daily_result` primary key uses.
+     */
+    val dailyDate: String? = null,
 )
 
 /**
+ * 3 — C6 added [SavedRun.dailyDate].
+ *
+ * The field is nullable with a default, so a version 2 blob would in fact decode
+ * cleanly. It is rejected anyway, and that is the rule rather than an oversight:
+ * "bump on every shape change" is checkable, and "bump only when the change is
+ * not backwards compatible" is a judgement call made under deadline by whoever
+ * is least likely to be wondering about it. The cost of being strict is one
+ * in-flight run on the release that lands it.
+ *
  * 2 — decision D11 removed `preview`, `hold` and `holdUsedThisDrop` from
  * `GameState`. Version 1 is the shape C4 shipped, which had no version field at
  * all and is therefore rejected by failing to decode.
  */
-const val SAVE_FORMAT_VERSION = 2
+const val SAVE_FORMAT_VERSION = 3

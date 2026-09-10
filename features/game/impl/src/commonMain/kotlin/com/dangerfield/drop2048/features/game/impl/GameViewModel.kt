@@ -19,11 +19,15 @@ import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
+import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
+import com.dangerfield.drop2048.libraries.progress.daily.DailyAttempt
+import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
 import com.dangerfield.drop2048.libraries.ui.system.Cue
 import com.dangerfield.drop2048.libraries.ui.system.reduced
 import kotlin.time.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -85,6 +89,7 @@ class GameViewModel(
     private val appCache: AppCache,
     private val savedRunStore: SavedRunStore,
     private val progress: ProgressRepository,
+    private val daily: DailyRepository,
     private val clock: Clock,
     private val appLifecycle: AppLifecycle,
 ) : SEAViewModel<GameUiState, GameEffect, GameAction>(initialStateArg = GameUiState()) {
@@ -105,6 +110,16 @@ class GameViewModel(
      * shape the game no longer has.
      */
     private val tutorial = TutorialRunner(started.state.config)
+
+    /**
+     * The UTC day the Daily run in flight belongs to (SPEC 14), ISO-formatted,
+     * null in Endless.
+     *
+     * Read at the end of the run rather than re-derived from the clock, because
+     * an attempt started at 23:58 UTC and finished after midnight belongs to the
+     * board it began on. It survives a force-quit through [SavedRun.dailyDate].
+     */
+    private var dailyDate: String? = null
 
     /** Epoch millis the current stretch of play began, null while not playing. */
     private var playingSince: Long? = null
@@ -188,11 +203,13 @@ class GameViewModel(
             GameAction.Pause -> action.pause()
             GameAction.Resume -> action.resume()
             GameAction.Restart -> action.restart()
+            GameAction.StartDaily -> action.startDaily()
             GameAction.TutorialAdvance -> action.tutorialAdvance()
             GameAction.TutorialSkip -> action.tutorialSkip()
             GameAction.ReplayTutorial -> action.replayTutorial()
             GameAction.Quit -> sendEvent(GameEffect.Leave)
             GameAction.ShowStats -> sendEvent(GameEffect.OpenStats)
+            GameAction.ShowDaily -> sendEvent(GameEffect.OpenDaily)
             GameAction.ToggleHandedness -> action.toggleHandedness()
             is GameAction.SetReduceMotion -> reduceMotion = action.enabled
             is GameAction.ShowFrame -> action.showFrame(action.index)
@@ -221,6 +238,7 @@ class GameViewModel(
             started = StartedRun(state = saved.state, seed = saved.seed, mode = saved.mode)
             engine = saved.state
             tally = saved.tally
+            dailyDate = saved.dailyDate
             logger.logEvent("run.resume", "level" to engine.level, "score" to engine.score)
         } else {
             beginRun()
@@ -415,11 +433,14 @@ class GameViewModel(
         drivePlayback()
     }
 
-    private fun beginRun() {
-        started = runFactory.newRun()
-        engine = started.state
+    private fun beginRun() = adopt(runFactory.newRun(), day = null)
+
+    private fun adopt(run: StartedRun, day: String?) {
+        started = run
+        dailyDate = day
+        engine = run.state
         tally = RunTally(highestTier = engine.board.highestValue()?.points ?: 0)
-        logger.logEvent("run.start", "level" to engine.level)
+        logger.logEvent("run.start", "level" to engine.level, "mode" to run.mode.name)
     }
 
     /** Starts the drop timer and the stretch of play the duration is made of. */
@@ -635,16 +656,57 @@ class GameViewModel(
      * launched it — on device, "Drop again" started a run the player could not
      * see and could not touch, because the scrim is a real input barrier.
      */
-    private suspend fun GameAction.restart() = resetToNewRun()
+    private suspend fun GameAction.restart() {
+        if (started.mode == GameMode.DAILY) {
+            sendEvent(GameEffect.Leave)
+            return
+        }
+        resetToNewRun()
+    }
+
+    /**
+     * SPEC 14, entered from `GameRoute(mode = DAILY)`.
+     *
+     * Two paths, and the fork is the one-attempt rule.
+     *
+     * A Daily run already in flight — resumed a moment ago by [enter] from the
+     * saved run store — is *continued*, not restarted. The attempt was spent when
+     * it began, so charging for it again would make backgrounding the app during
+     * the Daily cost the player their day.
+     *
+     * Otherwise the attempt is requested, and a refusal leaves rather than
+     * starting anything. The Daily screen is the gate and will not normally offer
+     * a run there are no attempts for, but the gate has to hold here too: this is
+     * a route, and a route can be reached from a deep link, a restored back stack
+     * or a stale screen.
+     */
+    private suspend fun GameAction.startDaily() {
+        if (started.mode == GameMode.DAILY && !engine.isOver) {
+            updateState { it.published() }
+            return
+        }
+        val attempt = Catching { daily.startAttempt() }
+            .logOnFailure { "Could not start a Daily attempt" }
+            .getOrDefault(DailyAttempt.NoAttemptsLeft)
+        if (attempt !is DailyAttempt.Granted) {
+            logger.logEvent("daily.refused", "reason" to attempt::class.simpleName.orEmpty())
+            sendEvent(GameEffect.Leave)
+            return
+        }
+        logger.logEvent("daily.start", "date" to attempt.date.toString(), "attempt" to attempt.attemptNumber)
+        resetToRun(runFactory.dailyRun(attempt.seed), day = attempt.date.toString())
+    }
+
+    private suspend fun GameAction.resetToNewRun() = resetToRun(runFactory.newRun(), day = null)
 
     /**
      * Everything a fresh run has to forget, and the one place it is written down.
      *
-     * Shared by "Drop again", the pause menu's Restart and the end of the
-     * tutorial, because all three are the same event: throw away what is on
-     * screen and start a run at level 1.
+     * Shared by "Drop again", the pause menu's Restart, the end of the tutorial
+     * and the start of a Daily attempt, because all four are the same event:
+     * throw away what is on screen and start [run] at level 1.
      */
-    private suspend fun GameAction.resetToNewRun() {
+    private suspend fun GameAction.resetToRun(run: StartedRun, day: String?) {
         tickerJob?.cancel()
         lockJob?.cancel()
         playbackJob?.cancel()
@@ -656,7 +718,7 @@ class GameViewModel(
         softDropping = false
         bufferedMove = null
         playingSince = null
-        beginRun()
+        adopt(run, day)
         updateState {
             it.copy(
                 phase = GamePhase.Playing,
@@ -746,6 +808,7 @@ class GameViewModel(
             seed = started.seed,
         )
         Catching { progress.record(record) }.logOnFailure { "Could not record the run" }
+        bankDailyResult(score)
         savedRunStore.clear()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }
             .getOrNull() ?: maxOf(state.best, score)
@@ -766,6 +829,26 @@ class GameViewModel(
             )
         }
         bestBeforeRun = best
+    }
+
+    /**
+     * Closes today's Daily row (SPEC 11), if this was a Daily run.
+     *
+     * The day comes from [dailyDate] rather than from the clock, so an attempt
+     * that crossed 00:00 UTC scores against the board it was played on. The write
+     * only ever raises `completed` and takes the better score, so reporting the
+     * same finish twice — which a force-quit on the stacked-out sheet can cause —
+     * costs nothing.
+     *
+     * `run_record` is written either way and carries `mode = DAILY`, which is what
+     * keeps SPEC 15's lifetime numbers whole: a Daily run is a run.
+     */
+    private suspend fun bankDailyResult(score: Long) {
+        if (started.mode != GameMode.DAILY) return
+        val day = dailyDate ?: return
+        Catching { daily.recordAttempt(LocalDate.parse(day), score) }
+            .logOnFailure { "Could not record the Daily result" }
+        logger.logEvent("daily.end", "date" to day, "score" to score)
     }
 
     private suspend fun GameAction.lock() {
@@ -918,6 +1001,7 @@ class GameViewModel(
                 mode = started.mode,
                 resolution = resolutionSnapshot?.takeIf { frameIndex < frames.size }
                     ?.copy(frameIndex = frameIndex),
+                dailyDate = dailyDate,
             )
         )
     }
@@ -946,6 +1030,7 @@ class GameViewModel(
         biggestTier = tally.highestTier,
         leftHanded = leftHanded,
         ghostEnabled = ghostEnabled,
+        mode = started.mode,
     )
 
     override fun onCleared() {
@@ -1027,6 +1112,17 @@ data class GameUiState(
      * `stringResource` needs a composition and this class has none.
      */
     val tutorial: TutorialFrame? = null,
+
+    /**
+     * Which rules are being played (SPEC 14).
+     *
+     * The screen reads it in exactly two places — the pause menu, where Restart
+     * would be a free reroll, and the stacked-out sheet, where "Drop again" would
+     * start an Endless run off the back of a Daily one and quietly leave the mode.
+     * Everything else about a Daily run looks and plays identically, which is the
+     * point.
+     */
+    val mode: GameMode = GameMode.ENDLESS,
 )
 
 sealed interface GameEffect {
@@ -1037,6 +1133,9 @@ sealed interface GameEffect {
 
     /** SPEC 15's stats page, opened from the stacked-out sheet. */
     data object OpenStats : GameEffect
+
+    /** SPEC 14's Daily Challenge, opened from the stacked-out sheet. */
+    data object OpenDaily : GameEffect
 }
 
 sealed interface GameAction {
@@ -1081,8 +1180,27 @@ sealed interface GameAction {
      */
     data object ReplayTutorial : GameAction
 
+    /**
+     * Play today's Daily Challenge, from `GameRoute(mode = DAILY)`.
+     *
+     * A route argument rather than a second screen, and an action rather than a
+     * constructor parameter, because the ViewModel is built before the back stack
+     * entry is read. It mirrors [ReplayTutorial] exactly, and for the same
+     * reason.
+     */
+    data object StartDaily : GameAction
+
     data object Quit : GameAction
     data object ShowStats : GameAction
+
+    /**
+     * SPEC 14's Daily Challenge, offered from the stacked-out sheet.
+     *
+     * The sheet is the only entry point until C11 builds a menu. It is also the
+     * right one: the moment a player has just lost a run is exactly when a board
+     * everyone else is also playing today is worth offering.
+     */
+    data object ShowDaily : GameAction
     data object ToggleHandedness : GameAction
 
     /**

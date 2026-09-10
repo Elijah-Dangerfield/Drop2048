@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.dangerfield.drop2048.libraries.progress.RunStats
+import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.BarChart
 import com.dangerfield.drop2048.libraries.ui.components.BarChartEntry
@@ -27,15 +28,20 @@ import com.dangerfield.drop2048.system.Dimension
 import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.daily_title
 import drop2048.libraries.resources.generated.resources.stats_average
 import drop2048.libraries.resources.generated.resources.stats_best
 import drop2048.libraries.resources.generated.resources.stats_blocks_placed
+import drop2048.libraries.resources.generated.resources.stats_daily_best_streak
+import drop2048.libraries.resources.generated.resources.stats_daily_streak
+import drop2048.libraries.resources.generated.resources.stats_days
 import drop2048.libraries.resources.generated.resources.stats_empty
 import drop2048.libraries.resources.generated.resources.stats_highest_tier
 import drop2048.libraries.resources.generated.resources.stats_lifetime
 import drop2048.libraries.resources.generated.resources.stats_lifetime_bursts
 import drop2048.libraries.resources.generated.resources.stats_longest_cascade
 import drop2048.libraries.resources.generated.resources.stats_most_bursts
+import drop2048.libraries.resources.generated.resources.stats_one_day
 import drop2048.libraries.resources.generated.resources.stats_playtime
 import drop2048.libraries.resources.generated.resources.stats_recent
 import drop2048.libraries.resources.generated.resources.stats_runs_played
@@ -51,9 +57,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * A pure render of [StatsState]. Every value on it was folded out of
  * `run_record` before it got here — nothing on this screen adds anything up.
  *
- * The Daily streak SPEC 15 also lists is deliberately missing. It needs
- * `daily_result`, which is C6's, and a zero drawn for a feature that does not
- * exist yet reads as a broken stat rather than an absent one.
+ * The Daily streak SPEC 15 lists arrived with C6, in its own section rather than
+ * folded into Lifetime: everything in Lifetime is a total over `run_record` and
+ * these two are a walk over `daily_result`, so putting them side by side would
+ * imply a relationship the fold does not have.
  */
 @Composable
 fun StatsScreen(
@@ -91,6 +98,8 @@ fun StatsScreen(
             RecentRuns(state.stats)
             VerticalSpacerD1000()
             Lifetime(state.stats)
+            VerticalSpacerD1000()
+            Daily(state.streak)
             VerticalSpacerD1000()
         }
     }
@@ -162,6 +171,35 @@ private fun RecentRuns(stats: RunStats) {
     }
 }
 
+/**
+ * SPEC 15's Daily streak, current and best.
+ *
+ * Drawn even at zero, unlike the rest of the page before the first run, because
+ * a streak of zero on a mode that exists is a true and actionable statement —
+ * whereas C4 left this section out entirely, and was right to, when the mode did
+ * not exist.
+ */
+@Composable
+private fun Daily(streak: DailyStreak) {
+    SectionCard(title = stringResource(Res.string.daily_title)) {
+        SummaryRow(
+            label = stringResource(Res.string.stats_daily_streak),
+            value = daysLabel(streak.current),
+        )
+        SummaryRow(
+            label = stringResource(Res.string.stats_daily_best_streak),
+            value = daysLabel(streak.best),
+        )
+    }
+}
+
+@Composable
+private fun daysLabel(days: Int): String = if (days == 1) {
+    stringResource(Res.string.stats_one_day)
+} else {
+    stringResource(Res.string.stats_days, days)
+}
+
 @Composable
 private fun Lifetime(stats: RunStats) {
     SectionCard(title = stringResource(Res.string.stats_lifetime)) {
@@ -216,6 +254,7 @@ private fun StatsScreenPreview() {
                     totalPlaytimeMs = 9_240_000,
                     recentScores = listOf(18_240L, 4_010L, 9_120L, 2_400L, 6_780L),
                 ),
+                streak = DailyStreak(current = 4, best = 11),
             ),
             onAction = {},
         )

@@ -20,7 +20,16 @@ import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
 import com.dangerfield.drop2048.libraries.progress.RunStats
+import com.dangerfield.drop2048.libraries.progress.daily.DailyAttempt
+import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
+import com.dangerfield.drop2048.libraries.progress.daily.DailyResult
+import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryResult
+import com.dangerfield.drop2048.libraries.progress.daily.DailyStatus
+import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
+import com.dangerfield.drop2048.libraries.progress.daily.dailySeedFor
 import com.dangerfield.drop2048.libraries.progress.statsFrom
+import kotlin.time.Duration
+import kotlinx.datetime.LocalDate
 import com.dangerfield.drop2048.libraries.ui.system.Cue
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -55,6 +64,7 @@ internal class GameScenario private constructor(
     val cache: FakeAppCache,
     val progress: FakeProgressRepository,
     val savedRuns: FakeSavedRunStore,
+    val daily: FakeDailyRepository,
     val lifecycle: FakeAppLifecycle,
     val clock: MutableClock,
 ) {
@@ -70,10 +80,20 @@ internal class GameScenario private constructor(
         viewModel = GameViewModel(
             runFactory = object : RunFactory {
                 override fun newRun() = StartedRun(state = start, seed = SCENARIO_SEED, mode = GameMode.ENDLESS)
+
+                /**
+                 * The same scripted board, flagged as a Daily. The seed is the
+                 * caller's so a scenario can assert which day it opened, and the
+                 * state is the fixture so the board under test stays the one the
+                 * scenario drew.
+                 */
+                override fun dailyRun(seed: Long) =
+                    StartedRun(state = start, seed = seed, mode = GameMode.DAILY)
             },
             appCache = cache,
             savedRunStore = savedRuns,
             progress = progress,
+            daily = daily,
             clock = clock,
             appLifecycle = lifecycle,
         )
@@ -211,6 +231,8 @@ internal class GameScenario private constructor(
              * do with it.
              */
             teach: Boolean = false,
+            /** The ledger a Daily scenario spends its attempt against (SPEC 14). */
+            daily: FakeDailyRepository = FakeDailyRepository(),
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -229,6 +251,7 @@ internal class GameScenario private constructor(
                 cache = FakeAppCache(AppData(hasUserOnboarded = !teach)),
                 progress = FakeProgressRepository(best = best),
                 savedRuns = FakeSavedRunStore(resume),
+                daily = daily,
                 lifecycle = FakeAppLifecycle(),
                 clock = MutableClock(),
             )
@@ -332,6 +355,62 @@ internal class FakeSavedRunStore(initial: SavedRun? = null) : SavedRunStore {
 
     override suspend fun clear() {
         stored = null
+    }
+}
+
+/**
+ * The Daily ledger, in memory.
+ *
+ * Records what the ViewModel asked for rather than simulating a database: the
+ * repository's own rules are `DailyRepositoryImplTest`'s, and re-implementing
+ * them here would mean a scenario could pass against a fake that had drifted
+ * from the real one.
+ */
+internal class FakeDailyRepository(
+    private val attempts: MutableList<DailyAttempt> = mutableListOf(),
+) : DailyRepository {
+
+    val started = mutableListOf<Unit>()
+    val banked = mutableListOf<Pair<LocalDate, Long>>()
+
+    /** Every attempt after the scripted ones is refused, which is the default rule. */
+    fun grant(date: LocalDate = DefaultDay, seed: Long = DefaultSeed, number: Int = 1) = apply {
+        attempts += DailyAttempt.Granted(date = date, seed = seed, attemptNumber = number)
+    }
+
+    override fun observe(): Flow<DailyStatus> = MutableStateFlow(Today)
+
+    override suspend fun status(): DailyStatus = Today
+
+    override suspend fun startAttempt(): DailyAttempt {
+        started += Unit
+        return attempts.removeFirstOrNull() ?: DailyAttempt.NoAttemptsLeft
+    }
+
+    override suspend fun recordAttempt(date: LocalDate, score: Long) {
+        banked += date to score
+    }
+
+    override suspend fun grantRetry(): DailyRetryResult = DailyRetryResult.Unavailable
+
+    override suspend fun history(): List<DailyResult> = emptyList()
+
+    override suspend fun reset() = Unit
+
+    companion object {
+        val DefaultDay: LocalDate = LocalDate(2026, 9, 9)
+        val DefaultSeed: Long = dailySeedFor(DefaultDay)
+
+        private val Today = DailyStatus(
+            date = DefaultDay,
+            seed = DefaultSeed,
+            result = null,
+            streak = DailyStreak.Empty,
+            attemptsAllowed = 1,
+            retryOffered = false,
+            resetsIn = Duration.ZERO,
+            enabled = true,
+        )
     }
 }
 

@@ -18,6 +18,13 @@ kotlin {
             // by implementing it, so "reset progress" never needs a list edit.
             implementation(projects.libraries.drop2048.storage)
             api(libs.kotlinx.coroutines.core)
+            // LocalDate is in DailyResult's signature, so it is api rather than
+            // implementation: every consumer of the daily has to be able to name
+            // the type the day is keyed on.
+            api(libs.kotlinx.datetime)
+            // GameMode is @Serializable: it is a field of the saved-run blob and
+            // a GameRoute argument. See its KDoc.
+            api(libs.kotlinx.serialization.core)
         }
     }
 }

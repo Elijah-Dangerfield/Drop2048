@@ -45,7 +45,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
 
     @Test
     fun `a run started with the server unreachable plays the compiled-in defaults`() {
-        val factory = EndlessRunFactory(remoteEngineConfig(MutableConfigMap()))
+        val factory = RealRunFactory(remoteEngineConfig(MutableConfigMap()))
 
         assertEquals(EngineConfig.Default, factory.newRun().state.config)
     }
@@ -53,7 +53,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
     @Test
     fun `the factory reads the map at the moment a run starts, not before`() {
         val config = MutableConfigMap()
-        val factory = EndlessRunFactory(remoteEngineConfig(config))
+        val factory = RealRunFactory(remoteEngineConfig(config))
 
         val before = factory.newRun().state.config
         config.overrides = mapOf("board.rows" to 6, "level.blocksPerLevel" to 5)
@@ -68,7 +68,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
     @Test
     fun `a state already handed to the engine is not reshaped by a later change`() {
         val config = MutableConfigMap()
-        val factory = EndlessRunFactory(remoteEngineConfig(config))
+        val factory = RealRunFactory(remoteEngineConfig(config))
 
         val run = factory.newRun()
         config.overrides = mapOf("board.rows" to 6, "speed.curve" to listOf(1_000))
@@ -109,7 +109,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
         val config = MutableConfigMap(
             mapOf("board.rows" to "six", "level.blocksPerLevel" to 25)
         )
-        val started = EndlessRunFactory(remoteEngineConfig(config)).newRun()
+        val started = RealRunFactory(remoteEngineConfig(config)).newRun()
 
         assertEquals(EngineConfig.DEFAULT_ROWS, started.state.config.rows)
         assertEquals(25, started.state.config.blocksPerLevel)
@@ -118,10 +118,11 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
 
 private fun startedRun(config: AppConfigMap): GameViewModel {
     val viewModel = GameViewModel(
-        runFactory = EndlessRunFactory(remoteEngineConfig(config)),
+        runFactory = RealRunFactory(remoteEngineConfig(config)),
         appCache = FakeAppCache(AppData(hasUserOnboarded = true)),
         savedRunStore = FakeSavedRunStore(),
         progress = FakeProgressRepository(),
+        daily = FakeDailyRepository(),
         clock = MutableClock(),
         appLifecycle = FakeAppLifecycle(),
     )

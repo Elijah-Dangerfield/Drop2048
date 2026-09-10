@@ -26,6 +26,7 @@ import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.Special
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
+import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -115,6 +116,27 @@ class GameScreenScreenshotTest {
             ghost = null,
             biggestTier = 512,
             newBest = true,
+        )
+    }
+
+    /**
+     * The same sheet after a Daily run (SPEC 14).
+     *
+     * Its own golden because the two differences are exactly the ones a
+     * refactor collapses by accident: the primary button is "Done" and leaves
+     * rather than "Drop again" and restarting, and the Daily Challenge option is
+     * gone because the player is already in it.
+     */
+    @Test
+    fun stackedOutDaily() = compose.captureScreen("game-stacked-out-daily") {
+        playingState().copy(
+            phase = GamePhase.StackedOut,
+            board = dangerBoard(),
+            falling = null,
+            ghost = null,
+            biggestTier = 512,
+            newBest = true,
+            mode = GameMode.DAILY,
         )
     }
 

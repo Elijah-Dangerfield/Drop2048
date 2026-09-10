@@ -1,12 +1,22 @@
 package com.dangerfield.drop2048.libraries.progress
 
+import kotlinx.serialization.Serializable
+
 /**
  * Which set of rules a run was played under.
  *
- * Endless is the only one that exists today. Daily arrives in C6 and shares this
- * table rather than getting one of its own — the stats in SPEC 15 are lifetime
- * numbers and a second table would mean every one of them became a union.
+ * Daily shares `run_record` rather than getting a table of its own — the stats in
+ * SPEC 15 are lifetime numbers and a second table would mean every one of them
+ * became a union. `daily_result` holds what is true about a *day*; this column
+ * holds what is true about a *run*.
+ *
+ * `@Serializable` for two reasons that both had to be satisfied at once: it is a
+ * field of the saved-run blob, and it is a `GameRoute` argument. Native has no
+ * built-in enum NavType, so a route enum is resolved through the destination's
+ * typeMap and a plain enum there fails graph construction with a message naming
+ * the wrong argument. See `baseRouteTypeMap`.
  */
+@Serializable
 enum class GameMode { ENDLESS, DAILY }
 
 /**

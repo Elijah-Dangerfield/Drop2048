@@ -595,7 +595,7 @@ owning library per the template's rules.
 | Table | Holds |
 |---|---|
 | `run_record` | One row per completed run: score, level, blocks placed, duration, highest tier, cause of death, longest cascade, bursts, mode, seed. This table is the stats page and the analytics backup. |
-| `daily_result` | Date (UTC), seed, score, attempts used, completed. Drives the streak. |
+| `daily_result` | Date (UTC) as the primary key, seed, score, attempts used, completed, retries used. Drives the streak. The one table in the app that is updated in place, because a row is the running state of a day rather than a finished fact — see `decisions.md`. |
 | `achievement_fact` / `achievement_unlock` | Ported from Sodogku unchanged. |
 
 In-progress run lives in `AppData` (the template's `AppCache`) as a serialized `GameState` plus
@@ -686,11 +686,39 @@ rule when they arrive: same seed, same tools, pure skill.
 Cheap to build relative to what it buys, because the engine is already seeded. It ships in v1 for
 that reason.
 
+**Built in C6.** Five rulings the section did not make, each of them forced once the thing was
+real. All five are in `decisions.md` with their alternatives.
+
+**The day is UTC everywhere.** The seed, the row, the attempt allowance and the streak all key on
+the same UTC date. The player's own zone is used for one thing — rendering the countdown to the
+next board — because the fairness question the boundary raises is answered by making the boundary
+visible, not by adding a second clock.
+
+**A Daily run pins `EngineConfig.Default` and never reads remote config.** This is the single most
+consequential call in the mode and it overrides 10 for this one path. Section 10's keys are all
+remote; C7 ruled a fetched config is sampled at the start of a run and never during one, which is
+enough to keep a single run coherent and is *not* enough to make two players' runs comparable.
+Comparability wins. The consequence is that from the first recorded Daily score,
+`EngineConfig.Default` joins `PINNED_DIGEST` and `level.blocksPerLevel` on the list of things that
+cannot move without invalidating scores.
+
+**The attempt is spent when the run starts**, not when it ends, or force-quitting a bad board is a
+free reroll. Restart is refused for the same reason.
+
+**The day's score is the best of its attempts.** "Scored on final score" says the score a run ends
+on, not which of two attempts counts.
+
+**One column beyond 11's list.** `daily_result` also stores `retriesUsed`, because a rewarded-retry
+cap that is not on disk is a cap a force-quit resets.
+
 ## 15. Meta
 
 **Stats.** Runs played, best score, average, highest tier, total merges, total blocks placed,
-longest cascade, most bursts in a run, lifetime bursts, total playtime, Daily streak current and
-best. All derived from `run_record`.
+longest cascade, most bursts in a run, lifetime bursts, total playtime — all derived from
+`run_record`. Daily streak current and best are derived from `daily_result`, in their own section
+on the page rather than folded into Lifetime, because the two are folds over different tables and
+sitting them together would imply a relationship neither has. C6 added the row C4 deliberately
+left out.
 
 **Achievements**, around 24, ported from Sodogku's engine. First merge, reach 64, first burst,
 two bursts in a run, 5-step cascade, 10-step cascade, clear the board, reach level 20, 500 blocks

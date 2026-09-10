@@ -78,6 +78,9 @@ import drop2048.libraries.resources.generated.resources.game_callout_level
 import drop2048.libraries.resources.generated.resources.game_callout_row_bust
 import drop2048.libraries.resources.generated.resources.game_callout_wildcard
 import drop2048.libraries.resources.generated.resources.game_chain
+import com.dangerfield.drop2048.libraries.progress.GameMode
+import drop2048.libraries.resources.generated.resources.daily_title
+import drop2048.libraries.resources.generated.resources.game_daily_done
 import drop2048.libraries.resources.generated.resources.game_drop_again
 import drop2048.libraries.resources.generated.resources.game_falling_block
 import drop2048.libraries.resources.generated.resources.game_left_handed
@@ -353,6 +356,7 @@ private fun BoardArea(
 
                     GamePhase.Paused -> PauseOverlay(
                         leftHanded = state.leftHanded,
+                        restartable = state.mode != GameMode.DAILY,
                         onAction = onAction,
                         modifier = Modifier.matchParentSize(),
                     )
@@ -461,13 +465,19 @@ private fun StartOverlay(onPlay: () -> Unit, modifier: Modifier = Modifier) {
  * SPEC 8.4, drawn as the handoff draws it plus the three options the prototype
  * has nowhere to put.
  *
- * Tapping the overlay resumes. The three secondary actions sit under the design's
+ * Tapping the overlay resumes. The secondary actions sit under the design's
  * "tap to resume" and are their own tap targets, so reaching for Quit cannot
  * resume the game by accident.
+ *
+ * Restart is absent in the Daily (SPEC 14). The day's attempt was spent when the
+ * run began, so a restart there is a free reroll of a board everyone else gets
+ * one shot at. `GameViewModel` refuses it as well as hiding it, because a route
+ * can be reached without going through this screen's pause menu.
  */
 @Composable
 private fun PauseOverlay(
     leftHanded: Boolean,
+    restartable: Boolean,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -479,7 +489,9 @@ private fun PauseOverlay(
         OverlayHeadline(stringResource(Res.string.game_paused))
         OverlayHint(stringResource(Res.string.game_tap_to_resume))
         Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
-            OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
+            if (restartable) {
+                OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
+            }
             OverlayOption(
                 text = stringResource(Res.string.game_left_handed) +
                     if (leftHanded) OnMark else OffMark,
@@ -531,14 +543,20 @@ private fun StackedOutOverlay(
                 ),
             )
         }
+        val daily = state.mode == GameMode.DAILY
         GamePrimaryButton(
-            label = stringResource(Res.string.game_drop_again),
-            onClick = { onAction(GameAction.Restart) },
+            label = stringResource(if (daily) Res.string.game_daily_done else Res.string.game_drop_again),
+            onClick = { onAction(if (daily) GameAction.Quit else GameAction.Restart) },
             fontSize = DropAgainSize,
             horizontalPadding = DropAgainPaddingX,
             verticalPadding = DropAgainPaddingY,
         )
-        OverlayOption(stringResource(Res.string.game_stats)) { onAction(GameAction.ShowStats) }
+        Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
+            OverlayOption(stringResource(Res.string.game_stats)) { onAction(GameAction.ShowStats) }
+            if (!daily) {
+                OverlayOption(stringResource(Res.string.daily_title)) { onAction(GameAction.ShowDaily) }
+            }
+        }
     }
 }
 
