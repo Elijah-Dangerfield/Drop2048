@@ -29,7 +29,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.libraries.cascade.Block
+import com.dangerfield.drop2048.libraries.ui.components.text.Text
+import com.dangerfield.drop2048.libraries.ui.debug.LocalBoardDiagnostics
+import com.dangerfield.drop2048.system.AppTheme
 import com.dangerfield.drop2048.libraries.cascade.Cell
+import com.dangerfield.drop2048.libraries.cascade.Direction
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.Special
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
@@ -116,6 +120,13 @@ fun GameBoard(
                         pitch = pitch,
                     )
 
+                    // SPEC 19. Drawn under the blocks so a coordinate never hides
+                    // the face it labels, and above the slots so it is legible on
+                    // an empty cell.
+                    if (LocalBoardDiagnostics.current.showCellCoordinates) {
+                        CellCoordinates(cols = cols, rows = rows, scale = scale, pitch = pitch)
+                    }
+
                     state.board.cells.forEachIndexed { index, block ->
                         if (block == null) return@forEachIndexed
                         val at = Cell(index % cols, index / cols)
@@ -148,6 +159,14 @@ fun GameBoard(
                                 pitchPx = pitchPx,
                                 description = fallingDescription,
                             )
+                            if (LocalBoardDiagnostics.current.showMergeArrows) {
+                                MergePriority(
+                                    at = falling.cell,
+                                    lastDirection = falling.lastDirection,
+                                    scale = scale,
+                                    pitch = pitch,
+                                )
+                            }
                         }
                     }
 
@@ -240,6 +259,67 @@ private fun Slots(cols: Int, rows: Int, activeCol: Int?, scale: BoardScale, pitc
         }
     }
 }
+
+/**
+ * SPEC 19's cell coordinates: `col,row` on every cell, in the board's own
+ * geometry rather than in a second grid laid over it.
+ *
+ * Positioned with the same `pitch * n + gutter` the slots use, so a coordinate
+ * that drifts from its cell is evidence about the board's layout rather than
+ * about this overlay.
+ */
+@Composable
+private fun CellCoordinates(cols: Int, rows: Int, scale: BoardScale, pitch: Dp) {
+    repeat(rows) { row ->
+        repeat(cols) { col ->
+            Text(
+                text = "\$col,\$row",
+                typography = AppTheme.typography.Body.B400,
+                color = AppTheme.colors.textSecondary,
+                modifier = Modifier.offset(
+                    x = pitch * col + scale.gutter,
+                    y = pitch * row + scale.gutter,
+                ),
+            )
+        }
+    }
+}
+
+/**
+ * SPEC 4.3's priority order, on the block it applies to.
+ *
+ * Down, then the last direction the player pushed it this drop, then Left, then
+ * Right — and the second slot is **skipped when the player has not moved it**,
+ * which is the part of the rule that is invisible on the board and is exactly
+ * what somebody staring at a merge that went the wrong way needs to see.
+ * Derived from the falling block rather than typed out, so it cannot drift from
+ * the engine.
+ */
+@Composable
+private fun MergePriority(at: Cell, lastDirection: Direction?, scale: BoardScale, pitch: Dp) {
+    val order = buildList {
+        add(Direction.DOWN)
+        lastDirection?.let { if (it != Direction.DOWN) add(it) }
+        add(Direction.LEFT)
+        add(Direction.RIGHT)
+    }.distinct()
+    Text(
+        text = order.joinToString("") { it.mark },
+        typography = AppTheme.typography.Body.B400,
+        color = AppTheme.colors.accentPrimary,
+        modifier = Modifier.offset(
+            x = pitch * at.col + scale.gutter,
+            y = pitch * at.row + scale.gutter,
+        ),
+    )
+}
+
+private val Direction.mark: String
+    get() = when (this) {
+        Direction.DOWN -> "v"
+        Direction.LEFT -> "<"
+        Direction.RIGHT -> ">"
+    }
 
 /**
  * A block at rest, popping whenever it arrives or changes.

@@ -2,7 +2,10 @@ package com.dangerfield.drop2048.features.game.impl
 
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.Board
+import com.dangerfield.drop2048.features.debug.DebugController
+import com.dangerfield.drop2048.features.debug.Diagnostics
 import com.dangerfield.drop2048.libraries.cascade.Cascade
+import com.dangerfield.drop2048.libraries.cascade.RunStatus
 import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.cascade.Direction
 import com.dangerfield.drop2048.libraries.cascade.FallingBlock
@@ -104,6 +107,8 @@ class GameViewModel(
     private val leaderboards: Leaderboards,
     private val clock: Clock,
     private val appLifecycle: AppLifecycle,
+    private val debug: DebugController,
+    private val diagnostics: Diagnostics,
 ) : SEAViewModel<GameUiState, GameEffect, GameAction>(initialStateArg = GameUiState()) {
 
     private val logger = KLog.withTag("Game")
@@ -961,6 +966,21 @@ class GameViewModel(
      * SPEC 3.1: the run ends on the frame the last cascade finishes on, never
      * during it. The engine has already decided; playback is what makes the
      * player watch the merge that killed them before the sheet arrives.
+     *
+     * ### A debug run is played and then thrown away
+     *
+     * [StartedRun.debug] is true for every run started in a session that has
+     * opened the debug menu (SPEC 19), and it gates all four writes at once:
+     * `run_record`, `daily_result`, `Leaderboards.submit` and the achievement
+     * fact log. The gate is here rather than inside each repository because
+     * these are the only four things in the app that claim a player did
+     * something, and one guard over the four of them is one place to be wrong
+     * instead of four.
+     *
+     * The stacked-out sheet is still drawn, with its score and its share — the
+     * run happened, it just does not count. The badge announcement is suppressed
+     * with the fact that would have earned it, since a toast for a badge the
+     * player does not own is worse than no toast.
      */
     private suspend fun GameAction.endRun() {
         tickerJob?.cancel()
@@ -981,11 +1001,14 @@ class GameViewModel(
             mode = started.mode,
             seed = started.seed,
         )
-        Catching { progress.record(record) }.logOnFailure { "Could not record the run" }
-        val streak = bankDailyResult(score)
-        postToLeaderboards(score)
+        val recordable = !started.debug
+        if (recordable) {
+            Catching { progress.record(record) }.logOnFailure { "Could not record the run" }
+        }
+        val streak = if (recordable) bankDailyResult(score) else 0
+        if (recordable) postToLeaderboards(score)
         savedRunStore.clear(started.mode)
-        val unlocked = recordAchievements(record, streak)
+        val unlocked = if (recordable) recordAchievements(record, streak) else emptyList()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }
             .getOrNull() ?: maxOf(state.best, score)
         logger.logEvent(
@@ -995,6 +1018,11 @@ class GameViewModel(
             "blocks" to engine.blocksDropped,
             "highest_tier" to tally.highestTier,
             "cause" to record.cause,
+            // SPEC 17's session flag, and the seam C8 consumes. It rides on the
+            // event rather than being inferred from a missing `run_record`,
+            // because "no row was written" and "no row reached us" look the same
+            // downstream.
+            "debug_session" to started.debug,
         )
         updateState {
             it.published(best = best).copy(
@@ -1117,9 +1145,14 @@ class GameViewModel(
         val scoreBefore = engine.score
 
         val transition = Cascade.apply(engine, Input.Lock)
-        engine = transition.state
+        engine = applyDebugToLanding(transition.state)
         tallyUp(transition)
         reportFaults(transition)
+        // Recorded whether or not the overlay is switched on. The merge that
+        // looked wrong has already happened by the time anybody reaches for the
+        // switch, so a transcript kept only while someone is watching is useless
+        // exactly when it is wanted (SPEC 19).
+        diagnostics.record(transition.transcript)
 
         frames = framesFor(before = before, scoreBefore = scoreBefore, transcript = transition.transcript)
         frameIndex = 0
@@ -1178,12 +1211,53 @@ class GameViewModel(
     private fun restartTicker() {
         tickerJob?.cancel()
         if (tutorial.isRunning) return
+        // SPEC 19's freeze. The falling block stops falling on its own and waits
+        // for a move, a nudge or a lock — which is the same shape as the tutorial
+        // above it, and for the same reason: a frozen clock is how you look at a
+        // board rather than play it.
+        if (debug.overrides.value.freezeTimer) return
         tickerJob = viewModelScope.launch {
+            var previous = clock.now().toEpochMilliseconds()
             while (isActive) {
-                delay(intervalMillis())
+                val intended = intervalMillis()
+                delay(intended)
+                val now = clock.now().toEpochMilliseconds()
+                // SPEC 19's actual-versus-intended tick. Measured here because
+                // this is the only place that knows both halves: what `delay` was
+                // asked for, and what the wall clock did about it.
+                diagnostics.recordTick(intendedMs = intended, actualMs = now - previous)
+                previous = now
                 takeAction(GameAction.Tick)
             }
         }
+    }
+
+    /**
+     * SPEC 19's forced block queue and invincibility, applied to the state the
+     * engine just produced.
+     *
+     * After the engine, not inside it. Both are lies about the run — a block the
+     * RNG did not draw, and a board that should have ended it — and the engine's
+     * whole value is that it is a pure function of state and a seed (SPEC 4.1).
+     * Teaching it about a debug queue would mean a `GameState` no longer
+     * determines the next one, which is the property Daily Challenge, undo,
+     * resume, the balance harness and replay are all built on.
+     *
+     * So the engine plays honestly and this rewrites the answer afterwards, which
+     * is also why a run that has been through here writes no `run_record`.
+     */
+    private fun applyDebugToLanding(state: GameState): GameState {
+        val overrides = debug.overrides.value
+        var result = state
+        if (overrides.invincible && result.isOver) {
+            result = result.copy(status = RunStatus.PLAYING, deathCause = null)
+        }
+        val forced = debug.takeForcedBlock()
+        val falling = result.falling
+        if (forced != null && falling != null) {
+            result = result.copy(falling = falling.copy(block = forced))
+        }
+        return result
     }
 
     private fun scheduleLock() {
@@ -1200,6 +1274,13 @@ class GameViewModel(
      */
     private fun intervalMillis(): Long {
         val curve = engine.config.speed
+        // SPEC 19's tick override, and note where it is applied: here, on the
+        // clock, and not on `engine.config`. The speed curve is a remote key that
+        // travels inside `GameState` (D5), so an override that went in there
+        // would end up in a saved run and in a replayed seed. Vertical position
+        // is not an input to the engine (L40), so overriding the interval cannot
+        // change where a block lands — only how long the tester waits for it.
+        debug.overrides.value.tickIntervalMs?.let { return it.toLong() }
         return if (softDropping) curve.softDropMsPerRow.toLong() else curve.msPerRow(engine.level).toLong()
     }
 

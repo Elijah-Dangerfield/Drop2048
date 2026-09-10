@@ -1,4 +1,4 @@
-package com.dangerfield.drop2048.tools.balance
+package com.dangerfield.drop2048.libraries.cascade.autoplay
 
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -92,7 +92,7 @@ sealed interface Policy {
             random: kotlin.random.Random,
             config: EngineConfig,
             allowed: (Int) -> Boolean,
-        ): Int = pick(state, random, config, allowed) { Harness.drop(state, it).transcript.merges.size }
+        ): Int = pick(state, random, config, allowed) { Autoplay.drop(state, it).transcript.merges.size }
     }
 
     /**
@@ -129,12 +129,12 @@ sealed interface Policy {
             config: EngineConfig,
             allowed: (Int) -> Boolean,
         ): Int = pick(state, random, config, allowed) { col ->
-                val after = Harness.drop(state, col)
+                val after = Autoplay.drop(state, col)
                 val next = after.state
                 val followUp = if (next.isOver || next.falling == null) {
                     0
                 } else {
-                    (0 until config.cols).maxOf { Harness.drop(next, it).transcript.merges.size }
+                    (0 until config.cols).maxOf { Autoplay.drop(next, it).transcript.merges.size }
                 }
                 after.transcript.merges.size + followUp
             }

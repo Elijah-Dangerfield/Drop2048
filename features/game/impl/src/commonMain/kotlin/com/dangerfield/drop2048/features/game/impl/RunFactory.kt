@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import com.dangerfield.drop2048.features.debug.DebugController
+import com.dangerfield.drop2048.features.debug.applyTo
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -51,6 +53,17 @@ data class StartedRun(
     val state: GameState,
     val seed: Long,
     val mode: GameMode,
+    /**
+     * Whether this run was started in a session that has opened the debug menu
+     * (SPEC 19).
+     *
+     * True means the run writes no `run_record`, banks no `daily_result` and
+     * posts no leaderboard score. It is a property of the run rather than a
+     * question asked at the end so that a menu opened *mid-run* cannot
+     * retroactively delete a legitimate run's record — the flag is read once,
+     * here, and travels with the run it describes.
+     */
+    val debug: Boolean = false,
 )
 
 /**
@@ -101,19 +114,35 @@ data class StartedRun(
  *
  * `DailyConfigPinningTest` is the enforcement: it moves every remote key it can
  * and asserts the Daily's block sequence does not budge.
+ *
+ * ### The Daily also ignores the debug menu
+ *
+ * [newRun] hands its fresh state through `DebugOverrides.applyTo`; [dailyRun]
+ * does not, and that is the same ruling as the config pin. A forced board or a
+ * forced seed on a shared day is a score nobody else could have set, and the
+ * player has no way to tell.
+ *
+ * The debug menu deliberately has no `EngineConfig` override at all, so there is
+ * no config here that *could* leak into a Daily — see `DebugOverrides`. This
+ * omission covers the rest: the board, the seed and the starting level.
+ * `DebugRunFactoryTest` pins it.
  */
 @ContributesBinding(AppScope::class)
 @Inject
 class RealRunFactory(
     private val engineConfig: RemoteEngineConfig,
+    private val debug: DebugController,
 ) : RunFactory {
 
     override fun newRun(): StartedRun {
-        val seed = Random.nextLong()
+        val overrides = debug.overrides.value
+        val seed = overrides.seed ?: Random.nextLong()
+        val fresh = Cascade.newGame(seed = seed, config = engineConfig.current())
         return StartedRun(
-            state = Cascade.newGame(seed = seed, config = engineConfig.current()),
+            state = overrides.applyTo(fresh, forcedBlock = debug.takeForcedBlock()),
             seed = seed,
             mode = GameMode.ENDLESS,
+            debug = debug.isDebugSession.value,
         )
     }
 
@@ -121,5 +150,6 @@ class RealRunFactory(
         state = Cascade.newGame(seed = seed, config = EngineConfig.Default),
         seed = seed,
         mode = GameMode.DAILY,
+        debug = debug.isDebugSession.value,
     )
 }

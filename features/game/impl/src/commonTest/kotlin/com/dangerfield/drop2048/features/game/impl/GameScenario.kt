@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import com.dangerfield.drop2048.features.debug.NoDebugController
+import com.dangerfield.drop2048.features.debug.NoDiagnostics
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
@@ -106,6 +108,8 @@ internal class GameScenario private constructor(
             leaderboards = leaderboards,
             clock = clock,
             appLifecycle = lifecycle,
+            debug = NoDebugController,
+            diagnostics = NoDiagnostics,
         )
         collectorScope.launch {
             viewModel.eventFlow.collect { effect ->

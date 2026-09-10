@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import com.dangerfield.drop2048.features.debug.NoDebugController
+import com.dangerfield.drop2048.features.debug.NoDiagnostics
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.config.AppConfigMap
 import com.dangerfield.drop2048.libraries.drop2048.AppData
@@ -45,7 +47,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
 
     @Test
     fun `a run started with the server unreachable plays the compiled-in defaults`() {
-        val factory = RealRunFactory(remoteEngineConfig(MutableConfigMap()))
+        val factory = RealRunFactory(remoteEngineConfig(MutableConfigMap()), NoDebugController)
 
         assertEquals(EngineConfig.Default, factory.newRun().state.config)
     }
@@ -53,7 +55,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
     @Test
     fun `the factory reads the map at the moment a run starts, not before`() {
         val config = MutableConfigMap()
-        val factory = RealRunFactory(remoteEngineConfig(config))
+        val factory = RealRunFactory(remoteEngineConfig(config), NoDebugController)
 
         val before = factory.newRun().state.config
         config.overrides = mapOf("board.rows" to 6, "level.blocksPerLevel" to 5)
@@ -68,7 +70,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
     @Test
     fun `a state already handed to the engine is not reshaped by a later change`() {
         val config = MutableConfigMap()
-        val factory = RealRunFactory(remoteEngineConfig(config))
+        val factory = RealRunFactory(remoteEngineConfig(config), NoDebugController)
 
         val run = factory.newRun()
         config.overrides = mapOf("board.rows" to 6, "speed.curve" to listOf(1_000))
@@ -109,7 +111,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
         val config = MutableConfigMap(
             mapOf("board.rows" to "six", "level.blocksPerLevel" to 25)
         )
-        val started = RealRunFactory(remoteEngineConfig(config)).newRun()
+        val started = RealRunFactory(remoteEngineConfig(config), NoDebugController).newRun()
 
         assertEquals(EngineConfig.DEFAULT_ROWS, started.state.config.rows)
         assertEquals(25, started.state.config.blocksPerLevel)
@@ -118,7 +120,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
 
 private fun startedRun(config: AppConfigMap): GameViewModel {
     val viewModel = GameViewModel(
-        runFactory = RealRunFactory(remoteEngineConfig(config)),
+        runFactory = RealRunFactory(remoteEngineConfig(config), NoDebugController),
         appCache = FakeAppCache(AppData(hasUserOnboarded = true)),
         savedRunStore = FakeSavedRunStore(),
         progress = FakeProgressRepository(),
@@ -127,6 +129,8 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         leaderboards = FakeLeaderboards(),
         clock = MutableClock(),
         appLifecycle = FakeAppLifecycle(),
+        debug = NoDebugController,
+        diagnostics = NoDiagnostics,
     )
     if (viewModel.state.phase == GamePhase.Ready) viewModel.takeAction(GameAction.Start)
     return viewModel

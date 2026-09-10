@@ -75,6 +75,12 @@ if (!serverOnly) {
     // with a mode argument, not a second game screen.
     include(":features:daily")
     include(":features:daily:impl")
+    // SPEC 19's QA menu and the in-game diagnostics overlay. Reachable only
+    // after seven taps on the version number, and on a release build only after
+    // a passphrase as well — it can grant Pro and it silences the analytics
+    // session, so it is not something a curious player should reach.
+    include(":features:debug")
+    include(":features:debug:impl")
     include(":features:game")
     include(":features:game:impl")
     // Force update, maintenance and legal re-accept. Rendered *instead of* the

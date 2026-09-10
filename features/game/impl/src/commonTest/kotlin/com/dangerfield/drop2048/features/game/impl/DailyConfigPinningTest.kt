@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import com.dangerfield.drop2048.features.debug.NoDebugController
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -64,8 +65,8 @@ class DailyConfigPinningTest {
         val day = LocalDate(2026, 9, 9)
         val seed = dailySeedFor(day)
 
-        val untouched = RealRunFactory(remoteEngineConfig(TestConfigMap())).dailyRun(seed)
-        val pushed = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved))).dailyRun(seed)
+        val untouched = RealRunFactory(remoteEngineConfig(TestConfigMap()), NoDebugController).dailyRun(seed)
+        val pushed = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved)), NoDebugController).dailyRun(seed)
 
         assertEquals(blockSequence(untouched.state), blockSequence(pushed.state))
         assertEquals(GameMode.DAILY, untouched.mode)
@@ -79,15 +80,15 @@ class DailyConfigPinningTest {
      */
     @Test
     fun theSameFetchedConfigDoesChangeAnEndlessRun() {
-        val untouched = RealRunFactory(remoteEngineConfig(TestConfigMap())).newRunOn(Seed)
-        val pushed = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved))).newRunOn(Seed)
+        val untouched = RealRunFactory(remoteEngineConfig(TestConfigMap()), NoDebugController).newRunOn(Seed)
+        val pushed = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved)), NoDebugController).newRunOn(Seed)
 
         assertNotEquals(blockSequence(untouched), blockSequence(pushed))
     }
 
     @Test
     fun aDailyRunCarriesTheCompiledInConfigVerbatim() {
-        val started = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved)))
+        val started = RealRunFactory(remoteEngineConfig(TestConfigMap(EveryKeyMoved)), NoDebugController)
             .dailyRun(dailySeedFor(LocalDate(2026, 9, 9)))
 
         assertEquals(EngineConfig.Default, started.state.config)
@@ -99,7 +100,7 @@ class DailyConfigPinningTest {
      */
     @Test
     fun differentDaysAreDifferentBoards() {
-        val factory = RealRunFactory(remoteEngineConfig(TestConfigMap()))
+        val factory = RealRunFactory(remoteEngineConfig(TestConfigMap()), NoDebugController)
         val today = factory.dailyRun(dailySeedFor(LocalDate(2026, 9, 9)))
         val tomorrow = factory.dailyRun(dailySeedFor(LocalDate(2026, 9, 10)))
 

@@ -1,11 +1,10 @@
 package com.dangerfield.drop2048.features.settings.impl
 
+import com.dangerfield.drop2048.features.debug.DebugEntitlements
 import com.dangerfield.drop2048.features.settings.AdConsent
 import com.dangerfield.drop2048.features.settings.ProEntitlement
 import com.dangerfield.drop2048.features.settings.RestoreOutcome
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
@@ -26,10 +25,19 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = ProEntitlement::class)
 @Inject
-class UnwiredProEntitlement : ProEntitlement {
+class UnwiredProEntitlement(
+    debugEntitlements: DebugEntitlements,
+) : ProEntitlement {
 
-    private val _isPro = MutableStateFlow(false)
-    override val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
+    /**
+     * Nobody owns Pro, unless the debug menu says otherwise (SPEC 19).
+     *
+     * The grant is folded in here rather than bound as a competing
+     * [ProEntitlement] so there is one answer to "does this device own Pro" and
+     * one place C10 replaces. **C10 has to keep this fold**, or the menu's Pro
+     * switch quietly stops working on the release where it matters most.
+     */
+    override val isPro: StateFlow<Boolean> = debugEntitlements.proGranted
 
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.Unavailable
 }

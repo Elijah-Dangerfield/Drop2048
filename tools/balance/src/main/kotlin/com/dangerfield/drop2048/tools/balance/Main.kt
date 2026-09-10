@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.tools.balance
 
+import com.dangerfield.drop2048.libraries.cascade.autoplay.Policy
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import java.util.stream.Collectors
 import kotlin.system.exitProcess

@@ -102,6 +102,7 @@ class SettingsViewModel(
             }
 
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
+            SettingsAction.OpenDebugMenu -> sendEvent(SettingsEvent.OpenDebugMenu)
             SettingsAction.ReplayTutorial -> sendEvent(SettingsEvent.ReplayTutorial)
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
             SettingsAction.OpenLicenses -> sendEvent(SettingsEvent.OpenLicenses)
@@ -250,6 +251,9 @@ sealed interface SettingsEvent {
     data object LocalDataDeleted : SettingsEvent
     data object DebugMenuUnlocked : SettingsEvent
 
+    /** SPEC 19's menu (C12). Drawn only once [PlayerSettings.debugMenuUnlocked] is set. */
+    data object OpenDebugMenu : SettingsEvent
+
     /** Terms and privacy are hosted pages, so they open in a browser. */
     data class OpenLink(val url: String) : SettingsEvent
 }
@@ -291,6 +295,7 @@ sealed interface SettingsAction {
     data object DismissRestoreMessage : SettingsAction
 
     data object TapVersion : SettingsAction
+    data object OpenDebugMenu : SettingsAction
 
     data class ShowDialog(val dialog: SettingsDialog) : SettingsAction
     data object DismissDialog : SettingsAction

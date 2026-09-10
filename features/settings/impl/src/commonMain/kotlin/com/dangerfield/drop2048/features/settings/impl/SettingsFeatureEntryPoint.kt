@@ -4,6 +4,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.achievements.AchievementsRoute
+import com.dangerfield.drop2048.features.debug.DebugRoute
 import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.features.home.FeedbackRoute
 import com.dangerfield.drop2048.features.settings.LicensesRoute
@@ -54,6 +55,7 @@ class SettingsFeatureEntryPoint(
                 when (event) {
                     SettingsEvent.NavigateBack -> router.goBack()
                     SettingsEvent.OpenAchievements -> router.navigate(AchievementsRoute())
+                    SettingsEvent.OpenDebugMenu -> router.navigate(DebugRoute())
                     SettingsEvent.OpenFeedback -> router.navigate(FeedbackRoute())
                     SettingsEvent.OpenLicenses -> router.navigate(LicensesRoute())
                     is SettingsEvent.OpenLink -> router.openWebLink(event.url)

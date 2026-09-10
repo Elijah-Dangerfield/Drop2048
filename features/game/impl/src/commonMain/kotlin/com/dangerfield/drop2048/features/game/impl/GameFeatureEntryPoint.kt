@@ -1,10 +1,16 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.daily.DailyRoute
+import com.dangerfield.drop2048.features.debug.Diagnostics
+import com.dangerfield.drop2048.features.debug.DiagnosticsSettings
+import com.dangerfield.drop2048.features.debug.describe
 import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.features.game.GameRouteTypeMap
 import com.dangerfield.drop2048.features.settings.SettingsRoute
@@ -18,6 +24,9 @@ import com.dangerfield.drop2048.libraries.navigation.toRouteOrNull
 import com.dangerfield.drop2048.libraries.sharing.ShareLabels
 import com.dangerfield.drop2048.libraries.sharing.ShareLauncher
 import com.dangerfield.drop2048.libraries.sharing.ShareText
+import com.dangerfield.drop2048.libraries.ui.debug.BoardDiagnostics
+import com.dangerfield.drop2048.libraries.ui.debug.DiagnosticsOverlay
+import com.dangerfield.drop2048.libraries.ui.debug.LocalBoardDiagnostics
 import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import drop2048.libraries.resources.generated.resources.Res
 import drop2048.libraries.resources.generated.resources.share_footer
@@ -48,6 +57,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 class GameFeatureEntryPoint(
     private val gameViewModelFactory: () -> GameViewModel,
     private val shareLauncher: ShareLauncher,
+    private val diagnostics: Diagnostics,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
@@ -90,8 +100,50 @@ class GameFeatureEntryPoint(
                 }
             }
 
-            GameScreen(state = state, onAction = viewModel::takeAction)
+            val diagnosticsSettings = diagnostics.settings.collectAsStateWithLifecycle().value
+            CompositionLocalProvider(
+                LocalBoardDiagnostics provides BoardDiagnostics(
+                    showCellCoordinates = diagnosticsSettings.showCellCoordinates,
+                    showMergeArrows = diagnosticsSettings.showMergeArrows,
+                ),
+            ) {
+                Box {
+                    GameScreen(state = state, onAction = viewModel::takeAction)
+                    DiagnosticsPanel(settings = diagnosticsSettings, cascadeStep = state.chainStep)
+                }
+            }
         }
+    }
+
+    /**
+     * SPEC 19's overlay, drawn over the board rather than inside it.
+     *
+     * Over, because everything it reports is about the *frame*: the rate it is
+     * arriving at, how far the drop clock has drifted, which cascade step is on
+     * screen, and what the engine said happened. None of it is a property of a
+     * cell, so none of it belongs in `GameBoard` — the two things that are
+     * (coordinates and merge arrows) are drawn there instead.
+     *
+     * Composed unconditionally and drawn only when something is switched on, so
+     * the state collection lives for the life of the screen rather than being
+     * torn down and rebuilt every time a tester flips a switch.
+     */
+    @Composable
+    private fun DiagnosticsPanel(settings: DiagnosticsSettings, cascadeStep: Int) {
+        if (!settings.anythingOn) return
+        val tick = diagnostics.tick.collectAsStateWithLifecycle().value
+        val transcript = diagnostics.lastResolution.collectAsStateWithLifecycle().value
+        DiagnosticsOverlay(
+            showFrameRate = settings.showFrameRate,
+            intendedTickMs = tick.intendedMs.takeIf { settings.showTick },
+            actualTickMs = tick.actualMs.takeIf { settings.showTick },
+            cascadeStep = cascadeStep.takeIf { settings.showTranscript },
+            transcript = if (settings.showTranscript) {
+                transcript.describe().map { "${it.step}  ${it.text}  +${it.points}" }
+            } else {
+                emptyList()
+            },
+        )
     }
 
     private companion object {

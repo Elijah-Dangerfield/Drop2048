@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import com.dangerfield.drop2048.features.debug.DebugMenuLabels
 import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.settings.PlayerSettings
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
@@ -153,6 +154,10 @@ fun SettingsScreen(
             DataSection(onAction)
             VerticalSpacerD1000()
             AboutSection(state, onAction)
+            if (state.settings.debugMenuUnlocked) {
+                VerticalSpacerD1000()
+                DebugSection(onAction)
+            }
             VerticalSpacerD1000()
         }
     }
@@ -443,6 +448,28 @@ private fun AboutSection(state: SettingsState, onAction: (SettingsAction) -> Uni
         color = AppTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * SPEC 19's menu, and the row C11 deliberately did not draw because the screen
+ * behind it did not exist yet.
+ *
+ * Last on the screen, under the version number it is unlocked from, and only
+ * once it *is* unlocked — a permanently visible row would make the seven taps
+ * pointless. The copy is a plain constant rather than a string resource: nobody
+ * who does not work on this game will ever see this row. See `DebugMenuLabels`.
+ */
+@Composable
+private fun DebugSection(onAction: (SettingsAction) -> Unit) {
+    ListSection(
+        items = listOf(
+            ListSectionItem(
+                headlineText = DebugMenuLabels.SettingsRow,
+                supportingText = DebugMenuLabels.SettingsRowHint,
+                onClick = { onAction(SettingsAction.OpenDebugMenu) },
+            ),
+        ),
     )
 }
 

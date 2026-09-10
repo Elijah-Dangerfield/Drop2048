@@ -42,6 +42,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.features.game)
+            implementation(projects.features.debug)
             implementation(projects.features.settings)
             implementation(projects.features.stats)
             implementation(projects.features.daily)
@@ -85,6 +86,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(projects.features.debug)
             implementation(projects.libraries.flowroutines.testing)
             // The screenshot harness in androidUnitTest names ControlScheme, and
             // a commonMain `implementation` dependency is not on a test

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.dangerfield.drop2048.features.settings.impl"
+    namespace = "com.dangerfield.drop2048.features.debug.impl"
 
     testOptions {
         unitTests {
@@ -13,12 +13,10 @@ android {
     }
 }
 
-// L39: `captureRoboImage` is a no-op unless a flag is set, so a plain
-// `testDebugUnitTest` runs every screenshot test, passes every one, and never
-// compares a pixel. The project's standard verification command is fixed, so
-// the harness has to be meaningful under it. Proven here the same way C2c and
-// C3b proved theirs — a golden was swapped for a different image and the task
-// went red.
+// L39: `captureRoboImage` does nothing unless verification is on, so a plain
+// `testDebugUnitTest` runs every screenshot test, passes every one and never
+// compares a pixel. Proven here the way every other module proved it — a golden
+// was replaced with a different image and the task went red.
 val recordingGoldens = gradle.startParameter.taskNames.any {
     it.contains("recordRoborazzi", ignoreCase = true)
 }
@@ -32,21 +30,21 @@ if (!recordingGoldens) {
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.features.settings)
-            implementation(projects.features.achievements)
             implementation(projects.features.debug)
             implementation(projects.features.game)
-            implementation(projects.features.home)
+            implementation(projects.features.settings)
             implementation(projects.libraries.navigation)
 
-            implementation(projects.libraries.config)
+            implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
-            implementation(projects.libraries.flowroutines)
-            implementation(projects.libraries.gameconfig)
-            implementation(projects.libraries.ui)
-            implementation(projects.libraries.resources)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.drop2048.storage)
+            implementation(projects.libraries.flowroutines)
+            implementation(projects.libraries.progress)
+            implementation(projects.libraries.resources)
+            implementation(projects.libraries.ui)
+
+            implementation(libs.kotlinx.serialization.json)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -67,13 +65,13 @@ kotlin {
         }
 
         commonTest.dependencies {
-            implementation(projects.features.settings)
-            implementation(projects.libraries.config)
-            implementation(projects.libraries.gameconfig)
-            implementation(projects.libraries.flowroutines.testing)
+            implementation(projects.features.debug)
+            implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.drop2048.storage)
+            implementation(projects.libraries.flowroutines.testing)
+            implementation(projects.libraries.progress)
             implementation(projects.libraries.ui)
         }
     }

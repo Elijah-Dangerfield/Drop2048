@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.tools.balance
 
+import com.dangerfield.drop2048.libraries.cascade.autoplay.Autoplay
+import com.dangerfield.drop2048.libraries.cascade.autoplay.Policy
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.DeathCause
@@ -220,13 +222,7 @@ object Harness {
      * gone is the score bonus, and — in the clocked harness — any pretence that a
      * player can put a block down in one press. See [DropClock].
      */
-    fun drop(state: GameState, col: Int): Transition {
-        val from = state.falling?.cell?.col ?: return Cascade.apply(state, Input.Lock)
-        val step = if (col > from) Input.MoveRight else Input.MoveLeft
-        var current = state
-        repeat(abs(col - from)) { current = Cascade.apply(current, step).state }
-        return Cascade.apply(current, Input.Lock)
-    }
+    fun drop(state: GameState, col: Int): Transition = Autoplay.drop(state, col)
 
     private fun higher(a: BlockValue?, b: BlockValue?): BlockValue? = when {
         a == null -> b

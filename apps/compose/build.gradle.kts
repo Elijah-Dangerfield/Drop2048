@@ -108,6 +108,8 @@ kotlin {
             implementation(projects.features.achievements.impl)
             implementation(projects.features.daily)
             implementation(projects.features.daily.impl)
+            implementation(projects.features.debug)
+            implementation(projects.features.debug.impl)
             implementation(projects.features.game)
             implementation(projects.features.game.impl)
             implementation(projects.features.gate)
