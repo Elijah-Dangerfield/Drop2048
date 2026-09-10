@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -566,17 +568,27 @@ private fun StartOverlay(
  * Daily, Stats and Settings, drawn wherever the player is not mid-drop.
  *
  * One composable rather than three call sites because the set is the app's whole
- * navigation surface and it must not drift between the two overlays that offer
- * it: a destination added to one and not the other is a screen that exists on
- * Monday and not on Tuesday.
+ * navigation surface and it must not drift between the overlays that offer it: a
+ * destination added to one and not the other is a screen that exists on Monday
+ * and not on Tuesday.
+ *
+ * A `FlowRow` rather than a `Row`, because the set grows. Four options on a
+ * 360dp board (L45) do not fit one line, and a `Row` does not fail by
+ * overflowing — it fails by hyphenating, which on device read as "Setti / ngs"
+ * under the stacked-out sheet.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MenuOptions(
     daily: Boolean,
     onAction: (GameAction) -> Unit,
     share: Boolean = false,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(OptionGap, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(OptionGap),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         if (share) {
             OverlayOption(stringResource(Res.string.share_run)) { onAction(GameAction.Share) }
         }

@@ -45,6 +45,24 @@ class TutorialRunner(private val config: EngineConfig = EngineConfig.Default) {
         }
 
     /**
+     * Whether the beat on screen is a card waiting for its own button.
+     *
+     * The board is frozen while this is true, and that is load-bearing rather
+     * than tidy. Before C3c the ▼ control stayed live under the card, so a player
+     * who kept nudging landed the *next* scripted drop before acknowledging the
+     * card that introduces it. [stateForCurrentLesson] then had nothing to
+     * install — the drop it wanted was already the drop on the board — and
+     * `GameViewModel` nulled the falling block, leaving a beat waiting for a
+     * landing that could never happen. On a frozen clock that is a permanent
+     * deadlock on first launch, with no coach mark left to offer the skip.
+     *
+     * The scrim deliberately passes touches through (it lights a control and asks
+     * the player to use it), so the freeze has to be here rather than in the
+     * screen's hit testing.
+     */
+    val awaitsTap: Boolean get() = lesson?.await == TutorialAwait.Tapped
+
+    /**
      * The columns the falling block may occupy, or null when nothing is running.
      *
      * See [TutorialDrop.allowedColumns] for why a scripted run clamps steering at

@@ -251,33 +251,47 @@ interface CaptionTypography {
 
 @Composable
 fun rememberTypography(): Typography {
-    val serifFontFamily = SerifFontFamily
-    val sansSerifFontFamily = SansSerifFontFamily
-    val brandFontFamily = BrandFontFamily
+    val displayFontFamily = FredokaFontFamily
+    val bodyFontFamily = NunitoFontFamily
 
-    return remember(serifFontFamily, sansSerifFontFamily, brandFontFamily) {
+    return remember(displayFontFamily, bodyFontFamily) {
         DefaultTypography(
-            serifFontFamily = serifFontFamily,
-            sansSerifFontFamily = sansSerifFontFamily,
-            brandFontFamily = brandFontFamily
+            displayFontFamily = displayFontFamily,
+            bodyFontFamily = bodyFontFamily,
         )
     }
 }
 
+/**
+ * Two faces, and the split is the handoff's own: **Fredoka** carries the
+ * wordmark, every headline and every button label; **Nunito** carries labels and
+ * body copy.
+ *
+ * The template shipped four faces here — Lust Script for `Brand`, DM Serif for
+ * `Display`, Roboto for everything else — none of which the design asks for, and
+ * the result was a settings screen set in Roboto sitting one tap from a board set
+ * in Fredoka. `Display` and `Brand` both resolve to Fredoka rather than being
+ * deleted, because the scale is read by template screens (`SplashScreen`,
+ * `AccessDeniedScreen`) that no chunk has rewritten.
+ *
+ * Nunito is bundled at 600/700/800 only, which the handoff's own type spec is
+ * explicit about, so a `Body` token asking for `FontWeight.Normal` resolves to
+ * SemiBold. That is intentional rather than a missing file: this is a game, and
+ * the handoff sets its body copy heavier than a document would.
+ */
 class DefaultTypography(
-    serifFontFamily: FontFamily,
-    sansSerifFontFamily: FontFamily,
-    brandFontFamily: FontFamily
+    displayFontFamily: FontFamily,
+    bodyFontFamily: FontFamily,
 ) : Typography {
-    override val Display: DisplayTypography = DisplayTypographyImpl(serifFontFamily)
+    override val Display: DisplayTypography = DisplayTypographyImpl(displayFontFamily)
 
-    override val Brand: BrandTypography = BrandTypographyImpl(brandFontFamily)
+    override val Brand: BrandTypography = BrandTypographyImpl(displayFontFamily)
 
-    override val Heading: HeadingTypography = HeadingTypographyImpl(sansSerifFontFamily)
+    override val Heading: HeadingTypography = HeadingTypographyImpl(displayFontFamily)
 
-    override val Body: BodyTypography = BodyTypographyImpl(sansSerifFontFamily)
-    override val Label: LabelTypography = LabelTypographyImpl(sansSerifFontFamily)
-    override val Caption: CaptionTypography = CaptionTypographyImpl(sansSerifFontFamily)
+    override val Body: BodyTypography = BodyTypographyImpl(bodyFontFamily)
+    override val Label: LabelTypography = LabelTypographyImpl(bodyFontFamily)
+    override val Caption: CaptionTypography = CaptionTypographyImpl(bodyFontFamily)
 
     override val Default: TypographyResource = Body.B600
 }
@@ -735,7 +749,7 @@ private fun PreviewBrandTypography() {
                     modifier = Modifier.padding(bottom = Dimension.D500)
                 )
                 Text(
-                    text = "Lust Script font for brand identity, logos, and decorative headlines",
+                    text = "Fredoka, the face the wordmark and every headline are set in",
                     fontSize = 14.sp,
                     color = Color(0xFF666666),
                     modifier = Modifier.padding(bottom = Dimension.D1000)

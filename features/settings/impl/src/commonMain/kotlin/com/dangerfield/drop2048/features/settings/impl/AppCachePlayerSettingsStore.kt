@@ -1,6 +1,7 @@
 package com.dangerfield.drop2048.features.settings.impl
 
 import com.dangerfield.drop2048.features.settings.ControlScheme
+import com.dangerfield.drop2048.features.settings.asEnumOr
 import com.dangerfield.drop2048.features.settings.PlayerSettings
 import com.dangerfield.drop2048.features.settings.PlayerSettingsStore
 import com.dangerfield.drop2048.libraries.core.AutoInit
@@ -66,13 +67,13 @@ class AppCachePlayerSettingsStore(
 }
 
 private fun AppData.toPlayerSettings() = PlayerSettings(
-    palette = blockPalette.toEnumOr(BlockPaletteChoice.Default),
+    palette = blockPalette.asEnumOr(BlockPaletteChoice.Default),
     reduceMotion = reduceMotion,
     largeNumbers = largeBlockNumbers,
-    haptics = hapticsSetting.toEnumOr(HapticsSetting.Light),
+    haptics = hapticsSetting.asEnumOr(HapticsSetting.Light),
     soundEnabled = soundEnabled,
     musicEnabled = musicEnabled,
-    controlScheme = controlScheme.toEnumOr(ControlScheme.Both),
+    controlScheme = controlScheme.asEnumOr(ControlScheme.Both),
     leftHanded = leftHandedControls,
     ghostEnabled = ghostEnabled,
     confirmBeforeQuit = confirmBeforeQuit,
@@ -94,14 +95,3 @@ private fun AppData.merge(settings: PlayerSettings) = copy(
     diagnosticsOptIn = settings.diagnosticsOptIn,
     debugMenuUnlocked = settings.debugMenuUnlocked,
 )
-
-/**
- * A stored enum name, or [fallback] if it is missing or no longer exists.
- *
- * Never throws. A palette that was removed between releases must cost the player
- * a colour scheme, not their whole record — which is what `valueOf` would do,
- * because this decode happens on the way out of one serialized blob that also
- * carries the install id and the onboarding flag.
- */
-private inline fun <reified T : Enum<T>> String?.toEnumOr(fallback: T): T =
-    this?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: fallback

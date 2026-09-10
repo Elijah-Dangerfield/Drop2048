@@ -70,9 +70,16 @@ class DailyViewModel(
      * reached without passing through here at all, so the gate has to live at the
      * board either way — putting a second one here would be two rules to keep in
      * agreement.
+     *
+     * The consequence is that **resuming is not the same question as playing**.
+     * An attempt in flight has already been spent, so `playable` is false for it
+     * and the gate has to let it through on [DailyStatus.inProgress] instead. The
+     * game screen makes the same distinction: it looks for a saved Daily before
+     * it asks for an attempt.
      */
     private suspend fun DailyAction.play() {
-        if (!state.status.playable) return
+        val status = state.status
+        if (!status.playable && !(status.enabled && status.inProgress)) return
         sendEvent(DailyEvent.OpenDaily)
     }
 

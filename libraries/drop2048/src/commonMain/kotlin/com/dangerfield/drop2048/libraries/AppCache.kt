@@ -60,6 +60,21 @@ data class AppData(
      */
     val savedRun: String? = null,
 
+    /**
+     * The Daily Challenge run in progress, serialized. Same format as
+     * [savedRun], a separate slot.
+     *
+     * One slot was a real bug and not a small one (C6 found it, C3c fixed it):
+     * abandoning a Daily attempt and starting an Endless run overwrote the blob,
+     * so the attempt was lost **and the day was spent** — SPEC 14 gives one
+     * attempt a day and there is no way to buy that back.
+     *
+     * Two slots rather than a list keyed by mode, because there are exactly two
+     * modes and a map here would be a schema nobody needs with a decode failure
+     * mode nobody wants.
+     */
+    val savedDailyRun: String? = null,
+
     /** SPEC 6's left-handed mirror. Owned by the settings screen since C11. */
     val leftHandedControls: Boolean = false,
 

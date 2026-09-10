@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.game.impl.GameCallout
 import com.dangerfield.drop2048.features.game.impl.GamePhase
 import com.dangerfield.drop2048.features.game.impl.GameScreen
@@ -51,7 +52,13 @@ import java.io.File
  * row; the danger frame catches the ring and glow; the three overlays catch the
  * three scrims; and the four ghost frames catch the landing preview's four
  * shapes, which are the states most easily collapsed into one by accident because
- * three of them are undesigned.
+ * three of them are undesigned. The two control-scheme frames catch SPEC 6's
+ * branch, which shipped inert through C11 because nothing drew it.
+ *
+ * The start and paused frames now also carry the app's navigation. C5 deleted
+ * the home screen, so these overlays are the only menu there is, and a
+ * destination dropped from one of them is a screen that becomes unreachable
+ * without anything failing.
  *
  * Two things are asserted only implicitly and are worth naming. The board is
  * bounded by height as well as width here, because [ShortPhoneHeight] is a real
@@ -105,6 +112,32 @@ class GameScreenScreenshotTest {
     @Test
     fun paused() = compose.captureScreen("game-paused") {
         playingState().copy(phase = GamePhase.Paused)
+    }
+
+    /**
+     * SPEC 6's `Drag` scheme, which persisted and displayed from C11 and changed
+     * nothing at all until C3c.
+     *
+     * The control row is gone and the board takes the height back. That is the
+     * whole visible difference, and it is exactly the kind of branch that gets
+     * written, believed and never drawn — which is how the setting managed to
+     * ship inert in the first place.
+     */
+    @Test
+    fun dragOnly() = compose.captureScreen("game-drag-only") {
+        playingState().copy(controlScheme = ControlScheme.Drag)
+    }
+
+    /**
+     * `Buttons`, where the row is drawn and the board refuses a drag.
+     *
+     * It looks identical to `Both`, and it is captured anyway: if it ever stops
+     * looking identical the branch has grown a visual side effect nobody asked
+     * for, and this is the frame that says so.
+     */
+    @Test
+    fun buttonsOnly() = compose.captureScreen("game-buttons-only") {
+        playingState().copy(controlScheme = ControlScheme.Buttons)
     }
 
     /**

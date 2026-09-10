@@ -128,6 +128,68 @@ class TutorialTest : CoroutineTest() {
         }
     }
 
+    /**
+     * The tutorial's worst bug, and it shipped in C5: a player who keeps tapping
+     * ▼ while a card is up bricks the guided run permanently.
+     *
+     * Reproduced on an emulator before it was fixed and reproduced here after.
+     * The mechanism is that the board a card introduces is installed *with* the
+     * card, and the scrim passes touches through, so ▼ landed drop five before
+     * "Watch this one" was acknowledged. The beat after it then waited on a
+     * landing that had already happened, on a frozen clock, with no coach mark
+     * left to offer the skip. The app was unplayable from first launch and the
+     * only way out was clearing app data.
+     *
+     * The three assertions are the three things that were false: the card is
+     * still up, the block is still there to be dropped, and the run keeps going
+     * once the card is answered.
+     */
+    @Test
+    fun nudgingUnderACard_doesNotStrandTheScript() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            playDrop(TutorialStep.Steer)
+            act(GameAction.TutorialAdvance)
+            playDrop(TutorialStep.SecondDrop)
+            playDrop(TutorialStep.ThirdDrop)
+            playDrop(TutorialStep.FourthDrop)
+
+            assertEquals(TutorialStep.WatchThis, state.tutorial?.step)
+            val board = state.board
+            val falling = state.falling
+
+            repeat(TrampleNudges) { act(GameAction.Nudge) }
+            waitOutLockDelay()
+            waitOutResolution()
+
+            assertEquals(TutorialStep.WatchThis, state.tutorial?.step, "the card is still asking")
+            assertEquals(board, state.board, "and nothing moved under it")
+            assertEquals(falling, state.falling, "including the block the next beat needs")
+
+            act(GameAction.TutorialAdvance)
+            playDrop(TutorialStep.CascadeDrop)
+            assertEquals(TutorialStep.BurstIntro, state.tutorial?.step, "the script kept going")
+        }
+    }
+
+    /**
+     * The same guard on the other two inputs. A card that stops ▼ and lets a drag
+     * through is the same deadlock one gesture later.
+     */
+    @Test
+    fun steeringUnderACard_isIgnoredToo() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            playDrop(TutorialStep.Steer)
+
+            assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
+            val board = state.board
+
+            act(GameAction.MoveLeft, GameAction.SteerTo(4), GameAction.LockNow)
+
+            assertEquals(board, state.board)
+            assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
+        }
+    }
+
     @Test
     fun theTutorial_isNotOfferedTwice() = runUnitTest {
         playing(teach = false) {
@@ -185,6 +247,28 @@ class TutorialTest : CoroutineTest() {
         }
     }
 
+    /**
+     * The scripted run scores about 11,600 points and is deliberately never
+     * recorded, so the number the header shows as "best" the moment the tutorial
+     * hands over has to come from `run_record` and not from the script.
+     *
+     * `GameUiState.best` is `maxOf(best, score)` on every publish (L44), so it
+     * had absorbed the tutorial's score and a brand-new player's first real run
+     * opened under a best they had never set — which then quietly corrected
+     * itself on the next launch.
+     */
+    @Test
+    fun theHandoff_doesNotCarryTheScriptedScoreIntoTheBest() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            playWholeScript()
+            assertTrue(state.best > 0, "the script really does run the number up")
+
+            act(GameAction.TutorialAdvance)
+
+            assertEquals(0L, state.best, "and none of it is the player's best")
+        }
+    }
+
     @Test
     fun aScriptedRun_isNeverRecorded() = runUnitTest {
         playing(teach = true, pressPlay = false) {
@@ -202,6 +286,8 @@ class TutorialTest : CoroutineTest() {
  * [expected] is asserted before the drop rather than after, so a script that
  * reorders itself fails on the step that moved instead of three assertions later.
  */
+private const val TrampleNudges = 12
+
 private fun GameScenario.playDrop(expected: TutorialStep) {
     assertEquals(expected, state.tutorial?.step, "the beat the board is waiting on")
     land()

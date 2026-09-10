@@ -45,6 +45,26 @@ class ProgressRepositoryImplTest {
         assertEquals(0, ProgressRepositoryImpl(FakeRunRecordDao()).bestScore())
     }
 
+    /**
+     * Decision D19: a Daily score cannot own the headline best, because a board
+     * everybody played the same seed of is not comparable to an Endless run.
+     *
+     * The positive control is the second half — the identical score recorded as
+     * Endless *does* take the best — so the assertion cannot pass because the
+     * repository simply lost the row.
+     */
+    @Test
+    fun bestScore_ignoresDailyRuns() = runTest {
+        val repository = ProgressRepositoryImpl(FakeRunRecordDao())
+        repository.record(run.copy(score = 4_000))
+        repository.record(run.copy(score = 30_000, mode = GameMode.DAILY))
+
+        assertEquals(4_000, repository.bestScore())
+
+        repository.record(run.copy(score = 30_000, mode = GameMode.ENDLESS))
+        assertEquals(30_000, repository.bestScore(), "the same score in Endless does take it")
+    }
+
     @Test
     fun bestScore_isTheMaximum() = runTest {
         val repository = ProgressRepositoryImpl(FakeRunRecordDao())
@@ -113,7 +133,18 @@ private class FakeRunRecordDao : RunRecordDao {
 
     override suspend fun all(): List<RunRecordEntity> = rows.value
 
-    override suspend fun bestScore(): Long? = rows.value.maxOfOrNull { it.score }
+    /**
+     * Mirrors `RunRecordDao.bestScore`'s `WHERE mode = 'ENDLESS'` (decision D19).
+     *
+     * A fake that reproduced the *old* query would make
+     * [ProgressRepositoryImplTest.bestScore_ignoresDailyRuns] pass for the wrong
+     * reason. It is worth stating that this is the only coverage the filter has:
+     * the real query is SQL Room compiles, and the project has no Room-backed
+     * test to run it against on any platform.
+     */
+    override suspend fun bestScore(): Long? = rows.value
+        .filter { it.mode == GameMode.ENDLESS.name }
+        .maxOfOrNull { it.score }
 
     override suspend fun deleteAll() {
         rows.value = emptyList()

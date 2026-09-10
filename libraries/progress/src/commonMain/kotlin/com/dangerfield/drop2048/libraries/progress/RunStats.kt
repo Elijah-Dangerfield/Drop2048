@@ -13,6 +13,13 @@ package com.dangerfield.drop2048.libraries.progress
  * already been got wrong here: it is `max(score)` over these rows and lives
  * nowhere else. `AppData` held a copy through C3 and C4 deleted it.
  *
+ * It is also the one number on the page that does **not** count every row.
+ * Decision D19 rules that a Daily score cannot own the all-time best, so
+ * [bestScore] folds Endless rows only while everything beside it stays a
+ * lifetime total. The screen has to say so, or the page contradicts itself: a
+ * player can see fourteen runs played and a best lower than a Daily they
+ * remember.
+ *
  * Daily streak is deliberately absent. It needs `daily_result`, which is C6's.
  */
 data class RunStats(
@@ -52,7 +59,7 @@ fun statsFrom(records: List<RunRecord>): RunStats {
     val totalScore = records.sumOf { it.score }
     return RunStats(
         runsPlayed = records.size,
-        bestScore = records.maxOf { it.score },
+        bestScore = records.filter { it.mode == GameMode.ENDLESS }.maxOfOrNull { it.score } ?: 0,
         averageScore = totalScore / records.size,
         highestTier = records.maxOf { it.highestTier },
         totalMerges = records.sumOf { it.merges.toLong() },

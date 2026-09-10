@@ -10,6 +10,7 @@ import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -30,9 +31,9 @@ class DailyRunTest : CoroutineTest() {
 
             assertEquals(1, daily.started.size)
             assertEquals(GameMode.DAILY, state.mode)
-            assertEquals(dailySeedFor(Day), savedRun()?.seed)
-            assertEquals(GameMode.DAILY, savedRun()?.mode)
-            assertEquals("2026-09-09", savedRun()?.dailyDate)
+            assertEquals(dailySeedFor(Day), savedRun(GameMode.DAILY)?.seed)
+            assertEquals(GameMode.DAILY, savedRun(GameMode.DAILY)?.mode)
+            assertEquals("2026-09-09", savedRun(GameMode.DAILY)?.dailyDate)
         }
     }
 
@@ -71,6 +72,40 @@ class DailyRunTest : CoroutineTest() {
     }
 
     /**
+     * Decision D19 at the moment the player sees it: a Daily that beat the
+     * all-time best does not say so, because `bestScore()` filters Daily rows out
+     * and the stats page would flatly contradict the celebration.
+     *
+     * The positive control is the second scenario: the identical score in Endless
+     * does light it, so the assertion cannot pass because the sheet lost the
+     * flag.
+     */
+    @Test
+    fun daily_neverClaimsANewBest() = runUnitTest {
+        playing(
+            picture = NearlyStackedOut,
+            fallingAt = Cell(2, 0),
+            daily = FakeDailyRepository().grant(),
+        ) {
+            act(GameAction.StartDaily)
+            land()
+            waitOutResolution()
+
+            assertPhase(GamePhase.StackedOut)
+            assertTrue(state.score > 0, "the run really did beat the old best of zero")
+            assertFalse(state.newBest, "and a Daily does not get to own it")
+        }
+
+        playing(picture = NearlyStackedOut, fallingAt = Cell(2, 0)) {
+            land()
+            waitOutResolution()
+
+            assertPhase(GamePhase.StackedOut)
+            assertTrue(state.newBest, "the same score in Endless does")
+        }
+    }
+
+    /**
      * Restart is a free reroll of a board everyone else gets one shot at, so it
      * leaves instead. The screen also hides the control; this is the half that
      * holds when the route is reached some other way.
@@ -79,12 +114,12 @@ class DailyRunTest : CoroutineTest() {
     fun daily_refusesRestart() = runUnitTest {
         playing(daily = FakeDailyRepository().grant()) {
             act(GameAction.StartDaily)
-            val seed = savedRun()?.seed
+            val seed = savedRun(GameMode.DAILY)?.seed
 
             act(GameAction.Restart)
 
             assertTrue(effects.contains(GameEffect.Leave))
-            assertEquals(seed, savedRun()?.seed)
+            assertEquals(seed, savedRun(GameMode.DAILY)?.seed)
             assertEquals(1, daily.started.size)
         }
     }
@@ -114,7 +149,7 @@ class DailyRunTest : CoroutineTest() {
         val ledger = FakeDailyRepository().grant()
         val saved = playing(daily = ledger) {
             act(GameAction.StartDaily)
-            savedRun()
+            savedRun(GameMode.DAILY)
         }
 
         playing(resume = saved, daily = ledger) {
@@ -123,6 +158,59 @@ class DailyRunTest : CoroutineTest() {
             assertEquals(1, ledger.started.size)
             assertEquals(GameMode.DAILY, state.mode)
             assertFalse(effects.contains(GameEffect.Leave))
+        }
+    }
+
+    /**
+     * The bug this chunk fixed, end to end, as the sequence that produced it:
+     * start the Daily, quit it, play Endless, come back.
+     *
+     * With one save slot the Endless run overwrote the Daily blob, so the attempt
+     * was gone **and the day was spent** — SPEC 14 gives one attempt a day and
+     * nothing hands it back. C6 found it and could not fix it.
+     *
+     * `daily.started` staying at one is the assertion that matters: the run comes
+     * back off its own slot rather than being charged for a second time, which
+     * would be the other way of "fixing" this and would give the player a free
+     * reroll of a board everybody else gets one shot at.
+     */
+    @Test
+    fun daily_survivesAnEndlessRunStartedOverTheTopOfIt() = runUnitTest {
+        val ledger = FakeDailyRepository().grant()
+        val slots = playing(daily = ledger) {
+            act(GameAction.StartDaily)
+            act(GameAction.Pause)
+            act(GameAction.ConfirmQuit)
+
+            act(GameAction.Restart)
+            land()
+
+            assertEquals(GameMode.ENDLESS, savedRun()?.mode, "the Endless run wrote its own slot")
+            assertEquals(GameMode.DAILY, savedRun(GameMode.DAILY)?.mode, "and left the Daily alone")
+            savedRuns
+        }
+
+        assertEquals(dailySeedFor(Day), slots.stored(GameMode.DAILY)?.seed)
+    }
+
+    /**
+     * And the attempt is playable again once it survives, without being charged
+     * for twice.
+     */
+    @Test
+    fun daily_resumesFromItsOwnSlotAfterAnEndlessRun() = runUnitTest {
+        val ledger = FakeDailyRepository().grant()
+        val saved = playing(daily = ledger) {
+            act(GameAction.StartDaily)
+            savedRun(GameMode.DAILY)
+        }
+
+        playing(resume = assertNotNull(saved), daily = ledger) {
+            act(GameAction.StartDaily)
+
+            assertEquals(1, ledger.started.size, "no second attempt was spent")
+            assertEquals(GameMode.DAILY, state.mode)
+            assertEquals(dailySeedFor(Day), savedRun(GameMode.DAILY)?.seed)
         }
     }
 

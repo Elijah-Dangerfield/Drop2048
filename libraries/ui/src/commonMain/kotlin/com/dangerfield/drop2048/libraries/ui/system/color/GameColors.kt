@@ -74,6 +74,24 @@ object GameColors {
     val ControlQuiet = Color(0xFF221C34)
     val ControlQuietShadow = Color(0xFF150F26)
 
+    /**
+     * [Control] lifted one step, for the things that have to read *above* a card
+     * rather than below it.
+     *
+     * Derived rather than drawn, and the only value in this object that is. The
+     * handoff's control system runs downward — control, quiet control, shadow —
+     * because on the board everything chunky is pressed into a dark surface.
+     * A role ramp needs the other direction too: a disabled button and an
+     * unselected chart bar both sit *on* a `Control` card, and painting them in
+     * anything darker made them vanish into it. That is not a hypothetical —
+     * `stats-populated` was recorded with the bar chart drawn in the well colour
+     * and the bars were invisible.
+     *
+     * It is [Control] composited with 6% white, which is [Surface]'s own lift, so
+     * it is the handoff's step size rather than a new one.
+     */
+    val ControlRaised = Color(0xFF3B3450)
+
     /** The brand yellow: the wordmark chip, the primary button, "new best!". */
     val AccentYellow = oklch(0.85f, 0.17f, 90f)
     val AccentYellowShadow = oklch(0.62f, 0.15f, 85f)

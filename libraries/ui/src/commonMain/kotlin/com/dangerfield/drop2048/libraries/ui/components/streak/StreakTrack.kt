@@ -44,11 +44,13 @@ data class StreakStop(
 )
 
 /**
- * SPEC 14's rewards at 3, 7, 14 and 30 days, drawn as the rungs they are.
+ * SPEC 14's milestones at 3, 7, 14 and 30 days, drawn as the rungs they are.
+ * They are cosmetic and pay nothing (decision D19), so nothing here should be
+ * captioned as a reward.
  *
  * A milestone track rather than a month calendar, and the difference is what the
  * player is being asked to care about. A calendar answers "which days did I
- * play", which is history; this answers "how far to the next reward", which is
+ * play", which is history; this answers "how far to the next milestone", which is
  * the only question a streak mechanic is actually posing. Sodogku draws a
  * calendar because its streak has freezes and restores to place on specific
  * days; Drop 2048's has neither, so a grid of thirty squares would be thirty

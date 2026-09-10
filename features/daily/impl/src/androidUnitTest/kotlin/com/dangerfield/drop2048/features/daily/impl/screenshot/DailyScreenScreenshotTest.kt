@@ -31,14 +31,14 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * The Daily screen in the four states a still frame can hold.
+ * The Daily screen in the five states a still frame can hold.
  *
  * The set is chosen so each image is the only one that would move for its own
  * concern. Not played catches the layout and the primary action; in progress
  * catches the fork between resuming an attempt and starting one, which is one
  * boolean away from being collapsed; completed catches the score block and the
  * absence of a Play button; the milestone frame catches the streak track filling
- * and the copy switching from "N days" to the reward line.
+ * and the copy switching from "N days" to the milestone line.
  *
  * The countdown is part of every frame on purpose. It is the only thing on the
  * screen rendered against the player's own clock rather than UTC, so a change
@@ -72,6 +72,29 @@ class DailyScreenScreenshotTest {
                 completed = false,
             ),
             attemptsAllowed = 2,
+        )
+    }
+
+    /**
+     * A one-attempt day with the attempt in flight, which is the shape every
+     * abandoned Daily actually has and which never drew before C3c.
+     *
+     * The screen offered Resume on `playable && inProgress`, and starting the
+     * attempt is what spends it, so those two are never true together under
+     * SPEC 14's one-attempt rule. The button that was meant to bring a player
+     * back to their board was unreachable. This frame is the one that would go
+     * back to "no attempts left" if the condition regressed.
+     */
+    @Test
+    fun inProgressOnASpentDay() = compose.captureScreen("daily-in-progress-spent") {
+        state(
+            result = DailyResult(
+                date = Day,
+                seed = Seed,
+                score = 0,
+                attemptsUsed = 1,
+                completed = false,
+            ),
         )
     }
 

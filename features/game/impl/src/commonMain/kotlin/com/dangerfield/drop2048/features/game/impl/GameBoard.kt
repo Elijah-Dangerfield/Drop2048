@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
@@ -79,7 +80,8 @@ fun GameBoard(
     onFlickDown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val steerable = state.phase == GamePhase.Playing
+    val steerable = state.phase == GamePhase.Playing &&
+        state.controlScheme != ControlScheme.Buttons
 
     BoardWell(
         modifier = modifier,

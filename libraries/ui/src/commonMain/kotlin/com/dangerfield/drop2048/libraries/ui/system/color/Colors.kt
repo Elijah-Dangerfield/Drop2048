@@ -3,8 +3,10 @@ package com.dangerfield.drop2048.system.color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
 import com.dangerfield.drop2048.libraries.ui.system.LocalContentColor
 import com.dangerfield.drop2048.libraries.ui.system.color.ColorResource
+import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
 
 @Immutable
 @Suppress("LongParameterList")
@@ -52,41 +54,78 @@ interface StatusColor {
     val bad: ColorResource
 }
 
-val defaultColors = object : Colors {
-    // Blue as primary accent - like a clear sky
-    override val accentPrimary = ColorResource.Blue600
-    override val onAccentPrimary = ColorResource.White
-    // Purple as secondary - adds a touch of creativity and calm
-    override val accentSecondary = ColorResource.Purple600
-    override val onAccentSecondary = ColorResource.White
+private fun token(color: Color, name: String) = ColorResource.FromColor(color, name)
 
-    override val shadow = ColorResource.Black_A30
-    override val textDisabled = ColorResource.Gray400
-    override val danger = ColorResource.Red600
-    // White surfaces for a clean, modern look
-    override val surfacePrimary = ColorResource.White
-    override val surfaceDisabled = ColorResource.Gray200
-    override val onSurfacePrimary = ColorResource.Gray900
-    override val surfaceSecondary = ColorResource.Gray100
-    override val onSurfaceSecondary = ColorResource.Gray800
-    override val surfaceTertiary = ColorResource.Gray200
-    override val onSurfaceTertiary = ColorResource.Gray700
-    override val onSurfaceDisabled = ColorResource.Gray400
-    // Light gray background for a soft, neutral canvas
-    override val background = ColorResource.Gray50
-    override val onBackground = ColorResource.Gray900
-    override val border = ColorResource.Gray300
-    override val borderSecondary = ColorResource.Gray400
-    override val borderDisabled = ColorResource.Gray200
-    // Dark gray text on light backgrounds for high readability
-    override val text = ColorResource.Gray900
-    override val backgroundOverlay = ColorResource.Black_A70
-    override val textSecondary = ColorResource.Gray600
+/**
+ * The one role ramp every screen in the app renders against, and it is dark.
+ *
+ * ### Why this file changed rather than the meta screens
+ *
+ * Through C11 this was the template's light ramp — `Gray50` background, `Gray900`
+ * text, white surfaces — while the game screen was the handoff's dark board. Two
+ * halves of one app that did not look like one app, and a white quit-confirm
+ * dialog over a dark board that C11 itself called wrong.
+ *
+ * There were two ways out. The meta screens could each reach for [GameColors]
+ * directly, which is faster and leaves this ramp light, so every template surface
+ * nobody rewrote — dialogs, bottom sheets, the snackbar, form fields, the launch
+ * gates, the bug reporter — stays light and the next screen anyone adds is light
+ * again. That is a third theme waiting to happen.
+ *
+ * So the design system grew the dark set instead, here, at the one place both
+ * halves already read from. No feature module changed a line to get it: they were
+ * all already asking for `AppTheme.colors.surfacePrimary` and friends and simply
+ * get a different answer.
+ *
+ * ### Where the values come from
+ *
+ * [GameColors] is still the source of truth and is still named for the board
+ * rather than for a role — see its KDoc for why the two objects do not merge.
+ * What happens here is a **mapping**: the backdrop's mid stop becomes the
+ * background, the well becomes the deepest surface, the ring becomes the border,
+ * the handoff's three-step ink ramp becomes the three text roles, and the accent
+ * yellow becomes the primary accent because it is already the colour of every
+ * primary button in the game.
+ *
+ * The four values with no handoff equivalent are the status triple and the danger
+ * red, which are lifted to their 400-weight cousins: a `Red600` that reads on
+ * white is nearly invisible on `#141021`.
+ */
+val defaultColors = object : Colors {
+    override val accentPrimary = token(GameColors.AccentYellow, "accent-yellow")
+    override val onAccentPrimary = token(GameColors.OnAccentYellow, "on-accent-yellow")
+    override val accentSecondary = token(GameColors.AccentViolet, "accent-violet")
+    override val onAccentSecondary = token(GameColors.BackdropFar, "on-accent-violet")
+
+    override val shadow = token(GameColors.ControlShadow, "control-shadow")
+    override val danger = ColorResource.Red400
+
+    override val background = token(GameColors.BackdropMid, "backdrop-mid")
+    override val onBackground = token(GameColors.Ink, "ink")
+    override val backgroundOverlay = token(GameColors.ScrimPaused, "scrim-paused")
+
+    override val surfacePrimary = token(GameColors.Control, "control")
+    override val onSurfacePrimary = token(GameColors.Ink, "ink")
+    override val surfaceSecondary = token(GameColors.ControlQuiet, "control-quiet")
+    override val onSurfaceSecondary = token(GameColors.Ink, "ink")
+    override val surfaceTertiary = token(GameColors.BoardWell, "board-well")
+    override val onSurfaceTertiary = token(GameColors.InkFaint, "ink-faint")
+
+    override val surfaceDisabled = token(GameColors.ControlRaised, "control-raised")
+    override val onSurfaceDisabled = token(GameColors.InkMuted, "ink-muted")
+
+    override val border = token(GameColors.BoardRing, "board-ring")
+    override val borderSecondary = token(GameColors.ControlQuietShadow, "control-quiet-shadow")
+    override val borderDisabled = token(GameColors.ControlQuiet, "control-quiet")
+
+    override val text = token(GameColors.Ink, "ink")
+    override val textSecondary = token(GameColors.InkFaint, "ink-faint")
+    override val textDisabled = token(GameColors.InkMuted, "ink-muted")
 
     override val status = object : StatusColor {
-        override val okay = ColorResource.Green600
-        override val warning = ColorResource.Amber600
-        override val bad = ColorResource.Red600
+        override val okay = ColorResource.Green400
+        override val warning = ColorResource.Amber500
+        override val bad = ColorResource.Red400
     }
 }
 

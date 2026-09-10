@@ -23,6 +23,7 @@ import com.dangerfield.drop2048.system.thenIf
 import com.dangerfield.drop2048.system.typography.TypographyResource
 import com.dangerfield.drop2048.libraries.ui.Elevation
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
+import com.dangerfield.drop2048.libraries.ui.components.appBackdropTopSlice
 import com.dangerfield.drop2048.libraries.ui.components.icon.IconButton
 import com.dangerfield.drop2048.libraries.ui.components.icon.Icons
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
@@ -34,15 +35,32 @@ fun TopBar(
     modifier: Modifier = Modifier,
     onNavigateBack: (() -> Unit)? = null,
     typographyToken: TypographyResource = AppTheme.typography.Display.D900,
-    backgroundColor: Color = AppTheme.colors.background.color,
+    /**
+     * Null draws the screen's own radial backdrop, aligned so the bar is a slice
+     * of it rather than a band across it.
+     *
+     * The bar cannot simply be transparent: every list screen applies the
+     * scaffold's top padding *inside* its scroll container, so its rows travel
+     * underneath and a see-through bar had section headers riding up over the
+     * title. And it cannot be a flat fill either — `colors.background` against
+     * the gradient is the seam that made a settings screen look like a different
+     * app from the board. See [appBackdropTopSlice].
+     */
+    backgroundColor: Color? = null,
     actions: @Composable () -> Unit = {},
     scrollState: ScrollState? = null,
     liftOnScroll: Boolean = scrollState != null,
 ) {
+    val surface = if (backgroundColor == null) {
+        Modifier.appBackdropTopSlice()
+    } else {
+        Modifier.background(backgroundColor)
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .then(surface)
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal

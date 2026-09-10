@@ -71,6 +71,21 @@ data class PlayerSettings(
     val debugMenuUnlocked: Boolean = false,
 )
 
+/**
+ * A stored enum name, or [fallback] if it is missing or no longer exists.
+ *
+ * Never throws. A palette that was removed between releases must cost the player
+ * a colour scheme, not their whole record — which is what `valueOf` would do,
+ * because these decode on the way out of one serialized blob that also carries
+ * the install id and the onboarding flag.
+ *
+ * Here rather than beside the store because the game screen decodes
+ * [ControlScheme] out of the same blob, and two copies of a lenient decoder is
+ * two places for one of them to become `valueOf`.
+ */
+inline fun <reified T : Enum<T>> String?.asEnumOr(fallback: T): T =
+    this?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: fallback
+
 /** SPEC 6's schemes. Buttons is the shipping default; drag is additive, not exclusive. */
 enum class ControlScheme {
     /** The three bottom buttons only. Drag on the board does nothing. */

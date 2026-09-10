@@ -1001,7 +1001,7 @@ class GameViewModel(
                 phase = GamePhase.StackedOut,
                 falling = null,
                 ghost = null,
-                newBest = score > 0 && score > bestBeforeRun,
+                newBest = started.mode == GameMode.ENDLESS && score > 0 && score > bestBeforeRun,
                 unlocked = unlocked,
             )
         }
@@ -1354,7 +1354,13 @@ data class GameUiState(
     val calloutNonce: Int = 0,
     val biggestTier: Int = 0,
 
-    /** Whether the run that just ended beat the score it started under. */
+    /**
+     * Whether the run that just ended beat the score it started under.
+     *
+     * Endless only (decision D19). A Daily score cannot own the headline best, so
+     * a Daily that celebrated one was promising a number the stats page would
+     * then refuse to show — `bestScore()` filters Daily rows out.
+     */
     val newBest: Boolean = false,
 
     /**

@@ -157,7 +157,11 @@ private fun Today(state: DailyState, onAction: (DailyAction) -> Unit) {
         VerticalSpacerD500()
 
         when {
-            status.playable && status.inProgress ->
+            // Not `playable && inProgress`, which is a contradiction under the
+            // one-attempt rule and so never drew: starting the attempt is what
+            // spends it, so a run left in flight always has zero attempts left.
+            // Resume is the one action a spent day still owes the player.
+            status.enabled && status.inProgress ->
                 Button(onClick = { onAction(DailyAction.Play) }) {
                     Text(stringResource(Res.string.daily_resume))
                 }
@@ -209,11 +213,16 @@ private fun Today(state: DailyState, onAction: (DailyAction) -> Unit) {
 }
 
 /**
- * SPEC 14's rewards at 3, 7, 14 and 30 days.
+ * SPEC 14's milestones at 3, 7, 14 and 30 days.
  *
  * The headline is the number and the track is the distance to the next one,
  * because those are two different questions and a single row of dots answers
  * neither well.
+ *
+ * **Milestones pay nothing** (decision D19). Coins and cosmetics are both cut
+ * from v1, so a milestone is celebratory copy and a filled dot and the copy here
+ * says exactly that. It used to read "N more for the next reward", which promised
+ * a payout the app has no way to make.
  */
 @Composable
 private fun Streak(streak: DailyStreak) {

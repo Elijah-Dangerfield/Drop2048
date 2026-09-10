@@ -32,7 +32,7 @@ class SavedRunStoreTest {
         store.save(saved)
 
         assertNotNull(cache.snapshot.savedRun, "something was written")
-        assertEquals(saved, store.load())
+        assertEquals(saved, store.load(GameMode.ENDLESS))
     }
 
     @Test
@@ -41,9 +41,9 @@ class SavedRunStoreTest {
         val store = AppCacheSavedRunStore(cache)
         store.save(midCascadeSnapshot())
 
-        store.clear()
+        store.clear(GameMode.ENDLESS)
 
-        assertNull(store.load())
+        assertNull(store.load(GameMode.ENDLESS))
         assertNull(cache.snapshot.savedRun)
     }
 
@@ -56,7 +56,7 @@ class SavedRunStoreTest {
     fun anUnreadableBlob_readsAsNoSavedRun() = runTest {
         val cache = FakeAppCache(AppData(savedRun = "{\"state\":\"this is not a GameState\"}"))
 
-        assertNull(AppCacheSavedRunStore(cache).load())
+        assertNull(AppCacheSavedRunStore(cache).load(GameMode.ENDLESS))
         assertEquals("{\"state\":\"this is not a GameState\"}", cache.snapshot.savedRun)
     }
 
@@ -87,16 +87,79 @@ class SavedRunStoreTest {
         val cache = FakeAppCache(AppData(savedRun = PRE_RULING_BLOB))
 
         assertNull(
-            AppCacheSavedRunStore(cache).load(),
+            AppCacheSavedRunStore(cache).load(GameMode.ENDLESS),
             "a saved run written against the old GameState was resumed into the new rules",
         )
         assertEquals(PRE_RULING_BLOB, cache.snapshot.savedRun, "and nothing else in AppData was touched")
 
         val versioned = PRE_RULING_BLOB.replaceFirst("{", "{\"version\":$SAVE_FORMAT_VERSION,")
-        val resumed = AppCacheSavedRunStore(FakeAppCache(AppData(savedRun = versioned))).load()
+        val resumed = AppCacheSavedRunStore(FakeAppCache(AppData(savedRun = versioned))).load(GameMode.ENDLESS)
 
         assertNotNull(resumed, "the blob is well-formed old data, not garbage")
         assertEquals(1_240L, resumed.state.score, "and the version is the only thing that refused it")
+    }
+
+    /**
+     * The bug the second slot exists for, stated as the sequence that produced
+     * it: play the Daily, wander off, start an Endless run.
+     *
+     * Before the split the Endless save overwrote the Daily one, so the attempt
+     * was gone and SPEC 14 had already spent the day. There is no way to buy that
+     * back, which is what makes it worth a slot rather than a warning.
+     */
+    @Test
+    fun anEndlessRunDoesNotOverwriteADailyOne() = runTest {
+        val cache = FakeAppCache()
+        val store = AppCacheSavedRunStore(cache)
+        val daily = midCascadeSnapshot().copy(mode = GameMode.DAILY, dailyDate = "2026-09-10")
+
+        store.save(daily)
+        store.save(midCascadeSnapshot())
+
+        assertEquals(daily, store.load(GameMode.DAILY), "the Daily attempt survived")
+        assertEquals(GameMode.ENDLESS, store.load(GameMode.ENDLESS)?.mode)
+    }
+
+    /** Ending one run leaves the other where it was. */
+    @Test
+    fun clearingOneSlotLeavesTheOther() = runTest {
+        val store = AppCacheSavedRunStore(FakeAppCache())
+        store.save(midCascadeSnapshot().copy(mode = GameMode.DAILY, dailyDate = "2026-09-10"))
+        store.save(midCascadeSnapshot())
+
+        store.clear(GameMode.ENDLESS)
+
+        assertNull(store.load(GameMode.ENDLESS))
+        assertNotNull(store.load(GameMode.DAILY))
+    }
+
+    /**
+     * The second guard, and it is deliberately not the same one as the version.
+     *
+     * The version catches the *old world* — a version 3 blob in `savedRun` that
+     * might be either mode. This catches a blob landing in the wrong slot for any
+     * other reason, and it has to be independent or a future version bump that
+     * forgets the slot rule would go unnoticed until a player resumed a Daily
+     * board under Endless rules.
+     *
+     * Positive control: the same run, at the same version, in its own slot, loads
+     * fine. Without that half this would pass on any refusal at all.
+     */
+    @Test
+    fun aRunFoundInTheWrongSlotIsRefused() = runTest {
+        val writer = FakeAppCache()
+        AppCacheSavedRunStore(writer)
+            .save(midCascadeSnapshot().copy(mode = GameMode.DAILY, dailyDate = "2026-09-10"))
+        val encoded = assertNotNull(writer.snapshot.savedDailyRun)
+
+        assertNull(
+            AppCacheSavedRunStore(FakeAppCache(AppData(savedRun = encoded))).load(GameMode.ENDLESS),
+            "a Daily run in the Endless slot was resumed under Endless rules",
+        )
+        assertNotNull(
+            AppCacheSavedRunStore(FakeAppCache(AppData(savedDailyRun = encoded))).load(GameMode.DAILY),
+            "and the slot it was found in is the only thing that refused it",
+        )
     }
 
     /** A version this build has never heard of is refused the same way. */
@@ -106,7 +169,7 @@ class SavedRunStoreTest {
         val store = AppCacheSavedRunStore(cache)
         store.save(midCascadeSnapshot().copy(version = SAVE_FORMAT_VERSION + 1))
 
-        assertNull(store.load())
+        assertNull(store.load(GameMode.ENDLESS))
     }
 
     private companion object {

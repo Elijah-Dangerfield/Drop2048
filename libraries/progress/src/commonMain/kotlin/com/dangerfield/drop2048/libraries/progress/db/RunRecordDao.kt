@@ -49,8 +49,18 @@ interface RunRecordDao : ClearableDao {
     @Query("SELECT * FROM run_record ORDER BY endedAt")
     suspend fun all(): List<RunRecordEntity>
 
-    /** Null before the first run, which is why the return type is nullable. */
-    @Query("SELECT MAX(score) FROM run_record")
+    /**
+     * The headline best, and it counts **Endless runs only** (decision D19).
+     *
+     * A Daily row is still written and still feeds every lifetime total, but a
+     * score set on a seed everybody else also played is not comparable to an
+     * Endless one, and one number meaning two things is worse than two numbers.
+     *
+     * Null before the first Endless run, which is why the return type is
+     * nullable — and note that is not the same as "before the first run": a
+     * player whose only runs are Dailies has no best score, correctly.
+     */
+    @Query("SELECT MAX(score) FROM run_record WHERE mode = 'ENDLESS'")
     suspend fun bestScore(): Long?
 
     @Query("DELETE FROM run_record")

@@ -50,7 +50,7 @@ class PlayerDataEraser(
                 .logOnFailure { "Failed to clear a table during reset progress" }
         }
         Catching {
-            appCache.update { data -> data.copy(savedRun = null) }
+            appCache.update { data -> data.copy(savedRun = null, savedDailyRun = null) }
         }.logOnFailure { "Failed to clear the in-flight run during reset progress" }
     }
 

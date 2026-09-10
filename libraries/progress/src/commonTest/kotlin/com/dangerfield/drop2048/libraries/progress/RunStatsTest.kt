@@ -18,6 +18,41 @@ class RunStatsTest {
         assertEquals(RunStats.Empty, statsFrom(emptyList()))
     }
 
+    /**
+     * Decision D19, on the stats page: a Daily run feeds every lifetime total on
+     * it and cannot own the best score.
+     *
+     * The two halves are the same 40,000-point run recorded under two modes, so
+     * the only variable is the mode. Without the second half this would pass on a
+     * fold that had dropped the row entirely, which would take `runsPlayed` and
+     * the whole Lifetime card with it.
+     */
+    @Test
+    fun bestScore_countsEndlessRunsOnly() {
+        val endless = threeRuns.first().copy(score = 1_000, mode = GameMode.ENDLESS)
+        val daily = threeRuns.first().copy(score = 40_000, mode = GameMode.DAILY)
+
+        val withDaily = statsFrom(listOf(endless, daily))
+        assertEquals(1_000, withDaily.bestScore)
+        assertEquals(2, withDaily.runsPlayed, "the Daily still counts everywhere else")
+        assertEquals(20_500, withDaily.averageScore)
+
+        assertEquals(
+            40_000,
+            statsFrom(listOf(endless, daily.copy(mode = GameMode.ENDLESS))).bestScore,
+            "the same score in Endless does take the best",
+        )
+    }
+
+    /** A player whose only runs are Dailies has no best score, not a Daily one. */
+    @Test
+    fun bestScore_isZeroWhenEveryRunIsADaily() {
+        val stats = statsFrom(listOf(threeRuns.first().copy(score = 40_000, mode = GameMode.DAILY)))
+
+        assertEquals(0, stats.bestScore)
+        assertEquals(1, stats.runsPlayed)
+    }
+
     @Test
     fun everyStatMatchesAHandCount() {
         val stats = statsFrom(threeRuns)
