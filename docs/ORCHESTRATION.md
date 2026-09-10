@@ -31,7 +31,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | not started | |
 | C10 · Ads + billing | not started | |
-| C11 · Settings, legal, gates, a11y | **IN PROGRESS** | Also the ClearableDao + replayTutorial call sites |
+| C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C12 · Debug menu | not started | |
 | C13 · Store prep | not started | |
 
@@ -254,6 +254,21 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D19 · Streak milestones stay cosmetic, and a Daily score cannot set the all-time best
+
+Owner rulings, 2026-09-10.
+
+**Streak milestones pay nothing.** Coins and cosmetics are both cut from v1, so SPEC 14's "rewards
+at 3, 7, 14 and 30 days" had nothing behind it. A milestone is celebratory copy and a filled dot,
+and the spec stops promising a payout it cannot deliver. Rejected: reintroducing coins solely for
+streaks (a ledger and a sink, which is why coins were cut), and unlocking block palettes (gating an
+accessibility feature behind a play streak is not defensible).
+
+**`bestScore()` filters to Endless only.** A Daily run still writes a `run_record` with
+`mode = DAILY` for lifetime totals, but it can no longer own the headline number. A best set on a
+seed everyone else also played is not comparable to an Endless best, and one number meaning two
+things is worse than two numbers.
 
 ### D18 · A Daily run pins `EngineConfig.Default` and ignores remote config entirely
 
