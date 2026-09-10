@@ -24,8 +24,9 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
-| C3c · One product + player bugs | **IN PROGRESS** | Dark theme everywhere, save slot, control scheme |
-| C3a · Feel | queued | Haptics/motion can land; audio needs owner assets |
+| C3c · One product + player bugs | **DONE** | `e049f95`. Dark design system (D20). Found L56 |
+| C3a · Feel + polish | **IN PROGRESS** | Haptics, motion, player-visible defects |
+| C12 · Debug menu | **IN PROGRESS** | Plus the first Room-backed test |
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
@@ -33,7 +34,6 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
 | C10 · Ads + billing | not started | |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
-| C12 · Debug menu | not started | |
 | C13 · Store prep | not started | |
 
 ---
@@ -74,11 +74,17 @@ These are not suggestions. A change that violates one gets reverted, not debated
     device for what only a device can answer — feel, haptics, real gesture timing — and write a
     test for everything else. C3 measured this: a screenshot harness would have caught two of its
     three device bugs.
-12. **Never run a repo-wide git operation.** No bare `git stash`, no `git checkout .`, no
-    `git clean`, no `reset --hard`. Other agents are writing to this checkout and those commands
-    do not know that (L38 — one bare `git stash` swept up two agents' work and the orchestrator's
-    docs). Scope everything to your paths: `git stash push -- <paths>`, `git add <paths>`. To test
-    whether a failure is pre-existing, read `git log -p` or copy a file out of HEAD to a temp path.
+12. **Every git operation is scoped to explicit files, always.** Two halves, both learned the
+    hard way:
+    - **No repo-wide command.** No bare `git stash`, `git checkout .`, `git clean`, `reset --hard`.
+      One bare `git stash` swept up two agents' work and the orchestrator's docs (L38).
+    - **`git add <directory>` is nearly as bad.** A wide add swept most of another agent's
+      in-flight work into a commit that does not mention it (L57). **Stage named files.** Where two
+      agents genuinely must touch one file, stage a reconstructed version with `git hash-object` +
+      `git update-index` and leave the working tree alone (L52).
+
+    To test whether a failure is pre-existing, build HEAD in a `git worktree` (C3c did exactly this
+    to prove the tutorial deadlock predated it) or read `git log -p`. Never move the shared tree.
 13. **Do not edit `ORCHESTRATION.md`, `OWNER-TODO.md` or `todos.md`.** The orchestrator owns all
     three and edits them concurrently with your run; your write will be silently lost (this has
     already happened once, L10). Put learnings, owner items and deferred work **in your report**
@@ -270,6 +276,28 @@ accessibility feature behind a play streak is not defensible).
 `mode = DAILY` for lifetime totals, but it can no longer own the headline number. A best set on a
 seed everyone else also played is not comparable to an Endless best, and one number meaning two
 things is worse than two numbers.
+
+### D20 · The design system grew a dark surface set; the meta screens did not adopt a backdrop
+
+C3c's ruling. `defaultColors` now maps the handoff's game palette onto the existing role ramp, and
+`rememberTypography` serves Fredoka and Nunito in place of DM Serif, Lust Script and Roboto.
+
+The rejected alternative — have each meta screen draw the game's backdrop — leaves `Colors` light,
+so every template surface nobody has rewritten (dialogs, sheets, snackbar, form fields, the launch
+gates, the bug reporter) stays light and **the next screen anyone adds is light again.** That is
+the third theme.
+
+**No feature module changed a line to go dark.** They were already asking for
+`AppTheme.colors.surfacePrimary` and simply got a different answer. It also caught the launch gates,
+which nobody had listed.
+
+One derived value was forced by a golden: `GameColors.ControlRaised`. The handoff's control system
+only runs *downward* (control → quiet → shadow) and a role ramp needs one step **up**, for disabled
+surfaces and unselected chart bars that sit *on* a card. Without it the stats bar chart was
+invisible.
+
+Evidence the change is contained: after re-recording, **the 16 board goldens are byte-identical**
+and `:libraries:ui`'s 17 did not move at all.
 
 ### D18 · A Daily run pins `EngineConfig.Default` and ignores remote config entirely
 
@@ -564,6 +592,35 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L56 · Nobody installed a build for eight chunks, and the app was unplayable the whole time
+
+C3c built and installed, and found that **a fresh install could not get past the tutorial.** A
+player who keeps tapping ▼ while a coach mark is up lands the next scripted drop before answering
+the card; the beat then waits forever for a landing that already happened, on a frozen clock, with
+no coach mark left to offer the skip. Empty board, no falling block, no exit but clearing app data.
+
+It confirmed the bug was pre-existing by **building HEAD in a separate worktree and reproducing it
+there.** From C5. Every chunk since had a green gate, 1,000+ passing tests, and dozens of goldens.
+
+Standing rule 11 (prefer tests to a simulator) is right and this is its boundary: **tests prove the
+parts, and only a build proves the app.** A frozen clock plus a pass-through scrim plus an eager
+tap is an interaction between three chunks, and no unit test owns it.
+
+**Install and play the app at the end of any chunk that changes the first-run path.** Not to verify
+what a test could verify — to find the thing no test is watching.
+
+### L57 · A broad `git add` in a shared checkout is as destructive as a stash
+
+C9's commit swept up most of C3c's in-flight work: its `strings.xml` edits, a file rename, and most
+of `GameViewModel.kt` and `GameScreen.kt`. Nothing was lost and the tree is correct, but that
+commit's message describes none of it, and C3c's own commit is correspondingly thin.
+
+This is L38 in the other direction — not a destructive command, just `git add` with a wide path.
+Standing rule 12 now says so as loudly as it says the stash rule.
+
+**Stage explicit files, not directories, when another agent is live.** Where that is impossible,
+use C6's technique (L52): `git hash-object` + `git update-index` to stage a reconstructed version.
 
 ### L53 · Derive a constant from the system that owns it, or it strands the feature built on it
 

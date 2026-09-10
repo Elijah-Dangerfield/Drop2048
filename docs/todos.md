@@ -12,20 +12,31 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
-### The app looks like two products
+### The first Room-backed test in the repo
 
-`:features:stats` and `:features:daily` render in the **light palette with Roboto body text** while
-the game screen is dark Fredoka/Nunito to the handoff's spec. Consistent with what C4 shipped, so
-neither chunk was wrong, but the two halves do not look like one app — and the owner's original
-complaint was exactly that the design looked bad.
+`bestScore()`'s `WHERE mode = 'ENDLESS'` filter has **no direct coverage**, and there is no
+Room-backed test anywhere in this project on any platform. `FakeRunRecordDao` mirrors the filter and
+the fold is tested properly, so the Kotlin is covered and the SQL is not.
 
-Neither module has design-fidelity goldens against the handoff. **This is the next visual chunk.**
+Needs an in-memory Room harness. Worth a chunk, not a line — and it would cover every DAO, not just
+this one.
 
-### One saved-run slot loses a Daily attempt
+### `BarChart` draws one full-width bar at n=1
 
-A Daily attempt abandoned and then overwritten by starting an Endless run is **lost, and the day is
-spent**. Fix is a second slot in `SavedRunStore` with its own format version. Real bug, found by C6,
-not fixed by it.
+Looks wrong on the stats page after a player's first run, which is exactly when they look at it.
+Cosmetic, in `:libraries:ui`.
+
+### Tutorial drops 2-4 do not force a steer
+
+A player who only taps ▼ drops everything down the spawn column, so the scripted merges never
+happen and the boards read as arbitrary. It still teaches ▼, which is the point (L49), but the
+lesson looks broken. Either force the steer or build those boards around the spawn column.
+
+### `GameUiState.best` still absorbs the live score
+
+`maxOf(best, score)`, so the header reads "best 736" during a run at 736 (L44). C3c fixed it where
+it actively lied (the tutorial's score briefly became the player's best) and left the rest, because
+changing it touches the score counter's animation.
 
 
 ### Decide whether the ▼ nudge pays any score
