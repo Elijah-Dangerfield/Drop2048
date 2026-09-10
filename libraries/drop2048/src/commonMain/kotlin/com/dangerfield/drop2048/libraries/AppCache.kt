@@ -60,11 +60,66 @@ data class AppData(
      */
     val savedRun: String? = null,
 
-    /** SPEC 6's left-handed mirror. Moves to the settings screen in C11. */
+    /** SPEC 6's left-handed mirror. Owned by the settings screen since C11. */
     val leftHandedControls: Boolean = false,
 
-    /** SPEC 6's landing outline. On by default, toggleable. Moves to settings in C11. */
+    /** SPEC 6's landing outline. On by default, toggleable. */
     val ghostEnabled: Boolean = true,
+
+    /**
+     * SPEC 16's palette choice and SPEC 9's haptic strength, by enum **name**.
+     *
+     * Strings rather than the enums themselves for the same reason [savedRun] is
+     * a string: `AppData` is one serialized blob, and a field that fails to
+     * decode takes the install id and the onboarding flag down with it. An enum
+     * renamed or removed in `:libraries:ui` would do exactly that. Decoded
+     * leniently on read, so an unknown name falls back to the default palette
+     * instead of losing the player's whole record over a colour.
+     *
+     * It also keeps `:libraries:drop2048` free of a dependency on the design
+     * system, which it has never had.
+     */
+    val blockPalette: String? = null,
+    val hapticsSetting: String? = null,
+
+    /** SPEC 6's control scheme, by enum name. Leniently decoded, as above. */
+    val controlScheme: String? = null,
+
+    /** SPEC 16. ORed with the OS setting at the theme, never instead of it. */
+    val reduceMotion: Boolean = false,
+
+    /** SPEC 16's larger numerals on block faces. */
+    val largeBlockNumbers: Boolean = false,
+
+    val soundEnabled: Boolean = true,
+    val musicEnabled: Boolean = true,
+
+    /** Whether Quit from the pause overlay asks first. On, because Quit ends the run. */
+    val confirmBeforeQuit: Boolean = true,
+
+    /** SPEC 17. Off by default: diagnostics attached to feedback are opt-in. */
+    val diagnosticsOptIn: Boolean = false,
+
+    /** Seven taps on the version number (C12). Persisted so it survives a launch. */
+    val debugMenuUnlocked: Boolean = false,
+
+    /**
+     * The legal record the launch gates measure against.
+     *
+     * [legalAcceptedAt] being 0 means this device has never recorded an
+     * acceptance, which is what makes the blocking re-accept gate unreachable on
+     * a fresh install whatever `legal.forceReacceptBelow` says: a first launch
+     * has nothing to be out of date *against*.
+     */
+    val acceptedTermsVersion: Int = 0,
+    val acceptedPrivacyVersion: Int = 0,
+    val legalAcceptedAt: Long = 0L,
+
+    /**
+     * The soft-update banner, dismissed at a version rather than forever. Raising
+     * `upgrade.softUpdateVersionCode` asks again.
+     */
+    val softUpdateDismissedFor: Int = 0,
 ) {
     /**
      * Get the visit count for a screen by its tracking key.

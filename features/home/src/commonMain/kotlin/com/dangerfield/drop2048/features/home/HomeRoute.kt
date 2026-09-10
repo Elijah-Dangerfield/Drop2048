@@ -8,9 +8,4 @@ import kotlinx.serialization.Serializable
 class HomeRoute : Route()
 
 @Serializable
-data class SettingsRoute(
-    val visitCount: Int = 1,
-) : TrackableRoute("settingsVisits")
-
-@Serializable
 class FeedbackRoute : TrackableRoute("feedbackScreenOpens")

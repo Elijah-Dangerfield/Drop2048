@@ -73,8 +73,15 @@ if (!serverOnly) {
     include(":features:daily:impl")
     include(":features:game")
     include(":features:game:impl")
+    // Force update, maintenance and legal re-accept. Rendered *instead of* the
+    // nav host rather than navigated to, so a blocking gate has no back stack
+    // entry to pop and no destination a deep link can land behind.
+    include(":features:gate")
+    include(":features:gate:impl")
     include(":features:home")
     include(":features:home:impl")
+    include(":features:settings")
+    include(":features:settings:impl")
     include(":features:stats")
     include(":features:stats:impl")
 

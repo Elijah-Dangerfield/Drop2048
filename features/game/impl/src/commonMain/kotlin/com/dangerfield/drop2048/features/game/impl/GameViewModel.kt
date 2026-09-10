@@ -16,9 +16,11 @@ import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.logEvent
 import com.dangerfield.drop2048.libraries.drop2048.AppCache
+import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
+import com.dangerfield.drop2048.libraries.flowroutines.collectIn
 import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
@@ -150,6 +152,9 @@ class GameViewModel(
 
     private var reduceMotion = false
 
+    /** SPEC 11's confirm-before-quit, kept current by `settingsChanged`. */
+    private var confirmBeforeQuit = true
+
     /**
      * The one sideways nudge the player made while a cascade was on screen.
      *
@@ -186,6 +191,15 @@ class GameViewModel(
     init {
         appLifecycle.addObserver(lifecycleObserver)
         takeAction(GameAction.Enter)
+        // The settings screen opens *over* a live board, so this ViewModel is
+        // still alive when the player flips left-handed or the landing outline.
+        // Reading them once in `enter` would leave the board disagreeing with
+        // the switch until the run ended, which is the inert-setting failure
+        // C11 exists to remove. Palette, reduce motion and large numbers do not
+        // need this: they come down a CompositionLocal from the theme.
+        appCache.updates.collectIn(viewModelScope) { data ->
+            takeAction(GameAction.SettingsChanged(data))
+        }
     }
 
     override suspend fun handleAction(action: GameAction) {
@@ -207,10 +221,13 @@ class GameViewModel(
             GameAction.TutorialAdvance -> action.tutorialAdvance()
             GameAction.TutorialSkip -> action.tutorialSkip()
             GameAction.ReplayTutorial -> action.replayTutorial()
-            GameAction.Quit -> sendEvent(GameEffect.Leave)
+            GameAction.Quit -> action.quit()
             GameAction.ShowStats -> sendEvent(GameEffect.OpenStats)
             GameAction.ShowDaily -> sendEvent(GameEffect.OpenDaily)
-            GameAction.ToggleHandedness -> action.toggleHandedness()
+            is GameAction.SettingsChanged -> action.settingsChanged(action.data)
+            GameAction.OpenSettings -> sendEvent(GameEffect.OpenSettings)
+            GameAction.ConfirmQuit -> sendEvent(GameEffect.Leave)
+            GameAction.DismissQuitConfirm -> action.updateState { it.copy(confirmingQuit = false) }
             is GameAction.SetReduceMotion -> reduceMotion = action.enabled
             is GameAction.ShowFrame -> action.showFrame(action.index)
             GameAction.FinishResolution -> action.finishResolution()
@@ -733,11 +750,37 @@ class GameViewModel(
         beginPlaying()
     }
 
-    private suspend fun GameAction.toggleHandedness() {
-        val flipped = !state.leftHanded
-        updateState { it.copy(leftHanded = flipped) }
-        Catching { appCache.update { data -> data.copy(leftHandedControls = flipped) } }
-            .logOnFailure { "Could not persist handedness" }
+    /**
+     * The settings the board itself has to honour, republished as they change.
+     *
+     * Only the three the engine or the layout reads. The palette, reduce motion
+     * and the large-numbers scale are not here on purpose: they arrive through
+     * `AppThemeProvider` as CompositionLocals (decision D4), and mirroring them
+     * into this state would be a second source for one setting.
+     */
+    private suspend fun GameAction.settingsChanged(data: AppData) {
+        confirmBeforeQuit = data.confirmBeforeQuit
+        updateState {
+            it.copy(
+                leftHanded = data.leftHandedControls,
+                ghostEnabled = data.ghostEnabled,
+                ghost = if (data.ghostEnabled) engine.landingCell else null,
+            )
+        }
+    }
+
+    /**
+     * Quit, which ends the run and cannot be undone.
+     *
+     * It sits a thumb-width from Restart on the pause overlay, so it asks first
+     * unless the player has turned that off in settings.
+     */
+    private suspend fun GameAction.quit() {
+        if (!confirmBeforeQuit) {
+            sendEvent(GameEffect.Leave)
+            return
+        }
+        updateState { it.copy(confirmingQuit = true) }
     }
 
     private suspend fun GameAction.showFrame(index: Int) {
@@ -1104,6 +1147,14 @@ data class GameUiState(
     val ghostEnabled: Boolean = true,
 
     /**
+     * Whether the pause overlay is asking whether Quit was meant.
+     *
+     * On the state rather than remembered in the overlay because backgrounding
+     * the app pauses the run and the question has to survive that.
+     */
+    val confirmingQuit: Boolean = false,
+
+    /**
      * The beat of the guided run the board is waiting on, null in a real run
      * (SPEC 13).
      *
@@ -1116,11 +1167,10 @@ data class GameUiState(
     /**
      * Which rules are being played (SPEC 14).
      *
-     * The screen reads it in exactly two places — the pause menu, where Restart
-     * would be a free reroll, and the stacked-out sheet, where "Drop again" would
-     * start an Endless run off the back of a Daily one and quietly leave the mode.
-     * Everything else about a Daily run looks and plays identically, which is the
-     * point.
+     * The screen reads it in exactly one place — the stacked-out sheet, where
+     * "Drop again" would otherwise start an Endless run off the back of a Daily
+     * one and quietly leave the mode. Everything else about a Daily run looks and
+     * plays identically, which is the point.
      */
     val mode: GameMode = GameMode.ENDLESS,
 )
@@ -1136,6 +1186,9 @@ sealed interface GameEffect {
 
     /** SPEC 14's Daily Challenge, opened from the stacked-out sheet. */
     data object OpenDaily : GameEffect
+
+    /** SPEC 11's settings, opened from the pause overlay. */
+    data object OpenSettings : GameEffect
 }
 
 sealed interface GameAction {
@@ -1201,7 +1254,12 @@ sealed interface GameAction {
      * everyone else is also playing today is worth offering.
      */
     data object ShowDaily : GameAction
-    data object ToggleHandedness : GameAction
+    /** `AppData` changed under a live board — see `settingsChanged`. */
+    data class SettingsChanged(val data: AppData) : GameAction
+
+    data object OpenSettings : GameAction
+    data object ConfirmQuit : GameAction
+    data object DismissQuitConfirm : GameAction
 
     /**
      * Reduce motion, read from `LocalReduceMotion` by the screen and forwarded.

@@ -107,6 +107,16 @@ class GameScreenScreenshotTest {
         playingState().copy(phase = GamePhase.Paused)
     }
 
+    /**
+     * SPEC 11's confirm-before-quit, which the settings screen can switch off.
+     * The only golden in this set that is a dialog rather than an overlay, and
+     * the one that says the two are not the same thing.
+     */
+    @Test
+    fun confirmingQuit() = compose.captureScreen("game-quit-confirm") {
+        playingState().copy(phase = GamePhase.Paused, confirmingQuit = true)
+    }
+
     @Test
     fun stackedOut() = compose.captureScreen("game-stacked-out") {
         playingState().copy(

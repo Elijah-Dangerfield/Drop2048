@@ -7,13 +7,14 @@ import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.daily.DailyRoute
 import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.features.game.GameRouteTypeMap
+import com.dangerfield.drop2048.features.settings.SettingsRoute
 import com.dangerfield.drop2048.features.stats.StatsRoute
+import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.Router
 import com.dangerfield.drop2048.libraries.navigation.screen
 import com.dangerfield.drop2048.libraries.navigation.toRouteOrNull
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -56,6 +57,7 @@ class GameFeatureEntryPoint(
                     GameEffect.Leave -> router.goBack()
                     GameEffect.OpenStats -> router.navigate(StatsRoute())
                     GameEffect.OpenDaily -> router.navigate(DailyRoute())
+                    GameEffect.OpenSettings -> router.navigate(SettingsRoute())
                 }
             }
 

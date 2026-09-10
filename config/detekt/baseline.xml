@@ -5,27 +5,8 @@
     <ID>VerifyStrings:AccessDeniedScreen.kt:"Appeal this decision"</ID>
     <ID>VerifyStrings:BlockingErrorScreen.kt:"(which is me cause I wrote myself)"</ID>
     <ID>VerifyStrings:BlockingErrorScreen.kt:"Report to developers"</ID>
-    <ID>VerifyStrings:BugReportScreen.kt:"Describe what happened…"</ID>
-    <ID>VerifyStrings:BugReportScreen.kt:"Help us understand what went wrong. We would love to fix it!"</ID>
-    <ID>VerifyStrings:BugReportScreen.kt:"Message"</ID>
     <ID>VerifyStrings:CameraPreview.android.kt:"Camera Ready"</ID>
-    <ID>VerifyStrings:Colors.kt:"42m remaining"</ID>
-    <ID>VerifyStrings:Colors.kt:"Active session"</ID>
-    <ID>VerifyStrings:Colors.kt:"All good"</ID>
-    <ID>VerifyStrings:Colors.kt:"Card content"</ID>
-    <ID>VerifyStrings:Colors.kt:"Color palette"</ID>
-    <ID>VerifyStrings:Colors.kt:"Modern light theme"</ID>
-    <ID>VerifyStrings:Colors.kt:"Recent activity"</ID>
-    <ID>VerifyStrings:Colors.kt:"Status"</ID>
-    <ID>VerifyStrings:Colors.kt:"View all"</ID>
     <ID>VerifyStrings:ErrorDialogContent.kt:"(which is me cause I wrote myself)"</ID>
-    <ID>VerifyStrings:FeedbackScreen.kt:"Describe what happened…"</ID>
-    <ID>VerifyStrings:FeedbackScreen.kt:"Message"</ID>
-    <ID>VerifyStrings:FeedbackScreen.kt:"We'd love to hear from you"</ID>
-    <ID>VerifyStrings:HomeScreen.kt:"Report a Bug"</ID>
-    <ID>VerifyStrings:HomeScreen.kt:"Send Feedback"</ID>
-    <ID>VerifyStrings:HomeScreen.kt:"This is your starting point.\nBuild something amazing!"</ID>
-    <ID>VerifyStrings:HomeScreen.kt:"Welcome to Drop 2048"</ID>
     <ID>VerifyStrings:NativeButton.jvm.kt:"Native Button"</ID>
     <ID>VerifyStrings:ShakeDialog.kt:"Dismiss"</ID>
     <ID>VerifyStrings:ShakeDialog.kt:"Report a bug"</ID>

@@ -21,6 +21,9 @@ import com.dangerfield.drop2048.system.Dimension
 import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
+import com.dangerfield.drop2048.libraries.ui.components.ListItemAccessory
+import com.dangerfield.drop2048.libraries.ui.components.ListSection
+import com.dangerfield.drop2048.libraries.ui.components.ListSectionItem
 import com.dangerfield.drop2048.libraries.ui.components.Screen
 import com.dangerfield.drop2048.libraries.ui.components.button.Button
 import com.dangerfield.drop2048.libraries.ui.components.button.ButtonSize
@@ -28,6 +31,16 @@ import com.dangerfield.drop2048.libraries.ui.components.header.TopBar
 import com.dangerfield.drop2048.libraries.ui.components.text.OutlinedTextField
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.libraries.ui.screenContentPadding
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.feedback_field_label
+import drop2048.libraries.resources.generated.resources.feedback_intro
+import drop2048.libraries.resources.generated.resources.feedback_placeholder
+import drop2048.libraries.resources.generated.resources.feedback_send
+import drop2048.libraries.resources.generated.resources.feedback_sending
+import drop2048.libraries.resources.generated.resources.feedback_title
+import drop2048.libraries.resources.generated.resources.settings_diagnostics
+import drop2048.libraries.resources.generated.resources.settings_diagnostics_hint
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private const val FEEDBACK_CHAR_LIMIT = 200
@@ -45,7 +58,7 @@ fun FeedbackScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopBar(
-                 title = "Share Your Feedback",
+                title = stringResource(Res.string.feedback_title),
                 onNavigateBack = { onAction(FeedbackAction.Back) }
             )
         }
@@ -63,7 +76,7 @@ fun FeedbackScreen(
             VerticalSpacerD1000()
 
             Text(
-                text = "We'd love to hear from you",
+                text = stringResource(Res.string.feedback_intro),
                 typography = AppTheme.typography.Body.B700,
                 color = AppTheme.colors.textSecondary
             )
@@ -79,8 +92,8 @@ fun FeedbackScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(Dimension.D1900),
-                label = { Text("Message") },
-                placeholder = { Text("Describe what happened…") },
+                label = { Text(stringResource(Res.string.feedback_field_label)) },
+                placeholder = { Text(stringResource(Res.string.feedback_placeholder)) },
                 singleLine = false,
                 minLines = 6,
                 maxLines = 10,
@@ -127,6 +140,22 @@ fun FeedbackScreen(
 
             VerticalSpacerD1000()
 
+            ListSection(
+                items = listOf(
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_diagnostics),
+                        supportingText = stringResource(Res.string.settings_diagnostics_hint),
+                        accessory = ListItemAccessory.Switch(
+                            checked = state.diagnosticsOptIn,
+                            onCheckedChange = { onAction(FeedbackAction.ToggleDiagnostics) },
+                        ),
+                        onClick = { onAction(FeedbackAction.ToggleDiagnostics) },
+                    ),
+                ),
+            )
+
+            VerticalSpacerD1000()
+
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 size = ButtonSize.Large,
@@ -138,7 +167,13 @@ fun FeedbackScreen(
                     }
                 }
             ) {
-                Text(if (state.isSubmitting) "Sending…" else "Send")
+                Text(
+                    if (state.isSubmitting) {
+                        stringResource(Res.string.feedback_sending)
+                    } else {
+                        stringResource(Res.string.feedback_send)
+                    },
+                )
             }
 
             VerticalSpacerD500()

@@ -42,6 +42,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.features.game)
+            implementation(projects.features.settings)
             implementation(projects.features.stats)
             implementation(projects.features.daily)
             implementation(projects.libraries.navigation)

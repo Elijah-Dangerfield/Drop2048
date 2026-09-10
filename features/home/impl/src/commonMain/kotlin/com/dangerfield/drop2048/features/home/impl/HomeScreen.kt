@@ -17,6 +17,12 @@ import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.system.AppTheme
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import com.dangerfield.drop2048.system.VerticalSpacerD800
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.home_body
+import drop2048.libraries.resources.generated.resources.home_bug_report
+import drop2048.libraries.resources.generated.resources.home_feedback
+import drop2048.libraries.resources.generated.resources.home_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun HomeScreen(
@@ -37,7 +43,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "Welcome to Drop 2048",
+                text = stringResource(Res.string.home_title),
                 typography = AppTheme.typography.Heading.H700,
                 color = AppTheme.colors.text,
                 textAlign = TextAlign.Center,
@@ -46,7 +52,7 @@ fun HomeScreen(
             VerticalSpacerD800()
 
             Text(
-                text = "This is your starting point.\nBuild something amazing!",
+                text = stringResource(Res.string.home_body),
                 typography = AppTheme.typography.Body.B500,
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
@@ -55,13 +61,13 @@ fun HomeScreen(
             VerticalSpacerD800()
 
             Button(onClick = onNavigateToFeedback) {
-                Text("Send Feedback")
+                Text(stringResource(Res.string.home_feedback))
             }
 
             VerticalSpacerD500()
 
             Button(onClick = onNavigateToBugReport) {
-                Text("Report a Bug")
+                Text(stringResource(Res.string.home_bug_report))
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048
 
+import com.dangerfield.drop2048.features.gate.impl.LaunchGateViewModel
+import com.dangerfield.drop2048.features.settings.PlayerSettingsStore
 import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.core.AutoInit
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ClearableDao
@@ -71,6 +73,26 @@ interface AppComponent {
      * build time, and C11 injects `Set<ClearableDao>` rather than a list.
      */
     val clearableDaos: Set<ClearableDao>
+
+    /**
+     * The player's accessibility and control settings, read at the root of the
+     * composition and handed to `AppThemeProvider`.
+     *
+     * On the component rather than reached for inside a feature because the
+     * theme is above every feature. This is the wire that makes C2's five
+     * palettes, its reduce-motion signal, its large-numbers scale and its haptic
+     * engine reachable at all — before C11 the provider was called on defaults.
+     */
+    val playerSettingsStore: PlayerSettingsStore
+
+    /**
+     * Force update, maintenance and legal re-accept.
+     *
+     * Held here and driven from `App` rather than registered as a destination:
+     * a blocking gate is rendered *instead of* the nav host, so there is no back
+     * stack entry to pop and no deep link that can land behind it.
+     */
+    val launchGateViewModel: LaunchGateViewModel
 
     @Provides
     fun provideClock(): Clock = Clock.System

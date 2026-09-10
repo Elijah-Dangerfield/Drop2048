@@ -102,8 +102,12 @@ kotlin {
             implementation(projects.features.daily.impl)
             implementation(projects.features.game)
             implementation(projects.features.game.impl)
+            implementation(projects.features.gate)
+            implementation(projects.features.gate.impl)
             implementation(projects.features.home)
             implementation(projects.features.home.impl)
+            implementation(projects.features.settings)
+            implementation(projects.features.settings.impl)
             implementation(projects.features.stats)
             implementation(projects.features.stats.impl)
 

@@ -1039,3 +1039,87 @@ and Bomb at 41.8 (deuteranopia's 2). Mark contrast is 4.85:1, 15.79:1 and 4.99:1
 Under the Viénot simulation the tightest pair is Wildcard against deuteranopia's
 8 at 21.5, which is under the 24 the ramps hold and above the 20 floor the test
 sets for specials — see `BlockPaletteTest.theSpecialsSurviveEachDeficiency`.
+
+## C11 · Settings, legal, launch gates, accessibility
+
+### The player's settings are one value read at the root, not a setting per feature
+
+`PlayerSettings` + `PlayerSettingsStore` live in `:features:settings`, are bound to
+`AppData` in `:features:settings:impl`, and are read in exactly one place:
+`PlayerThemeProvider`, which `App` calls instead of `AppThemeProvider`.
+
+The alternative — each feature reading `AppCache` for the settings it cares about —
+is what the app already did for `leftHandedControls` and `ghostEnabled`, and it is
+how C2's five palettes stayed unreachable for six chunks: `AppThemeProvider` was
+widened to take a palette, a reduce-motion flag, a large-numbers flag and a haptics
+setting, and nothing ever passed one. A single store means a new accessibility
+setting is a field, a row and a line in the provider, rather than a hunt for every
+screen that ought to care.
+
+`PlayerThemeProvider` lives in `:features:settings:impl` rather than in `App.kt` so
+`AccessibilitySettingsReachTheUiTest` composes the production wire rather than a
+copy of it. Reverting its body to `AppThemeProvider(content = content)` turns four
+of its five assertions red, which is the exact bug the last six chunks shipped.
+
+### Settings enums are persisted by name, decoded leniently
+
+`AppData` stores the palette, the haptic strength and the control scheme as
+nullable `String`s and decodes them with a fallback rather than `valueOf`.
+
+Same reasoning as `savedRun` being a string: `AppData` is one serialized blob, and a
+field that fails to decode takes the install id, the onboarding flag and the legal
+record with it. A palette removed between releases must cost the player a colour
+scheme, not their whole record. It also keeps `:libraries:drop2048` free of a
+dependency on the design system, which it has never had.
+
+### `SettingsRoute` carries no arguments at all
+
+Type-safe nav turns every serialized constructor `val` into a nav argument, and on
+Kotlin/Native an enum argument needs an explicit `NavType` in the destination's
+typeMap or graph-build throws — naming a *different* argument than the one that was
+forgotten. A settings screen is where enum arguments are most tempting. Every
+choice on this screen is persisted rather than routed, so an argument would buy
+nothing and cost a landmine.
+
+### Reset progress and delete local data are not the same control
+
+Both empty every `ClearableDao`. "Reset progress" additionally drops the run in
+flight and keeps everything else — the install id, the legal record and the
+accessibility choices are not progress, and re-accepting the terms is not what the
+player asked for. "Delete local data" replaces `AppData` with a fresh one carrying
+only the accessibility and control settings across, because resetting a palette out
+from under somebody mid-tap on "Delete" reads as a bug rather than as a deletion.
+
+Neither is `fallbackToDestructiveMigration`. L33 narrowed that so a *failed
+migration* crashes rather than silently wiping a player's history. This is the
+opposite thing wearing the same shape: a deliberate, double-confirmed request. The
+second confirmation asks for a typed word, because this app has no account and no
+server copy, so a reset is final in a way it is not in an app that can restore.
+
+### The launch gates render instead of the nav host
+
+Ported from `Sodogku/features/gate` with its domain stripped. `LaunchGateHost`
+wraps `AppNavigation` inside `App`; a blocking gate returns early and the nav host
+is never composed, so there is no back stack entry to pop and no deep link that can
+land behind the wall. A notice is a sibling *after* the content in a `Box`, never a
+`Column` above it — an inserted sibling before the content changes its slot and
+throws away the nav host every time a banner appears.
+
+The gate's config keys live in `:libraries:gameconfig` beside SPEC 10's other keys.
+Every default blocks nobody: zero is below no version, `off` is not `blocking`, and
+anything `resolveLaunchGates` does not recognise resolves to off. These are the only
+keys in the project that can brick every install at once.
+
+### The settings screen's visual language is the design system's list, derived
+
+The design handoff lists settings under "not designed yet — ask before inventing".
+Rather than invent a look, the screen is `ListSection` groups in the order a player
+looks for things, with the two destructive rows last and alone. The palette rows
+carry a live `BlockPaletteStrip`, because "Tritanopia" tells a player nothing about
+what their board is about to look like.
+
+One consequence worth an owner ruling: the meta screens (settings, stats, the
+dialogs, the gates) are the design system's light theme, while the board draws its
+own dark backdrop. That is consistent with the Stats screen as it already ships,
+and it is jarring — see the `game-quit-confirm` golden, a white dialog over a dark
+board.

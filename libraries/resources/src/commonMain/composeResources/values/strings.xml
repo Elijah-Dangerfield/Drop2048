@@ -65,7 +65,14 @@
     <string name="game_paused">Paused</string>
     <string name="game_restart">Restart</string>
     <string name="game_quit">Quit</string>
-    <string name="game_left_handed">Left-handed controls</string>
+    <string name="game_settings">Settings</string>
+
+    <!-- SPEC 8.4. Quit ends the run and there is no undo for it, and the control
+         sits a thumb-width from Restart. Off-able in settings. -->
+    <string name="game_quit_confirm_title">Quit this run?</string>
+    <string name="game_quit_confirm_body">The board goes away and the score is recorded as it stands.</string>
+    <string name="game_quit_confirm_action">Quit</string>
+    <string name="game_quit_confirm_cancel">Keep playing</string>
 
     <string name="game_stacked_out">Stacked out</string>
     <string name="game_biggest">Biggest</string>
@@ -96,6 +103,7 @@
     <string name="stats_duration_hours">%1$dh %2$dm</string>
     <string name="stats_duration_minutes">%1$dm</string>
     <string name="stats_duration_seconds">%1$ds</string>
+
     <!-- SPEC 14. The day is UTC everywhere; the countdown is the only thing
          rendered against the player's own clock, which is what stops the
          boundary being a surprise. See DailySeed.kt. -->
@@ -122,4 +130,145 @@
     <string name="daily_retry_unavailable">No ad available right now</string>
     <string name="daily_leaderboard">Leaderboard</string>
     <string name="daily_leaderboard_soon">Global and friends boards arrive with leaderboards.</string>
+    <!--
+        Settings (SPEC 11) and the accessibility block (SPEC 16).
+
+        Every row here changes something the player can see or feel on the next
+        frame. Rows for coins, powerups, board variants and cosmetic themes do
+        not exist, because SPEC 2 cut all four from v1.
+    -->
+    <string name="settings_title">Settings</string>
+
+    <string name="settings_section_sound">Sound and feel</string>
+    <string name="settings_sound_effects">Sound effects</string>
+    <string name="settings_music">Music</string>
+    <string name="settings_haptics">Vibration</string>
+    <string name="settings_haptics_off">Off</string>
+    <string name="settings_haptics_light">Light</string>
+    <string name="settings_haptics_strong">Strong</string>
+
+    <string name="settings_section_controls">Controls</string>
+    <string name="settings_control_scheme">How you steer</string>
+    <string name="settings_scheme_buttons">Buttons</string>
+    <string name="settings_scheme_drag">Drag the board</string>
+    <string name="settings_scheme_both">Both</string>
+    <string name="settings_left_handed">Left-handed layout</string>
+    <string name="settings_left_handed_hint">Swaps the two arrows so the one you use most sits under your thumb.</string>
+    <string name="settings_ghost">Landing outline</string>
+    <string name="settings_ghost_hint">Shows the cell the block will land in.</string>
+    <string name="settings_confirm_quit">Ask before quitting</string>
+    <string name="settings_confirm_quit_hint">Quit ends the run, and Quit sits next to Restart.</string>
+
+    <!-- SPEC 16. Colour never carries meaning alone here: the number is on every
+         block face in every palette, always. -->
+    <string name="settings_section_accessibility">Accessibility</string>
+    <string name="settings_palette">Block colours</string>
+    <string name="settings_palette_default">Default</string>
+    <string name="settings_palette_deuteranopia">Deuteranopia</string>
+    <string name="settings_palette_protanopia">Protanopia</string>
+    <string name="settings_palette_tritanopia">Tritanopia</string>
+    <string name="settings_palette_high_contrast">High contrast</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_hint">Drops the shake and the particles and shortens cascades. The game itself is unchanged.</string>
+    <string name="settings_large_numbers">Larger block numbers</string>
+    <string name="settings_large_numbers_hint">Bigger numerals on every block face.</string>
+
+    <string name="settings_section_game">Game</string>
+    <string name="settings_replay_tutorial">Play the tutorial again</string>
+    <string name="settings_replay_tutorial_hint">Six guided drops. Your run and your scores are untouched.</string>
+
+    <string name="settings_section_pro">Drop 2048 Pro</string>
+    <string name="settings_pro_status">Pro</string>
+    <string name="settings_pro_active">Active</string>
+    <string name="settings_pro_inactive">Not active</string>
+    <string name="settings_restore">Restore purchases</string>
+    <string name="settings_restore_working">Asking the store…</string>
+    <string name="settings_restore_restored">Pro restored. Thank you.</string>
+    <string name="settings_restore_nothing">Nothing to restore on this device.</string>
+    <string name="settings_restore_unavailable">Could not reach the store. Try again in a moment.</string>
+
+    <string name="settings_section_privacy">Privacy and legal</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="settings_terms">Terms of use</string>
+    <string name="settings_ad_consent">Ad preferences</string>
+    <string name="settings_licenses">Open source licences</string>
+    <string name="settings_diagnostics">Send diagnostics with feedback</string>
+    <string name="settings_diagnostics_hint">Attaches your device model and build number. Never your board, your scores or anything you typed elsewhere.</string>
+
+    <string name="settings_section_data">Your data</string>
+    <string name="settings_reset_progress">Reset progress</string>
+    <string name="settings_reset_progress_hint">Clears every run, score and stat. Your settings stay.</string>
+    <string name="settings_delete_data">Delete local data</string>
+    <string name="settings_delete_data_hint">Everything above, plus the record this device keeps of you.</string>
+
+    <!-- Two steps, and the second one asks for a typed word. There is no
+         account and no server copy, so a reset here is final in a way it is not
+         in an app that can restore. -->
+    <string name="settings_reset_warn_title">Reset your progress?</string>
+    <string name="settings_reset_warn_body">Every run, every score and every stat goes. There is no backup and no way to undo this.</string>
+    <string name="settings_reset_confirm_title">Type RESET to confirm</string>
+    <string name="settings_reset_confirm_body">This is the last step.</string>
+    <string name="settings_reset_confirm_word">RESET</string>
+    <string name="settings_reset_confirm_label">Confirmation</string>
+    <string name="settings_reset_done">Progress reset.</string>
+
+    <string name="settings_delete_warn_title">Delete local data?</string>
+    <string name="settings_delete_warn_body">Your runs, your stats and the record this device keeps of you. The tutorial will run again next launch.</string>
+    <string name="settings_delete_done">Local data deleted.</string>
+
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_continue">Continue</string>
+    <string name="settings_erase">Erase</string>
+
+    <string name="settings_section_about">About</string>
+    <string name="settings_feedback">Send feedback</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_credits">Made by Elijah Dangerfield</string>
+    <string name="settings_debug_unlocked">Debug menu unlocked.</string>
+
+    <string name="licenses_title">Open source licences</string>
+    <string name="licenses_body">Drop 2048 is built on Kotlin Multiplatform, Compose Multiplatform, AndroidX (Navigation, Lifecycle, Room, Startup), kotlinx coroutines, serialization and datetime, Ktor, kotlin-inject and kotlin-inject-anvil, Kermit, Sentry and Roborazzi. Every one of them is Apache 2.0 or MIT. Full licence text ships with the app listing.</string>
+
+    <!--
+        The launch gates (C11). Rendered instead of the nav host, never navigated
+        to, so there is nothing here that can pop a wall off the stack.
+
+        The maintenance message is deliberately absent: it is written by an
+        operator during an incident and shown verbatim, so it cannot be a
+        resource.
+    -->
+    <string name="gate_force_update_title">Time to update</string>
+    <string name="gate_force_update_body">This version of Drop 2048 is too old to keep playing. The update is quick.</string>
+    <string name="gate_force_update_action">Get the update</string>
+
+    <string name="gate_maintenance_title">Back shortly</string>
+
+    <string name="gate_legal_title">A quick update to our terms</string>
+    <string name="gate_legal_body">We have changed the terms of use and the privacy policy. Have a read, then carry on.</string>
+    <string name="gate_legal_accept">Accept and play</string>
+
+    <string name="notice_soft_update">A newer version of Drop 2048 is out.</string>
+    <string name="notice_soft_update_action">Update</string>
+    <string name="notice_legal">Our terms and privacy policy have been updated. Closing this accepts them.</string>
+    <string name="notice_legal_action">Read them</string>
+    <string name="notice_dismiss">Dismiss</string>
+
+    <!-- The template's placeholder home screen. Still registered because the
+         feedback and bug-report flows hang off it. -->
+    <string name="home_title">Drop 2048</string>
+    <string name="home_body">This is your starting point.</string>
+    <string name="home_feedback">Send feedback</string>
+    <string name="home_bug_report">Report a bug</string>
+
+    <string name="feedback_title">Send feedback</string>
+    <string name="feedback_intro">We would love to hear from you.</string>
+    <string name="feedback_field_label">Message</string>
+    <string name="feedback_placeholder">Tell us what you think…</string>
+    <string name="feedback_send">Send</string>
+    <string name="feedback_sending">Sending…</string>
+
+    <string name="bug_report_title">Report a bug</string>
+    <string name="bug_report_intro">Tell us what went wrong. We would love to fix it.</string>
+    <string name="bug_report_field_label">Message</string>
+    <string name="bug_report_placeholder">Describe what happened…</string>
 </resources>

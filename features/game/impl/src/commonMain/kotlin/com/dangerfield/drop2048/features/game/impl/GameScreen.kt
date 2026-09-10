@@ -42,6 +42,7 @@ import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.Screen
+import com.dangerfield.drop2048.libraries.ui.components.dialog.BasicDialog
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardRadius
 import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
 import com.dangerfield.drop2048.libraries.ui.components.game.FixedWidthDigits
@@ -83,7 +84,11 @@ import drop2048.libraries.resources.generated.resources.daily_title
 import drop2048.libraries.resources.generated.resources.game_daily_done
 import drop2048.libraries.resources.generated.resources.game_drop_again
 import drop2048.libraries.resources.generated.resources.game_falling_block
-import drop2048.libraries.resources.generated.resources.game_left_handed
+import drop2048.libraries.resources.generated.resources.game_quit_confirm_action
+import drop2048.libraries.resources.generated.resources.game_quit_confirm_body
+import drop2048.libraries.resources.generated.resources.game_quit_confirm_cancel
+import drop2048.libraries.resources.generated.resources.game_quit_confirm_title
+import drop2048.libraries.resources.generated.resources.game_settings
 import drop2048.libraries.resources.generated.resources.game_level_label
 import drop2048.libraries.resources.generated.resources.game_move_left
 import drop2048.libraries.resources.generated.resources.game_move_right
@@ -209,8 +214,32 @@ fun GameScreen(
             }
 
             TutorialLayer(state = state, onAction = onAction)
+
+            if (state.confirmingQuit) {
+                QuitConfirmDialog(onAction = onAction)
+            }
         }
     }
+}
+
+/**
+ * SPEC 11's confirm-before-quit, and the reason it defaults on.
+ *
+ * Quit ends the run, the run is recorded as it stands, and there is no undo.
+ * It also sits one thumb-width from Restart on the same row. Whether this
+ * appears at all is the player's, from the settings screen.
+ */
+@Composable
+private fun QuitConfirmDialog(onAction: (GameAction) -> Unit) {
+    BasicDialog(
+        title = stringResource(Res.string.game_quit_confirm_title),
+        description = stringResource(Res.string.game_quit_confirm_body),
+        primaryButtonText = stringResource(Res.string.game_quit_confirm_action),
+        secondaryButtonText = stringResource(Res.string.game_quit_confirm_cancel),
+        onDismissRequest = { onAction(GameAction.DismissQuitConfirm) },
+        onPrimaryButtonClicked = { onAction(GameAction.ConfirmQuit) },
+        onSecondaryButtonClicked = { onAction(GameAction.DismissQuitConfirm) },
+    )
 }
 
 /**
@@ -355,7 +384,6 @@ private fun BoardArea(
                     )
 
                     GamePhase.Paused -> PauseOverlay(
-                        leftHanded = state.leftHanded,
                         restartable = state.mode != GameMode.DAILY,
                         onAction = onAction,
                         modifier = Modifier.matchParentSize(),
@@ -476,7 +504,6 @@ private fun StartOverlay(onPlay: () -> Unit, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun PauseOverlay(
-    leftHanded: Boolean,
     restartable: Boolean,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
@@ -492,10 +519,9 @@ private fun PauseOverlay(
             if (restartable) {
                 OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
             }
-            OverlayOption(
-                text = stringResource(Res.string.game_left_handed) +
-                    if (leftHanded) OnMark else OffMark,
-            ) { onAction(GameAction.ToggleHandedness) }
+            OverlayOption(stringResource(Res.string.game_settings)) {
+                onAction(GameAction.OpenSettings)
+            }
             OverlayOption(stringResource(Res.string.game_quit)) { onAction(GameAction.Quit) }
         }
     }
@@ -752,8 +778,6 @@ private const val SoftDropAfterMillis = 160L
  * A toggle drawn as a mark rather than a switch, because the pause overlay is not
  * the settings screen and C11 will move this line there wholesale.
  */
-private const val OnMark = " ●"
-private const val OffMark = " ○"
 
 @Preview
 @Composable

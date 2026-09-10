@@ -17,6 +17,7 @@ import com.dangerfield.drop2048.libraries.ui.components.dialog.rememberDialogHos
 import com.dangerfield.drop2048.libraries.ui.system.LocalAppState
 import com.dangerfield.drop2048.libraries.ui.system.LocalBuildInfo
 import com.dangerfield.drop2048.libraries.ui.system.LocalClock
+import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
 import com.dangerfield.drop2048.libraries.ui.system.color.ColorResource
 import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.core.BuildInfo
@@ -69,9 +70,15 @@ sealed class PreviewBottomBar(val render: @Composable () -> Unit) {
 }
 
 /**
- * A composable that is suitable as the root for any composable preview
+ * A composable that is suitable as the root for any composable preview.
  *
- * It will set up the theme and some suitable defaults like a background color.
+ * It sets up the theme and some suitable defaults like a background colour.
+ *
+ * [palette], [reduceMotion] and [largeNumbers] default to the same values a
+ * fresh install has, and exist so a preview or a screenshot golden can be taken
+ * of a screen **under an accessibility setting** rather than only under the
+ * defaults. That is the only way to prove those settings reach what is drawn,
+ * which is what they had not been doing for six chunks.
  */
 @Composable
 fun PreviewContent(
@@ -80,6 +87,9 @@ fun PreviewContent(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     backgroundColor: ColorResource? = defaultColors.background,
     bottomBar: PreviewBottomBar = PreviewBottomBar.None,
+    palette: BlockPaletteChoice = BlockPaletteChoice.Default,
+    reduceMotion: Boolean = false,
+    largeNumbers: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val dialogHostState = rememberDialogHostState()
@@ -89,7 +99,11 @@ fun PreviewContent(
         LocalBuildInfo provides BuildInfo,
         LocalDialogHostState provides dialogHostState
     ) {
-        AppThemeProvider {
+        AppThemeProvider(
+            palette = palette,
+            reduceMotion = reduceMotion,
+            largeNumbers = largeNumbers,
+        ) {
             Box(
                 modifier = modifier
                     .fillMaxSize()

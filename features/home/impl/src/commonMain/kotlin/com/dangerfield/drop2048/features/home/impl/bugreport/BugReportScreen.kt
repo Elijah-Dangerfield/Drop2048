@@ -30,6 +30,12 @@ import com.dangerfield.drop2048.libraries.ui.components.header.TopBar
 import com.dangerfield.drop2048.libraries.ui.components.text.OutlinedTextField
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.libraries.ui.screenContentPadding
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.bug_report_field_label
+import drop2048.libraries.resources.generated.resources.bug_report_intro
+import drop2048.libraries.resources.generated.resources.bug_report_placeholder
+import drop2048.libraries.resources.generated.resources.bug_report_title
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private const val BUG_REPORT_CHAR_LIMIT = 180
@@ -47,7 +53,7 @@ fun BugReportScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopBar(
-                title = "Report a Bug",
+                title = stringResource(Res.string.bug_report_title),
                 onNavigateBack = { onAction(BugReportAction.Back) }
             )
         }
@@ -93,7 +99,7 @@ fun BugReportScreen(
             }
 
             Text(
-                text = "Help us understand what went wrong. We would love to fix it!",
+                text = stringResource(Res.string.bug_report_intro),
                 typography = AppTheme.typography.Body.B700,
                 color = AppTheme.colors.textSecondary
             )
@@ -109,8 +115,8 @@ fun BugReportScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(Dimension.D1900),
-                label = { Text("Message") },
-                placeholder = { Text("Describe what happened…") },
+                label = { Text(stringResource(Res.string.bug_report_field_label)) },
+                placeholder = { Text(stringResource(Res.string.bug_report_placeholder)) },
                 singleLine = false,
                 minLines = 6,
                 maxLines = 10,

@@ -21,6 +21,8 @@ import androidx.navigation.NavUri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.dangerfield.drop2048.features.gate.impl.LaunchGateHost
+import com.dangerfield.drop2048.features.settings.impl.PlayerThemeProvider
 import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.BuildInfo
@@ -51,7 +53,6 @@ import com.dangerfield.drop2048.libraries.ui.snackbar.showDebugSnackBar
 import com.dangerfield.drop2048.libraries.ui.system.LocalAppState
 import com.dangerfield.drop2048.libraries.ui.system.LocalBuildInfo
 import com.dangerfield.drop2048.libraries.ui.system.LocalClock
-import com.dangerfield.drop2048.system.AppThemeProvider
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.seconds
 
@@ -126,7 +127,7 @@ fun App(appComponent: AppComponent) {
         LocalBuildInfo provides BuildInfo,
         LocalDialogHostState provides dialogHostState
     ) {
-        AppThemeProvider {
+        PlayerThemeProvider(appComponent.playerSettingsStore) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Stage 1: null until the async AppData read resolves — the
                 // platform splash (keyed on appViewModel.isReady) covers the
@@ -137,15 +138,26 @@ fun App(appComponent: AppComponent) {
                 val startDestination by appViewModel.startDestination.collectAsState()
                 val route = startDestination
                 if (bootComplete && route != null) {
-                    AppNavigation(
-                        navController = navController,
-                        floatingWindowNavigator = floatingWindowNavigator,
-                        featureEntryPoints = appComponent.featureEntryPoints,
-                        startDestination = route,
-                        router = router,
-                        telemetry = appComponent.telemetry,
-                        jankMonitor = appComponent.jankMonitor,
-                    )
+                    // The gate wraps the nav host rather than living inside it.
+                    // A blocking gate renders *instead of* `AppNavigation`, so
+                    // there is no destination behind it to pop back to and
+                    // nothing a deep link can land on. It sits after the boot
+                    // gate on purpose: its inputs are remote-config keys, and
+                    // deciding before config resolves would decide on defaults.
+                    LaunchGateHost(
+                        viewModel = appComponent.launchGateViewModel,
+                        onOpenLink = router::openWebLink,
+                    ) {
+                        AppNavigation(
+                            navController = navController,
+                            floatingWindowNavigator = floatingWindowNavigator,
+                            featureEntryPoints = appComponent.featureEntryPoints,
+                            startDestination = route,
+                            router = router,
+                            telemetry = appComponent.telemetry,
+                            jankMonitor = appComponent.jankMonitor,
+                        )
+                    }
                 } else {
                     BootLoadingScreen()
                 }
