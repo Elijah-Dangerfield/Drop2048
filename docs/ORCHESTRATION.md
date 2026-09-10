@@ -277,6 +277,34 @@ accessibility feature behind a play streak is not defensible).
 seed everyone else also played is not comparable to an Endless best, and one number meaning two
 things is worse than two numbers.
 
+### D21 · ▼ is a hard drop. Soft drop is deleted.
+
+Owner ruling from **playing it**, 2026-09-10, and it supersedes the D11 half that cut hard drop.
+
+The packet said hard drop was "tried and cut" and replaced by a two-tick accelerator. Play says
+otherwise: the expectation at the control is "send this tile to the bottom", and the measurements
+never disagreed — C1c put hard drop at level 4 in **33s** against **223s** patient (L29), and C1e
+found the nudge recovered 88% of the clock but explicitly could not measure whether it recovered
+the *decisiveness* (L40 note).
+
+**Soft drop goes with it.** It was a *hold* of the same control, and holding is what produced the
+bug below. One input, one meaning, no mode.
+
+**The bug this fixes, which is the real argument.** `softDropOnHold` was keyed on `enabled = live`.
+Hold ▼, let the block land, and the resolution phase flips `live` false — which re-keys the
+`pointerInput` and **tears the gesture down mid-flight**, so `waitForUpOrCancellation()` is
+cancelled and `onEnd()` never runs. `softDropping` then stays `true` with no path to clear it
+except a new run. One accidental hold and the entire rest of the run falls at soft-drop speed.
+
+Generalisable: **a `pointerInput` keyed on a value that changes during the gesture will drop the
+release callback.** Any hold-to-do-X built this way leaks its "on" state. Prefer a gesture that
+cannot be re-keyed mid-press, or reset the state on the phase change as well as at the callback.
+
+**Costs, all accepted:** the determinism digest moves a third time (still free — no scores exist,
+and D18's freeze does not bite until Daily scores are recorded); `Input.Nudge` and
+`EngineConfig.nudgeRows` retire; every balance number shifts to the hard-dropping column, which
+C1e already measured. `Motion.HardDropMillis` exists and was never used — now it has a caller.
+
 ### D20 · The design system grew a dark surface set; the meta screens did not adopt a backdrop
 
 C3c's ruling. `defaultColors` now maps the handoff's game palette onto the existing role ramp, and

@@ -12,6 +12,19 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### ▼ becomes a hard drop, soft drop is deleted (D21) — DO THIS FIRST
+
+Owner ruling from play. `Input.Lock` already locks at the landing cell, so the engine side is
+nearly free. Retire `Input.Nudge`, `EngineConfig.nudgeRows`, `GameAction.SoftDropStart/End`,
+`softDropOnHold` and the `softDropping` field. Re-pin the determinism digest by **running the
+engine**, not by pasting the assertion's actual (L17).
+
+Also update: the tutorial teaches ▼ as "drop it" rather than "nudge it" (L49's mechanism survives —
+with the clock frozen, ▼ is still the only way to make progress, and now it takes one tap per
+drop); SPEC 6, 7 and 13; `docs/reference/design-handoff-deltas.md`, since the packet's control
+scheme is now overridden on this point too.
+
+
 ### The first Room-backed test in the repo
 
 `bestScore()`'s `WHERE mode = 'ENDLESS'` filter has **no direct coverage**, and there is no
