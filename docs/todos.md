@@ -89,15 +89,13 @@ reduce motion, large numbers and haptics are **inert end to end**. The plumbing 
 feeds it. Belongs to C11 (Settings), but it means no accessibility setting actually works until
 then — worth knowing before someone tests one and reports a bug.
 
-### Convert the remaining 28 `VerifyStrings` baseline entries
+### Sweep the 28 `VerifyStrings` baseline entries
 
-C0 pruned the baseline from 53 to 28 and made `OnboardingScreen` the worked example. The rest are
-unverified copy on template screens nobody has rewritten: `HomeScreen`, `BugReportScreen`,
-`FeedbackScreen`, `ShakeDialog`, `SplashScreen`, `AccessDeniedScreen`, `BlockingErrorScreen`, the
-UI catalog.
+Audited in C5 (correcting an earlier claim of mine): **none of them are onboarding.** They break
+down as `HomeScreen` 4, the colour catalog 9, `BugReportScreen` + `FeedbackScreen` 6, plus
+error / dialog / splash strays. All template leftovers.
 
-**Not a chunk of its own.** Each screen's entries get deleted by whichever chunk replaces that
-screen. Tracked here so the count is visible and it does not quietly stay at 28 forever.
+Probably a C11 job, since Settings is the chunk that touches most of those screens anyway.
 
 ### Regrow the scenario-harness pattern demo in `:features:game` (C3)
 
@@ -199,10 +197,10 @@ and `ShareButton` for C9.
 **Do not port them up front.** An unported component costs nothing; a ported-and-unused one costs
 maintenance forever.
 
-### Decide whether `:features:onboarding` keeps its name
+### Soft drop is dead during the tutorial
 
-C0 guts it down to the route. C5 refills it with the tutorial. If nothing auth-shaped ever comes
-back, `:features:tutorial` is the honest name and the rename is cheapest before C5 fills it.
+It is a *hold* of ▼, and soft drop is the ticker running faster — and the tutorial's ticker is off
+(L49). If C3a's feel pass wants soft drop taught, it needs its own beat after the handoff.
 
 ### Check `:libraries:review` is still wanted
 

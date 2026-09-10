@@ -25,13 +25,13 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
 | C3a · Feel | not started | Needs audio assets from the owner |
-| C5 · Tutorial | **IN PROGRESS** | Teaching ▼ is worth 223s→56s (L29, C1e) |
-| C6 · Daily Challenge | not started | |
+| C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
+| C6 · Daily Challenge | **IN PROGRESS** | Seeded engine makes it cheap |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | not started | |
 | C10 · Ads + billing | not started | |
-| C11 · Settings, legal, gates, a11y | not started | |
+| C11 · Settings, legal, gates, a11y | **IN PROGRESS** | Also the ClearableDao + replayTutorial call sites |
 | C12 · Debug menu | not started | |
 | C13 · Store prep | not started | |
 
@@ -515,6 +515,43 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L49 · Teach a habit, not a fact: make the thing you are teaching the only way forward
+
+The tutorial's job was to put the ▼ nudge in the player's hands, because using it is worth 223s
+versus 56s to reach level 4 (L29). The obvious approach is a card saying "tap ▼", and a card
+teaches a fact that is forgotten by drop seven.
+
+C5's answer was one line:
+
+```kotlin
+if (tutorial.isRunning) return   // in restartTicker()
+```
+
+SPEC 13 already froze the clock, for the stated reason that a scripted run should not be a race.
+**That is not the valuable reason.** With no ticker, gravity never moves a block, so ▼ becomes the
+only input that makes progress. A player cannot finish six drops without pressing it five to
+fifteen times, and the 2048 burst — the game's biggest moment — is delivered by that button.
+
+It also cost one line instead of a lesson, a gate and a nag. Rejected alternatives (a scrim that
+only lets ▼ through, a "you didn't use ▼" prompt) are in `decisions.md`.
+
+**Known limitation, recorded rather than hidden:** soft drop is a *hold* of ▼ and soft drop is the
+ticker running faster, so soft drop does nothing during the tutorial.
+
+### L50 · A brief can carry a wrong fact, and the agent should check rather than inherit it
+
+My C5 brief told the agent that C0 left 28 `VerifyStrings` baseline entries "for the onboarding
+screen" and that the chunk should shrink that count. **That was my misreading.** All 28 are in
+`HomeScreen`, the colour catalog, `BugReportScreen`, `FeedbackScreen`, `ShakeDialog`,
+`SplashScreen` and `AccessDeniedScreen`. Not one is onboarding — `OnboardingScreen` used
+`stringResource` correctly, so deleting it shrank nothing.
+
+C5 checked and said so instead of quietly reporting 28 → 28 as a failure to deliver.
+
+**Orchestrator rule:** a brief is written from the orchestrator's memory of other agents' reports,
+which is exactly the place a fact gets garbled. Agents should verify load-bearing claims in a brief
+against the repo, and say so when the brief is wrong.
 
 ### L46 · A test that has never run can be wrong for months and look green
 
