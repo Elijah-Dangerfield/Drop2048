@@ -78,6 +78,13 @@ Seed your own here as features land — the onboarding feature already emits
 `onboarding.abandoned` (see `OnboardingViewModel`). Keep the pattern: one row per event, name the
 attributes and the exact fire site.
 
+| Event | Attributes | Fires |
+|---|---|---|
+| `run.end` | `score`, `level`, `blocks`, `highest_tier`, `cause` | Every completed run, in `GameViewModel.endRun` (SPEC 17). A run abandoned via Restart or Quit is not a completed run and does not fire (D12) |
+| `daily.end` | `date` (UTC, ISO), `score` | A finished Daily attempt, banked against the day it was *started* on (SPEC 14) |
+| `engine.fault` | `fault` | The engine reporting a bug in itself (SPEC 18.1, 18.14). Should be zero; if it is not, that is the finding |
+| `leaderboard.submitted` | `board`, `value` | A value the platform **accepted**, in `RealLeaderboards.send`. Deliberately not fired on a refusal: signed out, restricted and offline are the normal state for most players, and an event on every one of them would drown the one that means something. Zero of these on iOS while `run.end` climbs is the shape of the bug this chunk exists to prevent |
+
 ## Warn+ log forwarding (not events)
 
 Besides events, `GrafanaLogTree` forwards plain KLog lines at Warn and above to Loki as ordinary

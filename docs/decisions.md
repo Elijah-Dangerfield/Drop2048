@@ -6,6 +6,86 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — Score achievements are priced off the scoring coefficients, never typed
+
+**Decision:** the five score badges take their targets from `ScoreLadder`, which
+computes the score a run is **guaranteed** to have banked by the time it reaches
+level 5, 10, 15, 20 or 25 — survival plus level-up bonuses, nothing else — and
+rounds each down to two significant figures. No number of points is written down
+anywhere in `:libraries:achievements`.
+
+**Why:** points are the one quantity in the game with no natural scale. SPEC 7's
+table is six coefficients in `Scoring`, and halving `survivalPerLevel` would
+halve most of every score there will ever be. Sodogku shipped the typed version
+twice and stranded three badges both times — a 10x rescale of its coefficients
+left targets nobody could reach, while they still rendered as ordinary tiles with
+a progress bar stuck near zero. A badge nobody can earn is worse than no badge
+precisely because it looks like a working one.
+
+Pricing off a *level* rather than off a measured distribution is what makes the
+rung mean something a player can aim at ("get to level twenty") rather than name
+a number, and the floor is a guarantee: merges, bursts and detonations are all
+additive on top, so anybody who reaches the level has the rung.
+
+**Alternatives rejected.** *Typed literals*: the bug above. *A fraction of a
+measured p90*: it moves with the balance harness rather than with the formula, so
+a spawn-table change nobody thought was a scoring change would silently retune
+the badges. *A remote-config key*: SPEC 10 marks the scoring formulas never-remote
+because moving them invalidates high scores; a remote target would be a way to
+invalidate badges instead.
+
+**What it does not cover:** the catalog is compiled in and reads the *shipped*
+coefficients, while an Endless run scores on whatever remote config says. SPEC
+10's never-remote rule is what closes that gap, and it is a rule rather than
+code.
+
+---
+
+## 2026-09-10 — Achievement facts are folded out of the transcript, and the burst step counts its own Stones
+
+**Decision:** `RunFacts` — board clears, three-Stone bursts, Wildcard 2048s and
+the danger-drop streak — is folded from `Transition` one locked drop at a time,
+alongside the tally `run_record` is written from. `ResolutionStep.Burst` gained a
+`stones: Int` field so the fold can read it.
+
+**Why:** SPEC 4.2 makes the transcript the single channel for everything a
+transition did, and scoring already flows down it — the invariant
+`next.score == previous.score + transcript.points` exists because a second
+scoring channel would have let the floating numbers drift from the score. A badge
+counted in the ViewModel by watching events would be exactly that second channel,
+and the first thing to disagree would be a board-clear badge against the
+board-cleared bonus that paid out beside it.
+
+The `stones` count is on the engine's step rather than derived downstream because
+it cannot be derived downstream. A burst three cascade steps in sits on a board no
+caller holds: the transcript returns the final board, and the intermediate ones
+are re-derived by replaying the steps. Counting Stones outside the resolver would
+mean a second copy of the resolution loop, which is a much worse trade than one
+integer. It is not scored — the burst bonus is per block regardless of what the
+block was — and the determinism digest is over `GameState`, so it does not move.
+
+**Cost:** `SAVE_FORMAT_VERSION` goes to 4. `RunTally` grew a field and the saved
+transcript embeds the new one, and the rule is "bump on every shape change"
+rather than "bump when it is not backwards compatible", for the reason version 3
+gave.
+
+---
+
+## 2026-09-10 — Achievements record while the player is not looking, and pay nothing
+
+**Decision:** there is no settings toggle for achievements and no currency
+attached to them. A badge unlocks, posts to the platform, and stops.
+
+**Why:** SPEC 2 cut coins along with the powerups they existed to buy, so the
+payouts the original spec attached to badges have nothing behind them. Adding a
+currency field "for later" would be a ledger with no sink, which is the exact
+argument that cut coins.
+
+Sodogku's display toggle is not ported either. It exists there because that game
+has seventy-three badges and nine of them are surprises; twenty-four goals a
+player is working toward is a screen somebody opens on purpose, and a switch that
+hides it earns less than the branch it costs on every read.
+
 ## 2026-09-09 — The Daily Challenge pins the compiled-in `EngineConfig` and ignores remote config
 
 **Decision:** `RunFactory.dailyRun()` builds its `GameState` with

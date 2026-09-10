@@ -61,7 +61,19 @@ sealed interface ResolutionStep {
         override val points: Int,
     ) : ResolutionStep
 
-    /** A 2048 was created in [row], so the whole row clears — Stones included (SPEC 18.5). */
+    /**
+     * A 2048 was created in [row], so the whole row clears — Stones included
+     * (SPEC 18.5).
+     *
+     * [stones] is how many of [cleared] held a Stone. It is counted here rather
+     * than derived downstream because the only board that could answer the
+     * question is the one this step is about to destroy: a burst three steps
+     * into a cascade sits on a board no caller holds, and reconstructing it
+     * means replaying the resolution outside the resolver. The count is not
+     * scored — the burst bonus is per block regardless of what the block was —
+     * and exists because SPEC 15 asks for a badge for clearing a row with three
+     * of them.
+     */
     @Serializable
     @SerialName("burst")
     data class Burst(
@@ -69,6 +81,7 @@ sealed interface ResolutionStep {
         val row: Int,
         val cleared: List<Cell>,
         override val points: Int,
+        val stones: Int = 0,
     ) : ResolutionStep
 
     /** Everything that fell after a merge, burst or detonation. Scores nothing. */

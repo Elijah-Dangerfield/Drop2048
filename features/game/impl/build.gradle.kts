@@ -45,8 +45,14 @@ kotlin {
             implementation(projects.features.settings)
             implementation(projects.features.stats)
             implementation(projects.features.daily)
+            // The badge copy for the unlock toast. A feature impl may depend on
+            // another feature's api, which is why AchievementCopy lives there.
+            implementation(projects.features.achievements)
             implementation(projects.libraries.navigation)
 
+            implementation(projects.libraries.achievements)
+            implementation(projects.libraries.leaderboards)
+            implementation(projects.libraries.sharing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.core)
@@ -80,6 +86,13 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
+            // The screenshot harness in androidUnitTest names ControlScheme, and
+            // a commonMain `implementation` dependency is not on a test
+            // compilation's classpath.
+            implementation(projects.features.settings)
+            implementation(projects.libraries.achievements)
+            implementation(projects.libraries.leaderboards)
+            implementation(projects.libraries.sharing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.config)

@@ -265,6 +265,7 @@ internal object Resolver {
         val allCleared = mutableListOf<Cell>()
         rows.forEach { row ->
             val cleared = current.rowCells(row).filter { current[it] != null }
+            val stones = cleared.count { current[it]?.specialKind == Special.STONE }
             current = current.withAll(cleared.associateWith { null })
             allCleared += cleared
             steps += ResolutionStep.Burst(
@@ -272,6 +273,7 @@ internal object Resolver {
                 row = row,
                 cleared = cleared,
                 points = config.scoring.burstBase + config.scoring.burstPerBlock * cleared.size,
+                stones = stones,
             )
         }
         return BurstOutcome(current, steps, allCleared)

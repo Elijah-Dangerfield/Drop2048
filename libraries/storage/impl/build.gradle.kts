@@ -18,6 +18,7 @@ kotlin {
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.drop2048.storage)
             implementation(projects.libraries.progress)
+            implementation(projects.libraries.achievements)
             implementation(libs.kotlinx.serialization.json)
         }
     }

@@ -67,6 +67,10 @@ if (!serverOnly) {
     include(":apps:admin")
 
     // Features
+    // SPEC 15's badge grid. The catalog and the fold are in
+    // :libraries:achievements; this is the screen that draws them.
+    include(":features:achievements")
+    include(":features:achievements:impl")
     // SPEC 14's Daily Challenge screen. The board it opens is :features:game
     // with a mode argument, not a second game screen.
     include(":features:daily")
@@ -86,6 +90,18 @@ if (!serverOnly) {
     include(":features:stats:impl")
 
     // Libraries
+    // SPEC 15's twenty-four badges: the catalog, the fold over the fact log, and
+    // the `achievement_fact` / `achievement_unlock` tables. They unlock and post
+    // and pay nothing — SPEC 2 cut the currency they used to pay in.
+    include(":libraries:achievements")
+    include(":libraries:achievements:impl")
+    // SPEC 15's platform boards. Game Center on iOS; Play Games is not in v1, so
+    // Android binds an inert seam rather than a second implementation.
+    include(":libraries:leaderboards")
+    include(":libraries:leaderboards:impl")
+    // The share sheet and the string that goes in it. Deliberately dependency-free.
+    include(":libraries:sharing")
+    include(":libraries:sharing:impl")
     // The game engine. Zero project dependencies on purpose (SPEC 4.1) — it is a
     // pure state machine and everything downstream assumes it stays that way.
     include(":libraries:cascade")

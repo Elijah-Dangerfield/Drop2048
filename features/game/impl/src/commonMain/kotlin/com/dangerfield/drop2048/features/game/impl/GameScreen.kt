@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
@@ -47,6 +49,9 @@ import com.dangerfield.drop2048.libraries.ui.components.game.BoardRadius
 import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
 import com.dangerfield.drop2048.libraries.ui.components.game.FixedWidthDigits
 import com.dangerfield.drop2048.libraries.ui.components.game.GameControlRow
+import com.dangerfield.drop2048.features.achievements.AchievementCopy
+import com.dangerfield.drop2048.libraries.ui.components.feedback.UnlockToastItem
+import com.dangerfield.drop2048.libraries.ui.components.feedback.UnlockToasts
 import com.dangerfield.drop2048.libraries.ui.components.game.GameOverlay
 import com.dangerfield.drop2048.libraries.ui.components.game.GamePrimaryButton
 import com.dangerfield.drop2048.libraries.ui.components.game.LevelMeter
@@ -56,7 +61,6 @@ import com.dangerfield.drop2048.libraries.ui.components.game.ScoreCounter
 import com.dangerfield.drop2048.libraries.ui.components.game.StatLabel
 import com.dangerfield.drop2048.libraries.ui.components.game.WellPadding
 import com.dangerfield.drop2048.libraries.ui.components.game.Wordmark
-import com.dangerfield.drop2048.libraries.ui.components.game.gameBackdrop
 import com.dangerfield.drop2048.libraries.ui.components.game.groupThousands
 import com.dangerfield.drop2048.libraries.ui.system.FocusRegistry
 import com.dangerfield.drop2048.libraries.ui.system.FocusScrim
@@ -89,6 +93,7 @@ import drop2048.libraries.resources.generated.resources.game_quit_confirm_body
 import drop2048.libraries.resources.generated.resources.game_quit_confirm_cancel
 import drop2048.libraries.resources.generated.resources.game_quit_confirm_title
 import drop2048.libraries.resources.generated.resources.game_settings
+import drop2048.libraries.resources.generated.resources.achievements_unlocked
 import drop2048.libraries.resources.generated.resources.game_level_label
 import drop2048.libraries.resources.generated.resources.game_move_left
 import drop2048.libraries.resources.generated.resources.game_move_right
@@ -103,6 +108,7 @@ import drop2048.libraries.resources.generated.resources.game_score
 import drop2048.libraries.resources.generated.resources.game_stacked_out
 import drop2048.libraries.resources.generated.resources.game_start_body
 import drop2048.libraries.resources.generated.resources.game_stats
+import drop2048.libraries.resources.generated.resources.share_run
 import drop2048.libraries.resources.generated.resources.game_tap_to_resume
 import drop2048.libraries.resources.generated.resources.tutorial_begin
 import drop2048.libraries.resources.generated.resources.tutorial_burst_body
@@ -148,12 +154,26 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * it is given. The spacer is what is left over, which is the handoff's intent
  * rather than its arithmetic.
  *
- * **The paused overlay carries three secondary actions the handoff does not
+ * **The paused overlay carries the secondary actions the handoff does not
  * draw.** Its paused state is "Paused / tap to resume" and nothing else, because
- * its prototype has no restart, no handedness setting and nowhere to quit to.
- * SPEC 8.4 has all three. They are drawn as quiet text under the design's own
- * copy and they consume their own taps, so tap-anywhere-to-resume still works
- * everywhere else on the overlay.
+ * its prototype has no restart, no handedness setting, nowhere to quit to and no
+ * other screens at all. SPEC 8.4 has all of them. They are drawn as quiet text
+ * under the design's own copy and they consume their own taps, so
+ * tap-anywhere-to-resume still works everywhere else on the overlay.
+ *
+ * **The start and paused overlays are the app's menu.** C5 deleted the home
+ * screen, so this is the launch destination and there is nowhere else for Daily,
+ * Stats and Settings to be reached from. Until C11 they were reachable *only*
+ * from the stacked-out sheet, which meant a player had to lose a run to open the
+ * Daily.
+ *
+ * **[ControlScheme] is honoured here rather than only stored.** `Drag` hides the
+ * control row, `Buttons` stops [GameBoard] accepting a drag, `Both` is what the
+ * game has shipped with. Decision D11 makes drag primary and the buttons the
+ * secondary path, so `Drag` is the scheme that loses least — the downward flick
+ * still nudges. What it does lose is **soft drop**, which is a hold of the ▼
+ * button and has no gesture equivalent; that is a known cost of picking `Drag`
+ * rather than an oversight.
  */
 @Composable
 fun GameScreen(
@@ -174,7 +194,6 @@ fun GameScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .gameBackdrop()
                         .padding(padding)
                         .padding(horizontal = RootPaddingX, vertical = RootPaddingY),
                     verticalArrangement = Arrangement.spacedBy(RootGap),
@@ -192,34 +211,74 @@ fun GameScreen(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 
-                    GameControlRow(
-                        onLeft = { onAction(GameAction.MoveLeft) },
-                        onNudge = { onAction(GameAction.Nudge) },
-                        onRight = { onAction(GameAction.MoveRight) },
-                        leftDescription = stringResource(Res.string.game_move_left),
-                        nudgeDescription = stringResource(Res.string.game_nudge),
-                        rightDescription = stringResource(Res.string.game_move_right),
-                        enabled = live,
-                        mirrored = state.leftHanded,
-                        nudgeModifier = Modifier
-                            .softDropOnHold(
-                                enabled = live,
-                                onStart = { onAction(GameAction.SoftDropStart) },
-                                onEnd = { onAction(GameAction.SoftDropEnd) },
-                            )
-                            .focusTarget(NudgeFocusKey),
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    )
+                    if (state.controlScheme != ControlScheme.Drag) {
+                        GameControlRow(
+                            onLeft = { onAction(GameAction.MoveLeft) },
+                            onNudge = { onAction(GameAction.Nudge) },
+                            onRight = { onAction(GameAction.MoveRight) },
+                            leftDescription = stringResource(Res.string.game_move_left),
+                            nudgeDescription = stringResource(Res.string.game_nudge),
+                            rightDescription = stringResource(Res.string.game_move_right),
+                            enabled = live,
+                            mirrored = state.leftHanded,
+                            nudgeModifier = Modifier
+                                .softDropOnHold(
+                                    enabled = live,
+                                    onStart = { onAction(GameAction.SoftDropStart) },
+                                    onEnd = { onAction(GameAction.SoftDropEnd) },
+                                )
+                                .focusTarget(NudgeFocusKey),
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        )
+                    }
                 }
             }
 
             TutorialLayer(state = state, onAction = onAction)
+
+            UnlockLayer(state = state, onAction = onAction)
 
             if (state.confirmingQuit) {
                 QuitConfirmDialog(onAction = onAction)
             }
         }
     }
+}
+
+/**
+ * SPEC 15's badge announcement, over the stacked-out sheet.
+ *
+ * It sits at the top of the window rather than inside the sheet, because the
+ * sheet is where Drop again lives and a toast that pushed the buttons down would
+ * move a target under a thumb that was already on its way to it. It dismisses on
+ * its own timer and on a tap; either way it clears the list on the state, so a
+ * rotation cannot re-announce it.
+ *
+ * The copy is resolved here, not in the ViewModel: `AchievementCopy` returns
+ * `StringResource`s and a `stringResource` needs a composition. Same split as
+ * `GameCallout`.
+ */
+@Composable
+private fun BoxScope.UnlockLayer(state: GameUiState, onAction: (GameAction) -> Unit) {
+    if (state.unlocked.isEmpty()) return
+
+    val label = stringResource(Res.string.achievements_unlocked)
+    val items = state.unlocked.map { id ->
+        UnlockToastItem(
+            glyph = AchievementCopy.glyph(id),
+            label = label,
+            title = stringResource(AchievementCopy.name(id)),
+        )
+    }
+
+    UnlockToasts(
+        items = items,
+        onDismiss = { onAction(GameAction.DismissUnlocks) },
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(top = UnlockToastTopInset),
+    )
 }
 
 /**
@@ -380,11 +439,12 @@ private fun BoardArea(
                 when (state.phase) {
                     GamePhase.Ready -> StartOverlay(
                         onPlay = { onAction(GameAction.Start) },
+                        onAction = onAction,
                         modifier = Modifier.matchParentSize(),
                     )
 
                     GamePhase.Paused -> PauseOverlay(
-                        restartable = state.mode != GameMode.DAILY,
+                        daily = state.mode == GameMode.DAILY,
                         onAction = onAction,
                         modifier = Modifier.matchParentSize(),
                     )
@@ -480,12 +540,51 @@ private fun GameHeader(
     }
 }
 
+/**
+ * The first thing a player sees, and — since C5 deleted the home screen — the
+ * only menu the app has before a run starts.
+ *
+ * Play is the one primary action and the other three sit under it as quiet text,
+ * in the same treatment the paused overlay uses, so the design's start card is
+ * still a start card rather than a list of destinations.
+ */
 @Composable
-private fun StartOverlay(onPlay: () -> Unit, modifier: Modifier = Modifier) {
+private fun StartOverlay(
+    onPlay: () -> Unit,
+    onAction: (GameAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     GameOverlay(kind = OverlayKind.Start, modifier = modifier) {
         Wordmark()
         OverlayBody(stringResource(Res.string.game_start_body))
         GamePrimaryButton(label = stringResource(Res.string.game_play), onClick = onPlay)
+        MenuOptions(daily = true, onAction = onAction)
+    }
+}
+
+/**
+ * Daily, Stats and Settings, drawn wherever the player is not mid-drop.
+ *
+ * One composable rather than three call sites because the set is the app's whole
+ * navigation surface and it must not drift between the two overlays that offer
+ * it: a destination added to one and not the other is a screen that exists on
+ * Monday and not on Tuesday.
+ */
+@Composable
+private fun MenuOptions(
+    daily: Boolean,
+    onAction: (GameAction) -> Unit,
+    share: Boolean = false,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
+        if (share) {
+            OverlayOption(stringResource(Res.string.share_run)) { onAction(GameAction.Share) }
+        }
+        if (daily) {
+            OverlayOption(stringResource(Res.string.daily_title)) { onAction(GameAction.ShowDaily) }
+        }
+        OverlayOption(stringResource(Res.string.game_stats)) { onAction(GameAction.ShowStats) }
+        OverlayOption(stringResource(Res.string.game_settings)) { onAction(GameAction.OpenSettings) }
     }
 }
 
@@ -504,7 +603,7 @@ private fun StartOverlay(onPlay: () -> Unit, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun PauseOverlay(
-    restartable: Boolean,
+    daily: Boolean,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -516,14 +615,12 @@ private fun PauseOverlay(
         OverlayHeadline(stringResource(Res.string.game_paused))
         OverlayHint(stringResource(Res.string.game_tap_to_resume))
         Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
-            if (restartable) {
+            if (!daily) {
                 OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
-            }
-            OverlayOption(stringResource(Res.string.game_settings)) {
-                onAction(GameAction.OpenSettings)
             }
             OverlayOption(stringResource(Res.string.game_quit)) { onAction(GameAction.Quit) }
         }
+        MenuOptions(daily = !daily, onAction = onAction)
     }
 }
 
@@ -577,12 +674,7 @@ private fun StackedOutOverlay(
             horizontalPadding = DropAgainPaddingX,
             verticalPadding = DropAgainPaddingY,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
-            OverlayOption(stringResource(Res.string.game_stats)) { onAction(GameAction.ShowStats) }
-            if (!daily) {
-                OverlayOption(stringResource(Res.string.daily_title)) { onAction(GameAction.ShowDaily) }
-            }
-        }
+        MenuOptions(daily = !daily, onAction = onAction, share = true)
     }
 }
 
@@ -711,6 +803,9 @@ private fun Block.spoken(): String = when (this) {
     is NumberBlock -> value.points.toString()
     is SpecialBlock -> special.name.lowercase()
 }
+
+/** Clear of the header row, so a badge never lands on the live score. */
+private val UnlockToastTopInset: Dp = 72.dp
 
 /** The handoff's `padding: 56px 16px 44px`, averaged onto one vertical value. */
 private val RootPaddingX: Dp = 16.dp

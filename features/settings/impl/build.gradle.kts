@@ -33,6 +33,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.features.settings)
+            implementation(projects.features.achievements)
             implementation(projects.features.game)
             implementation(projects.features.home)
             implementation(projects.libraries.navigation)

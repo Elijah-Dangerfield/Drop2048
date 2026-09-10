@@ -12,6 +12,10 @@ import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.Rng
 import com.dangerfield.drop2048.libraries.cascade.Special
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
+import com.dangerfield.drop2048.libraries.achievements.Achievement
+import com.dangerfield.drop2048.libraries.achievements.AchievementState
+import com.dangerfield.drop2048.libraries.achievements.AchievementsRepository
+import com.dangerfield.drop2048.libraries.achievements.RunOutcome
 import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
@@ -27,6 +31,8 @@ import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryResult
 import com.dangerfield.drop2048.libraries.progress.daily.DailyStatus
 import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
 import com.dangerfield.drop2048.libraries.progress.daily.dailySeedFor
+import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
+import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
 import com.dangerfield.drop2048.libraries.progress.statsFrom
 import kotlin.time.Duration
 import kotlinx.datetime.LocalDate
@@ -65,6 +71,8 @@ internal class GameScenario private constructor(
     val progress: FakeProgressRepository,
     val savedRuns: FakeSavedRunStore,
     val daily: FakeDailyRepository,
+    val achievements: FakeAchievementsRepository,
+    val leaderboards: FakeLeaderboards,
     val lifecycle: FakeAppLifecycle,
     val clock: MutableClock,
 ) {
@@ -94,6 +102,8 @@ internal class GameScenario private constructor(
             savedRunStore = savedRuns,
             progress = progress,
             daily = daily,
+            achievements = achievements,
+            leaderboards = leaderboards,
             clock = clock,
             appLifecycle = lifecycle,
         )
@@ -233,6 +243,8 @@ internal class GameScenario private constructor(
             teach: Boolean = false,
             /** The ledger a Daily scenario spends its attempt against (SPEC 14). */
             daily: FakeDailyRepository = FakeDailyRepository(),
+            /** What the run that ends in this scenario is told it unlocked (SPEC 15). */
+            achievements: FakeAchievementsRepository = FakeAchievementsRepository(),
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -252,6 +264,8 @@ internal class GameScenario private constructor(
                 progress = FakeProgressRepository(best = best),
                 savedRuns = FakeSavedRunStore(resume),
                 daily = daily,
+                achievements = achievements,
+                leaderboards = FakeLeaderboards(),
                 lifecycle = FakeAppLifecycle(),
                 clock = MutableClock(),
             )
@@ -325,6 +339,9 @@ internal fun GameScenario.recordedRuns(): List<RunRecord> = progress.recorded.to
 /** What would be restored if the process died right now. */
 internal fun GameScenario.savedRun(): SavedRun? = savedRuns.stored
 
+/** The save in a named slot. Endless and the Daily each have one (SPEC 11). */
+internal fun GameScenario.savedRun(mode: GameMode): SavedRun? = savedRuns.stored(mode)
+
 internal class FakeProgressRepository(best: Long = 0) : ProgressRepository {
     val recorded = mutableListOf<RunRecord>()
     private val seededBest = best
@@ -343,18 +360,37 @@ internal class FakeProgressRepository(best: Long = 0) : ProgressRepository {
  * [load] so a test can assert what the process would have found on disk without
  * having to be inside a coroutine.
  */
+/**
+ * Two slots, keyed by mode, exactly as the real store is.
+ *
+ * A single field with the mode ignored would have made every two-slot assertion
+ * in `ResumeTest` and `DailyRunTest` vacuous — the fake would have reproduced the
+ * bug those tests exist to pin.
+ */
 internal class FakeSavedRunStore(initial: SavedRun? = null) : SavedRunStore {
-    var stored: SavedRun? = initial
-        private set
+    private val slots = mutableMapOf<GameMode, SavedRun>()
 
-    override suspend fun load(): SavedRun? = stored
-
-    override suspend fun save(run: SavedRun) {
-        stored = run
+    init {
+        initial?.let { slots[it.mode] = it }
     }
 
-    override suspend fun clear() {
-        stored = null
+    /** The Endless slot, which is what almost every scenario means by "the save". */
+    val stored: SavedRun? get() = slots[GameMode.ENDLESS]
+
+    fun stored(mode: GameMode): SavedRun? = slots[mode]
+
+    override suspend fun load(mode: GameMode): SavedRun? = slots[mode]
+
+    override suspend fun save(run: SavedRun) {
+        slots[run.mode] = run
+    }
+
+    override suspend fun clear(mode: GameMode) {
+        slots.remove(mode)
+    }
+
+    override suspend fun clearAll() {
+        slots.clear()
     }
 }
 
@@ -412,6 +448,55 @@ internal class FakeDailyRepository(
             enabled = true,
         )
     }
+}
+
+/**
+ * Records what reached the platform, and nothing else.
+ *
+ * The whole point of the double is [submissions]: SPEC 15 says Sodogku shipped
+ * `Leaderboards.submit` with no production caller, and the only way to notice
+ * that is a test on the *game* asserting the platform was touched at the end of
+ * a run. A double that returned a value would let a call site branch on it,
+ * which the real interface refuses on purpose.
+ */
+internal class FakeLeaderboards : Leaderboards {
+
+    val submissions = mutableListOf<Pair<Leaderboard, Long>>()
+    val dashboards = mutableListOf<Leaderboard?>()
+
+    override val isOfferable = MutableStateFlow(false)
+
+    override fun submit(board: Leaderboard, value: Long) {
+        submissions += board to value
+    }
+
+    override fun openDashboard(board: Leaderboard?) {
+        dashboards += board
+    }
+}
+
+/**
+ * The achievement log, in memory. [recorded] is what the run reported, which is
+ * the half that has to carry the transcript-derived facts; [unlocks] is what the
+ * repository hands back, so a scenario can drive the unlock toast without
+ * building a history that earns a badge.
+ */
+internal class FakeAchievementsRepository(
+    private val unlocks: List<Achievement> = emptyList(),
+) : AchievementsRepository {
+
+    val recorded = mutableListOf<RunOutcome>()
+
+    override fun observe(): Flow<AchievementState> = MutableStateFlow(AchievementState.Empty)
+
+    override suspend fun state(): AchievementState = AchievementState.Empty
+
+    override suspend fun record(outcome: RunOutcome): List<Achievement> {
+        recorded += outcome
+        return unlocks
+    }
+
+    override suspend fun reset() = Unit
 }
 
 internal class FakeAppLifecycle : AppLifecycle {

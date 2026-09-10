@@ -123,6 +123,8 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         savedRunStore = FakeSavedRunStore(),
         progress = FakeProgressRepository(),
         daily = FakeDailyRepository(),
+        achievements = FakeAchievementsRepository(),
+        leaderboards = FakeLeaderboards(),
         clock = MutableClock(),
         appLifecycle = FakeAppLifecycle(),
     )

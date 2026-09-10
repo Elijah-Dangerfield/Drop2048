@@ -944,6 +944,38 @@ arrive shaped like that game; strip the domain and keep the reasoning.
 - **The submit call site ships in this chunk.** Sodogku shipped `Leaderboards.submit` with zero
   production callers and did not notice for a while. A test asserts submit fires on run end.
 
+### What it built
+
+**Done.** 1,036 tests, 0 failed, 0 skipped.
+
+The catalog is twenty-four badges over seven shelves, and **five of the targets are derived rather
+than typed**: `ScoreLadder` prices each score rung at the score a run is *guaranteed* to have banked
+by the time it reaches level 5, 10, 15, 20 or 25, from SPEC 7's survival and level-up coefficients
+alone. Sodogku shipped the typed version of this twice and stranded three badges behind a rescale
+both times.
+
+**Facts come off the transcript.** `RunFacts` folds one locked drop at a time out of
+`Transition`, which is the same single channel scoring already flows down (SPEC 4.2). It rides in
+the saved run, so a resume cannot lose a board clear. `ResolutionStep.Burst` gained a `stones`
+count for the same reason: the only board that could answer "how many Stones did that row hold" is
+the one the burst is about to destroy, and three cascade steps in, no caller holds it.
+
+**Play Games is not in this chunk.** Android binds an inert `NoGameServices`, which is enough for
+the whole feature to be silent there. Game Center is real, in Kotlin against the GameKit bindings,
+and **none of the three board ids exist in App Store Connect yet** — that is on `OWNER-TODO.md`,
+and until it is done every submission fails the same silent way a signed-out player's does.
+
+**`AchievementReachabilityTest` answers in three ways**, with no `else`: measured (forty fixed-seed
+greedy runs, for score, level, drops, tier and the danger streak), witnessed (a posed board, for
+the ten-step cascade and the double burst, which are far too rare to turn up in any affordable
+number of played runs), or refused (a wall clock and a calendar are not the engine's to bound).
+Every one of the twenty-four is earnable.
+
+**The call sites.** `GameViewModel.endRun` submits to the platform, files the achievement fact, and
+publishes what it unlocked; `GameFeatureEntryPoint` assembles the share string and hands it to
+`ShareLauncher`. `RunEndReportingTest` goes red if the first one is deleted and
+`RealLeaderboardsTest` does not, which is the distinction the whole chunk is about.
+
 ---
 
 ## C10 · Ads and billing

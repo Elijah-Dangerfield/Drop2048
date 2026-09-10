@@ -6,6 +6,9 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
+import com.dangerfield.drop2048.libraries.achievements.db.AchievementDao
+import com.dangerfield.drop2048.libraries.achievements.db.AchievementFactEntity
+import com.dangerfield.drop2048.libraries.achievements.db.AchievementUnlockEntity
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ExampleUserDataDao
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ExampleUserDataEntity
 import com.dangerfield.drop2048.libraries.progress.db.DailyResultDao
@@ -18,8 +21,10 @@ import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
         ExampleUserDataEntity::class,
         RunRecordEntity::class,
         DailyResultEntity::class,
+        AchievementFactEntity::class,
+        AchievementUnlockEntity::class,
     ],
-    version = 7,
+    version = 8,
     /**
      * Every bump from [AppDatabase.FIRST_PLAYER_DATA_VERSION] on has to be listed
      * here.
@@ -37,10 +42,17 @@ import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
      * player something they cannot replay: a run history can at least be re-earned
      * by playing, and a Daily streak cannot, because the boards it was built on
      * are in the past.
+     *
+     * 7 to 8 adds `achievement_fact` and `achievement_unlock` (SPEC 15). Two more
+     * new tables, so Room migrates them on its own; the facts are what let a badge
+     * shipped in a later release back-fill from a player's history, so losing them
+     * would silently reset everybody to zero on a release that only added a
+     * column.
      */
     autoMigrations = [
         AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7),
+        AutoMigration(from = 7, to = 8),
     ],
     exportSchema = true
 )
@@ -50,6 +62,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun exampleUserDataDao(): ExampleUserDataDao
     abstract fun runRecordDao(): RunRecordDao
     abstract fun dailyResultDao(): DailyResultDao
+    abstract fun achievementDao(): AchievementDao
 
     companion object {
         /**

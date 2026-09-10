@@ -101,6 +101,7 @@ class SettingsViewModel(
                 it.copy(diagnosticsOptIn = !it.diagnosticsOptIn)
             }
 
+            SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.ReplayTutorial -> sendEvent(SettingsEvent.ReplayTutorial)
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
             SettingsAction.OpenLicenses -> sendEvent(SettingsEvent.OpenLicenses)
@@ -241,6 +242,8 @@ sealed interface SettingsEvent {
     data object OpenLicenses : SettingsEvent
 
     /** `GameRoute(replayTutorial = true)` — SPEC 13's replay, from its only caller. */
+    data object OpenAchievements : SettingsEvent
+
     data object ReplayTutorial : SettingsEvent
 
     data object ProgressReset : SettingsEvent
@@ -268,6 +271,9 @@ sealed interface SettingsAction {
     data object ToggleGhost : SettingsAction
     data object ToggleConfirmQuit : SettingsAction
     data object ToggleDiagnostics : SettingsAction
+
+    /** SPEC 15's badge grid. Settings is its only entry point. */
+    data object OpenAchievements : SettingsAction
 
     data object ReplayTutorial : SettingsAction
     data object OpenFeedback : SettingsAction

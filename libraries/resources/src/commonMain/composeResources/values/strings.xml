@@ -70,7 +70,7 @@
     <!-- SPEC 8.4. Quit ends the run and there is no undo for it, and the control
          sits a thumb-width from Restart. Off-able in settings. -->
     <string name="game_quit_confirm_title">Quit this run?</string>
-    <string name="game_quit_confirm_body">The board goes away and the score is recorded as it stands.</string>
+    <string name="game_quit_confirm_body">The board goes away. The run is kept, so you can pick it back up.</string>
     <string name="game_quit_confirm_action">Quit</string>
     <string name="game_quit_confirm_cancel">Keep playing</string>
 
@@ -82,7 +82,7 @@
 
     <string name="stats_title">Stats</string>
     <string name="stats_empty">No runs yet. Finish one and this fills in.</string>
-    <string name="stats_best">Best</string>
+    <string name="stats_best">Best endless run</string>
     <string name="stats_runs_played">Runs played</string>
     <string name="stats_average">Average score</string>
     <string name="stats_recent">Recent runs</string>
@@ -124,7 +124,7 @@
     <string name="daily_streak_days">%1$d days</string>
     <string name="daily_streak_one_day">1 day</string>
     <string name="daily_streak_none">No streak yet. Finish today and it starts.</string>
-    <string name="daily_streak_next">%1$d more for the next reward</string>
+    <string name="daily_streak_next">%1$d more to the next milestone</string>
     <string name="daily_streak_milestone">%1$d day streak</string>
     <string name="daily_retry">Watch an ad for one more try</string>
     <string name="daily_retry_unavailable">No ad available right now</string>
@@ -271,4 +271,91 @@
     <string name="bug_report_intro">Tell us what went wrong. We would love to fix it.</string>
     <string name="bug_report_field_label">Message</string>
     <string name="bug_report_placeholder">Describe what happened…</string>
+
+    <!-- SPEC 15's badge grid. Every id in AchievementId has a name and a body
+         here; the exhaustive `when` in AchievementCopy is what stops one being
+         forgotten. Descriptions that quote a number take it as %1$s from the
+         catalog, so copy and target cannot drift. -->
+    <string name="achievements_title">Achievements</string>
+    <string name="achievements_summary">%1$s of %2$s earned</string>
+    <string name="achievements_earned">Earned</string>
+    <string name="achievements_locked">Locked</string>
+    <string name="achievements_progress">%1$s / %2$s</string>
+    <string name="achievements_unlocked">Achievement unlocked</string>
+    <string name="achievements_leaderboards">Leaderboards</string>
+    <string name="achievements_close">Close</string>
+
+    <string name="achievements_group_firsts">Firsts</string>
+    <string name="achievements_group_chains">Chains</string>
+    <string name="achievements_group_endurance">Endurance</string>
+    <string name="achievements_group_rare">Rare</string>
+    <string name="achievements_group_score">Score</string>
+    <string name="achievements_group_daily">Daily</string>
+    <string name="achievements_group_dedication">Dedication</string>
+
+    <string name="achievement_first_merge_name">Two of a Kind</string>
+    <string name="achievement_first_merge_body">Merge two blocks together.</string>
+    <string name="achievement_sixty_four_name">Sixty-Four</string>
+    <string name="achievement_sixty_four_body">Make a block worth %1$s.</string>
+    <string name="achievement_first_burst_name">Row Buster</string>
+    <string name="achievement_first_burst_body">Make a 2048 and take its row with it.</string>
+
+    <string name="achievement_chain_of_five_name">Chain of Five</string>
+    <string name="achievement_chain_of_five_body">Land a cascade %1$s steps deep.</string>
+    <string name="achievement_chain_of_ten_name">Chain of Ten</string>
+    <string name="achievement_chain_of_ten_body">Land a cascade %1$s steps deep.</string>
+    <string name="achievement_double_burst_name">Double Trouble</string>
+    <string name="achievement_double_burst_body">Burst %1$s rows in a single run.</string>
+
+    <string name="achievement_level_twenty_name">Level Twenty</string>
+    <string name="achievement_level_twenty_body">Reach level %1$s.</string>
+    <string name="achievement_five_hundred_blocks_name">Five Hundred</string>
+    <string name="achievement_five_hundred_blocks_body">Place %1$s blocks in one run.</string>
+    <string name="achievement_on_the_brink_name">On the Brink</string>
+    <string name="achievement_on_the_brink_body">Survive %1$s drops in a row with the board in the red.</string>
+
+    <string name="achievement_clean_sweep_name">Clean Sweep</string>
+    <string name="achievement_clean_sweep_body">Leave the board with nothing on it.</string>
+    <string name="achievement_stone_cold_name">Stone Cold</string>
+    <string name="achievement_stone_cold_body">Burst a row holding three Stones.</string>
+    <string name="achievement_wild_finish_name">Wild Finish</string>
+    <string name="achievement_wild_finish_body">Turn a Wildcard into a 2048.</string>
+
+    <string name="achievement_first_figures_name">Warmed Up</string>
+    <string name="achievement_first_figures_body">Score %1$s in a run.</string>
+    <string name="achievement_solid_run_name">Solid Run</string>
+    <string name="achievement_solid_run_body">Score %1$s in a run.</string>
+    <string name="achievement_sharp_run_name">Sharp Run</string>
+    <string name="achievement_sharp_run_body">Score %1$s in a run.</string>
+    <string name="achievement_big_run_name">Big Run</string>
+    <string name="achievement_big_run_body">Score %1$s in a run.</string>
+    <string name="achievement_monster_run_name">Monster Run</string>
+    <string name="achievement_monster_run_body">Score %1$s in a run.</string>
+
+    <string name="achievement_seven_days_name">Week Straight</string>
+    <string name="achievement_seven_days_body">Keep a Daily streak going for %1$s days.</string>
+    <string name="achievement_thirty_days_name">Month Straight</string>
+    <string name="achievement_thirty_days_body">Keep a Daily streak going for %1$s days.</string>
+
+    <string name="achievement_one_hour_name">An Hour In</string>
+    <string name="achievement_one_hour_body">Play for %1$s minutes.</string>
+    <string name="achievement_five_hours_name">Five Hours Deep</string>
+    <string name="achievement_five_hours_body">Play for %1$s minutes.</string>
+    <string name="achievement_ten_hours_name">Ten Hours Deep</string>
+    <string name="achievement_ten_hours_body">Play for %1$s minutes.</string>
+    <string name="achievement_twenty_five_hours_name">Twenty-Five Hours Deep</string>
+    <string name="achievement_twenty_five_hours_body">Play for %1$s minutes.</string>
+    <string name="achievement_fifty_hours_name">Fifty Hours Deep</string>
+    <string name="achievement_fifty_hours_body">Play for %1$s minutes.</string>
+
+    <!-- SPEC 15's share. The formatter in :libraries:sharing owns the layout and
+         the numbers; these are the only words in it. -->
+    <string name="share_run">Share this run</string>
+    <string name="share_title_endless">Drop 2048 · Endless</string>
+    <string name="share_title_daily">Drop 2048 Daily</string>
+    <string name="share_streak">🔥 %1$s day streak</string>
+    <string name="share_footer">drop2048.app</string>
+
+    <string name="settings_achievements">Achievements</string>
+    <string name="settings_achievements_hint">Twenty-four badges, and how far you are into each.</string>
 </resources>

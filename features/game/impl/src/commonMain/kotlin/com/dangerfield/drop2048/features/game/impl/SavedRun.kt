@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.features.game.impl
 
 import com.dangerfield.drop2048.libraries.cascade.Board
 import com.dangerfield.drop2048.libraries.cascade.GameState
+import com.dangerfield.drop2048.libraries.achievements.RunFacts
 import com.dangerfield.drop2048.libraries.cascade.Transcript
 import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlinx.serialization.Serializable
@@ -26,6 +27,14 @@ data class RunTally(
     /** Points value of the highest tier reached, 0 before the first merge. */
     val highestTier: Int = 0,
     val playedMs: Long = 0,
+    /**
+     * SPEC 15's four achievement facts that `run_record` has no column for.
+     *
+     * It rides here rather than in a second accumulator so a resumed run cannot
+     * report a board clear on the stats page and lose the badge for it: one
+     * tally, saved at the same moments, restored from the same blob.
+     */
+    val facts: RunFacts = RunFacts.Empty,
 )
 
 /**
@@ -103,6 +112,16 @@ data class SavedRun(
 )
 
 /**
+ * 4 — C3c split the one save slot in two, one per [GameMode].
+ *
+ * [SavedRun] itself did not change shape, and this is bumped anyway because the
+ * *slot* did. A version 3 blob in `AppData.savedRun` may be a Daily run — that
+ * was exactly the bug the split fixes — and reading it back as the Endless save
+ * would resume a Daily board under Endless rules on a seed the player did not
+ * choose. `SavedRunStore` also checks [SavedRun.mode] against the slot it came
+ * out of, so the two guards are independent: one catches the old world, the other
+ * catches a future write to the wrong slot.
+ *
  * 3 — C6 added [SavedRun.dailyDate].
  *
  * The field is nullable with a default, so a version 2 blob would in fact decode
@@ -116,4 +135,4 @@ data class SavedRun(
  * `GameState`. Version 1 is the shape C4 shipped, which had no version field at
  * all and is therefore rejected by failing to decode.
  */
-const val SAVE_FORMAT_VERSION = 3
+const val SAVE_FORMAT_VERSION = 4

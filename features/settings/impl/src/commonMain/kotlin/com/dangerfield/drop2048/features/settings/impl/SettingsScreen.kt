@@ -77,6 +77,8 @@ import drop2048.libraries.resources.generated.resources.settings_restore_working
 import drop2048.libraries.resources.generated.resources.settings_scheme_both
 import drop2048.libraries.resources.generated.resources.settings_scheme_buttons
 import drop2048.libraries.resources.generated.resources.settings_scheme_drag
+import drop2048.libraries.resources.generated.resources.settings_achievements
+import drop2048.libraries.resources.generated.resources.settings_achievements_hint
 import drop2048.libraries.resources.generated.resources.settings_section_about
 import drop2048.libraries.resources.generated.resources.settings_section_accessibility
 import drop2048.libraries.resources.generated.resources.settings_section_controls
@@ -293,6 +295,11 @@ private fun GameSection(onAction: (SettingsAction) -> Unit) {
     ListSection(
         title = stringResource(Res.string.settings_section_game),
         items = listOf(
+            ListSectionItem(
+                headlineText = stringResource(Res.string.settings_achievements),
+                supportingText = stringResource(Res.string.settings_achievements_hint),
+                onClick = { onAction(SettingsAction.OpenAchievements) },
+            ),
             ListSectionItem(
                 headlineText = stringResource(Res.string.settings_replay_tutorial),
                 supportingText = stringResource(Res.string.settings_replay_tutorial_hint),

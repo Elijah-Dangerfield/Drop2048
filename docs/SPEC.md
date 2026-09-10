@@ -596,7 +596,7 @@ owning library per the template's rules.
 |---|---|
 | `run_record` | One row per completed run: score, level, blocks placed, duration, highest tier, cause of death, longest cascade, bursts, mode, seed. This table is the stats page and the analytics backup. |
 | `daily_result` | Date (UTC) as the primary key, seed, score, attempts used, completed, retries used. Drives the streak. The one table in the app that is updated in place, because a row is the running state of a day rather than a finished fact — see `decisions.md`. |
-| `achievement_fact` / `achievement_unlock` | Ported from Sodogku unchanged. |
+| `achievement_fact` / `achievement_unlock` | One row per finished run, and one per badge already announced. The engine shape is Sodogku's; the columns are this game's. The facts overlap `run_record` on purpose and are not a join onto it — a badge's evidence must not disappear with a row it never owned. |
 
 In-progress run lives in `AppData` (the template's `AppCache`) as a serialized `GameState` plus
 the transcript-in-flight flag, not in Room. It is one value, it is overwritten constantly, and it
@@ -720,18 +720,39 @@ on the page rather than folded into Lifetime, because the two are folds over dif
 sitting them together would imply a relationship neither has. C6 added the row C4 deliberately
 left out.
 
-**Achievements**, around 24, ported from Sodogku's engine. First merge, reach 64, first burst,
-two bursts in a run, 5-step cascade, 10-step cascade, clear the board, reach level 20, 500 blocks
-in one run, burst a row with three Stones, Wildcard into a 2048, survive 10 drops in the danger
-state, 7-day and 30-day streaks, plus tiered score and playtime milestones.
+**Achievements**, exactly 24, on the engine shape ported from Sodogku. First merge, reach 64,
+first burst, two bursts in a run, 5-step cascade, 10-step cascade, clear the board, reach level 20,
+500 blocks in one run, burst a row with three Stones, Wildcard into a 2048, survive 10 drops in the
+danger state, 7-day and 30-day streaks, plus five score and five playtime milestones.
 
 The coin payouts attached to achievements in the original spec are cut with the economy. They
 unlock, they post to the platform, they do not pay.
 
-**Leaderboards.** Game Center and Play Games, plus an in-app view. All-time high score, weekly
-high score, Daily Challenge. Sodogku shipped a Game Center implementation and then had zero
-production call sites for `submit` for a while; do not repeat that. The submit call site is part
-of the same chunk as the integration, and a test asserts it fires on run end.
+**The five score targets are derived, not written down.** Each is the score a run is guaranteed to
+have banked by the time it reaches a given level — survival plus level-up bonuses out of 7's
+table — so they move with the coefficients instead of going stale behind them. C9 ruled it in
+`decisions.md`; Sodogku shipped the typed version and stranded three badges behind a rescale.
+
+**Every badge is checked against the engine.** `AchievementReachabilityTest` either measures what
+the shipped engine produces over forty fixed-seed greedy runs or poses a board and locks a block
+into it. A badge nobody can earn is worse than no badge, because it looks exactly like a working
+one. Two of them were only provable the second way: a 10-step cascade turns up four times in
+three-quarters of a million drops, and a row holding three Stones is not a board a random run
+builds.
+
+**Leaderboards.** Game Center and Play Games, plus the platform's own dashboard as the in-app view.
+All-time high score, weekly high score, Daily Challenge. Sodogku shipped a Game Center
+implementation and then had zero production call sites for `submit` for a while; do not repeat
+that. The submit call site is part of the same chunk as the integration, and a test asserts it
+fires on run end.
+
+**Which board depends on the mode, and it is not a preference.** An Endless score goes to the
+all-time and weekly boards; a Daily score goes to the Daily board and nowhere near the other two
+(D19). Nothing below the ViewModel knows what mode a value came from, so the call site is the only
+place that rule can live.
+
+**Play Games is not in v1.** Android binds an inert seam, which is enough for the whole feature to
+be silent there, and the board ids do not exist in either console yet.
 
 ## 16. Accessibility
 
