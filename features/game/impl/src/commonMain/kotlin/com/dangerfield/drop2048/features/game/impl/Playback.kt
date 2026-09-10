@@ -142,28 +142,71 @@ private fun Board.settled(step: ResolutionStep.Gravity): Board {
     return withAll(cleared + landed)
 }
 
+/**
+ * How long the player looks at this step before the next one replaces it.
+ *
+ * **This is the cascade's pace, and C3a set it by watching one rather than by
+ * reading the handoff.** Every step used to be held for the same 195ms, which
+ * made a three-step chain arrive as a single flash — `CHAIN x2` was replaced by
+ * `CHAIN x3` before either could be read — and gave the 2048 that ends a run
+ * four tenths of a second on screen before its own row burst took it away.
+ *
+ * So the beats are now separated by what they are worth:
+ *
+ * - a **step-one merge** is what happens on most drops and has nothing to
+ *   announce, so it gets the handoff's plain [Motion.MergeHoldMillis];
+ * - a **chained merge** is the thing SPEC 21 says to keep, and gets
+ *   [Motion.CascadeStepMillis], long enough for its callout to be read;
+ * - a merge producing a **2048** gets [Motion.TerminalMergeMillis], because it is
+ *   the only tile in the game that destroys itself and is otherwise never seen;
+ * - a **burst** gets [Motion.RowBurstMillis], which SPEC 9 says is the longest
+ *   sample in the game and should look like it;
+ * - **gravity** gets the handoff's [Motion.GravitySettleMillis], slightly under a
+ *   merge, because it is the consequence of the merge rather than an event;
+ * - **survival and level up** move nothing and only exist so the score rolls
+ *   rather than jumping once at the end.
+ *
+ * Reduce motion scales all of them together and never to zero (SPEC 16), so a
+ * player who asked for less motion still sees the order things happened in.
+ */
 private fun ResolutionStep.holdMillis(): Int = when (this) {
+    is ResolutionStep.Merge -> when {
+        result.points >= TerminalTier -> Motion.TerminalMergeMillis
+        step >= ChainedFrom -> Motion.CascadeStepMillis
+        else -> Motion.MergeHoldMillis
+    }
+
     is ResolutionStep.Burst -> Motion.RowBurstMillis
+    is ResolutionStep.Gravity -> Motion.GravitySettleMillis
+
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     -> ScoreOnlyMillis
 
-    else -> Motion.CascadeStepMillis
+    is ResolutionStep.Detonation,
+    is ResolutionStep.BoardCleared,
+    -> Motion.CascadeStepMillis
 }
 
 /**
- * There is no `Sound.BoardCleared`, and SPEC 7 asks for one. It plays silent
- * here rather than borrowing the level-up sample, because a wrong sound is
- * harder to notice than a missing one and C3a is where the bank gets authored.
+ * Gravity and survival are the two steps with nothing to say. Gravity is the
+ * consequence of the merge that has already sounded, and survival is a payout
+ * that happens on every drop of every run — a sound on either would be a sound
+ * the player stops hearing.
+ *
+ * Everything else does. `Sound.BoardCleared` was the one gap C3 left, on the
+ * argument that a wrong sound is harder to notice than a missing one; C3a
+ * authored the key, so SPEC 7's "distinct sound" for the rarest frame in the
+ * game now has one to be.
  */
 private fun ResolutionStep.cue(): Cue? = when (this) {
     is ResolutionStep.Merge -> Cue.Merge(step = step, big = result.points >= BigMergeFrom)
     is ResolutionStep.Detonation -> Cue.Bomb
     is ResolutionStep.Burst -> Cue.Burst
     is ResolutionStep.LevelUp -> Cue.LevelUp
+    is ResolutionStep.BoardCleared -> Cue.BoardCleared
     is ResolutionStep.Gravity,
     is ResolutionStep.Survival,
-    is ResolutionStep.BoardCleared,
     -> null
 }
 
@@ -201,6 +244,9 @@ private const val BigMergeFrom = 256
 
 /** SPEC 8.2 calls out `CHAIN x2` upward, so step 1 is a merge and not a chain. */
 private const val ChainedFrom = 2
+
+/** SPEC 5.1's terminal tier. A 2048 cannot exist at rest, so it gets its own beat. */
+private const val TerminalTier = 2048
 
 /**
  * Long enough for the score roll to be seen starting, short enough that a level

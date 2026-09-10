@@ -27,7 +27,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
@@ -44,6 +46,7 @@ import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
+import com.dangerfield.drop2048.libraries.core.doNothing
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.Screen
 import com.dangerfield.drop2048.libraries.ui.components.dialog.BasicDialog
@@ -190,6 +193,8 @@ fun GameScreen(
 
     val registry = remember { FocusRegistry() }
 
+    GameBackHandler(phase = state.phase, onAction = onAction)
+
     CompositionLocalProvider(LocalFocusRegistry provides registry) {
         Box(modifier = Modifier.fillMaxSize()) {
             Screen(contentWindowInsets = WindowInsets.systemBars) { padding ->
@@ -244,6 +249,42 @@ fun GameScreen(
                 QuitConfirmDialog(onAction = onAction)
             }
         }
+    }
+}
+
+/**
+ * What the system back gesture does to a run in progress, which until C3a was
+ * "close the app".
+ *
+ * This is the launch destination, so back on it popped an empty stack and the
+ * game vanished mid-drop with the run only saved as far as its last lock. Owner
+ * ruling: **a game does not close from its play surface.** While a block is
+ * falling or a cascade is playing, back does nothing at all — not pause, because
+ * a gesture the player made by accident should not also stop the clock and put a
+ * menu in front of them.
+ *
+ * Paused is the exception and the obvious one: an overlay is up, so back closes
+ * it, which is what back means everywhere else in the app.
+ *
+ * `Ready` and `StackedOut` are deliberately absent. Neither is the board — the
+ * start overlay is the app's menu (C5 deleted the home screen) and the
+ * stacked-out sheet sits over a run that is finished and already written to
+ * `run_record`. Leaving the app from either is a decision the player can
+ * reasonably be making, and swallowing back there would leave the one screen the
+ * app opens on with no way out.
+ *
+ * The quit confirmation is not handled here. It is a `BasicDialog`, which
+ * registers its own handler while it is up, and a nested handler composed later
+ * takes precedence — so back dismisses the dialog rather than reaching this.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun GameBackHandler(phase: GamePhase, onAction: (GameAction) -> Unit) {
+    BackHandler(enabled = phase == GamePhase.Playing || phase == GamePhase.Resolving) {
+        doNothing()
+    }
+    BackHandler(enabled = phase == GamePhase.Paused) {
+        onAction(GameAction.Resume)
     }
 }
 

@@ -4,6 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * Plays a [Cue] — both halves of it, in one call.
@@ -15,15 +19,20 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * whole API.
  *
  * It also means the Off / Light / Strong setting is respected everywhere without
- * every feature remembering to check it.
+ * every feature remembering to check it, and it is the one place a rate limit can
+ * be applied to the cues that chatter — see [Cue.chatters].
  */
 @Immutable
 class Cues(
     private val haptics: HapticEngine,
     private val sounds: SoundPlayer,
     private val setting: HapticsSetting,
+    timeSource: TimeSource = TimeSource.Monotonic,
 ) {
+    private val chatter = ChatterGate(timeSource)
+
     fun play(cue: Cue) {
+        if (cue.chatters && !chatter.admits()) return
         sounds.play(cue.sound, cue.pitchSteps)
         haptics.play(cue.haptic, setting.strength)
     }
@@ -31,6 +40,47 @@ class Cues(
     companion object {
         /** Defaults to this, so previews, tests and screenshots need arrange nothing. */
         val Silent = Cues(HapticEngine.Silent, SoundPlayer.Silent, HapticsSetting.Off)
+    }
+}
+
+/**
+ * Whether this cue is one of the short clicks that a fast hand can issue faster
+ * than an ear can separate them.
+ *
+ * Move and nudge, and nothing else. Both fire once per engine column step, and a
+ * drag across the board steps a column every frame or two: on device that is a
+ * click every ~40ms, which stops sounding like steering and starts sounding like
+ * a fault. Every other cue in the game is caused by a resolution step, and those
+ * are paced by the playback driver.
+ */
+private val Cue.chatters: Boolean
+    get() = sound == Sound.Move || sound == Sound.Nudge
+
+/**
+ * The floor on how close together two chattering cues may land.
+ *
+ * Deliberately not a debounce, which would swallow the *first* click of a drag
+ * and make the control feel dead. The first one through always plays; the next
+ * one waits out the gap. A player tapping an arrow button never notices this —
+ * a deliberate tap is a hundred milliseconds at best — and a drag comes out as a
+ * texture instead of a buzz, which is what [Cue.Move]'s own KDoc asks for.
+ *
+ * The [TimeSource] is a constructor parameter so the gate is testable at all:
+ * there is no clock in a composition and a real one cannot be advanced.
+ */
+private class ChatterGate(private val timeSource: TimeSource) {
+
+    private var last: TimeMark? = null
+
+    fun admits(): Boolean {
+        val previous = last
+        if (previous != null && previous.elapsedNow() < MinGap) return false
+        last = timeSource.markNow()
+        return true
+    }
+
+    private companion object {
+        val MinGap: Duration = 50.milliseconds
     }
 }
 

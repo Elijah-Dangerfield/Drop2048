@@ -145,9 +145,12 @@ class GameViewModel(
      * The best score as it stood **before** this run, which is the only number
      * that can answer "did they beat it".
      *
-     * `GameUiState.best` cannot: it is `maxOf(best, score)` on every publish, so
-     * it has already absorbed the live score and is equal to it by the time the
-     * run ends. Comparing against that would light "new best!" on every run.
+     * It survives C3a's fix to [published], which stopped `GameUiState.best`
+     * absorbing the live score, because the two answer different questions.
+     * `best` is what the header shows and is re-read from the run store *after*
+     * the run is recorded, so by the time the stacked-out sheet is drawn it
+     * already includes the run being asked about. This is the number from before
+     * it, kept in memory for exactly one comparison.
      */
     private var bestBeforeRun: Long = 0
 
@@ -411,6 +414,15 @@ class GameViewModel(
      * The persisted flag is written here and only here, so a player who quits
      * halfway through gets the tutorial again rather than a game nobody
      * explained.
+     *
+     * The best score is re-read from disk on the way out rather than carried
+     * over. The scripted run banks about 11,600 points and is deliberately never
+     * recorded, so the only number that can be right here is the one `run_record`
+     * holds — which for a brand-new player is zero. C3c needed this because
+     * `published()` folded the live score into `best` and the script's total had
+     * therefore become the player's record; that fold is gone, and this stays
+     * because the tutorial is also the one path where the run behind the state is
+     * replaced wholesale.
      */
     private suspend fun GameAction.finishTutorial() {
         logger.logEvent("tutorial.completed", "drop" to tutorial.currentDrop)
@@ -418,12 +430,6 @@ class GameViewModel(
         Catching { appCache.update { data -> data.copy(hasUserOnboarded = true) } }
             .logOnFailure { "Could not persist tutorial completion" }
         resetToNewRun()
-        // `best` is `maxOf(best, score)` on every publish (L44), so the scripted
-        // run's 11,598 is sitting in it by the time the script ends — and the
-        // tutorial is deliberately never recorded, so nothing on disk agrees.
-        // A brand-new player's first real run opened under a best they had not
-        // set and could not have set, and it corrected itself on the next launch,
-        // which is the worst version of a wrong number.
         val best = Catching { progress.bestScore() }
             .logOnFailure { "Could not read best score" }
             .getOrNull() ?: 0
@@ -718,7 +724,7 @@ class GameViewModel(
         val transition = Cascade.apply(engine, Input.Nudge)
         if (transition.isRejected) return
         engine = transition.state
-        sendEvent(GameEffect.Play(Cue.Move))
+        sendEvent(GameEffect.Play(Cue.Nudge))
         updateState { it.published() }
         noteTutorial(TutorialAwait.Nudged)
 
@@ -1347,6 +1353,25 @@ class GameViewModel(
         }
     }
 
+    /**
+     * The engine copied onto the state, and the one number that is deliberately
+     * *not* recomputed here.
+     *
+     * [best] used to be `maxOf(best, engine.score)`, which made the header read
+     * "BEST 736" during a run sitting at 736 — the game congratulating the player
+     * on a record they were still in the middle of setting, and then, on the next
+     * launch, quietly disagreeing with itself. It also made the number useless as
+     * a baseline: a value derived to always include the current one cannot be the
+     * thing you compare the current one against (L44), which is why C3b had to add
+     * [bestBeforeRun] beside it.
+     *
+     * So best is now what it says: the best score as of the last time the run
+     * store was read. It is read on entry, and again in [endRun] *after* the run
+     * has been recorded — so the moment the number is genuinely beaten is the
+     * moment the stacked-out sheet says so, which is where "new best!" already
+     * lives. Nothing animates it: the header draws it as plain text, and only the
+     * live score has a counter on it.
+     */
     private fun GameUiState.published(
         best: Long = this.best,
         leftHanded: Boolean = this.leftHanded,
@@ -1357,7 +1382,7 @@ class GameViewModel(
         falling = engine.falling,
         ghost = if (ghostEnabled) engine.landingCell else null,
         score = engine.score,
-        best = maxOf(best, engine.score),
+        best = best,
         level = engine.level,
         levelFraction = engine.blocksDropped % engine.config.blocksPerLevel /
             engine.config.blocksPerLevel.toFloat(),

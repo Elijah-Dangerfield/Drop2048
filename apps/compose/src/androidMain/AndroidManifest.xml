@@ -3,6 +3,21 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!--
+      SPEC 9's five haptic intensities go through HapticEngine.android.kt, which
+      calls Vibrator directly rather than View.performHapticFeedback. That call
+      requires this permission, and its absence is what the pre-existing
+      MissingPermission lint errors on that file were about.
+
+      C3a ran the control rather than assuming: with this line deleted, on an
+      API 36 emulator, the vibrations still played. So the missing permission was
+      *not* what had kept the haptics quiet — nothing had, and nobody had ever
+      checked. The declaration stays because the API contract asks for it and
+      because a platform that does enforce it fails silently, which is the worst
+      way for this to break.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application

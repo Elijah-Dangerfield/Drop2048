@@ -6,6 +6,153 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — The sample bank is one folder per platform, and a missing sample is not an error
+
+**Decision:** `SoundPlayer` now has a real engine behind it on both platforms —
+Android `SoundPool`, iOS pooled `AVAudioPlayer` — and both pitch a cascade step
+by **playback rate**, `2^(n/12)`. The samples themselves do not exist yet and are
+the owner's; each platform looks for them in a folder called `audio`, one file
+per `Sound` named after its `key` (`merge_big.ogg`). Android reads
+`libraries/ui/src/androidMain/assets/audio/`, iOS reads the app bundle, checking
+a subdirectory and then the root so that either kind of Xcode drag works.
+
+A sample that is not there is logged once, by name, and leaves that one `Sound`
+silent. Nothing throws and nothing else stops playing.
+
+**Why rate rather than a pitch shifter.** Resampling makes a merge at step six
+both higher *and* shorter, which is what an arcade cascade has sounded like for
+forty years and what keeps a deep chain from dragging — every note the same
+length is a run that outstays its welcome. It is also the one method both
+platforms implement natively and identically, so the two cannot disagree about
+what step four sounds like. It happens to justify `Cue.MaxPitchSteps = 12`, which
+C2 chose by ear and nobody had checked: both engines cap playback rate at 2.0x,
+which *is* twelve semitones, so a thirteenth step would have been clamped by
+whichever engine received it rather than by a decision.
+
+**Why two folders rather than `composeResources`.** One bank in
+`:libraries:resources` would be one place for the owner to look, and it is how the
+fonts ship. But `Res.readBytes` is suspend and hands back a `ByteArray`, and
+`SoundPool` wants a file descriptor — so Android would have to spool every sample
+through the cache directory at launch to feed an API that reads assets natively.
+Two documented folders beat a copy step that can fail on a full disk.
+
+**Alternatives rejected.** *`MediaPlayer`*: decodes on demand, so the first merge
+of a cascade is late, and plays one thing at a time, so the second merge cuts off
+the first. *`AVAudioEngine` with a varispeed node per voice on iOS*: correct, and
+a great deal of interop for a result `AVAudioPlayer.rate` already gives. *Shipping
+placeholder beeps so the path could be heard*: a placeholder that ships is a
+placeholder that stays.
+
+**What is not built:** the music track and its three intensity layers (SPEC 9).
+That is a streaming concern rather than a sample bank and it has no assets either.
+
+---
+
+## 2026-09-10 — The cascade is paced per step kind, and the 2048 gets its own beat
+
+**Decision:** transcript playback no longer holds every step for the same
+`Motion.CascadeStepMillis`. A step-one merge gets the handoff's `MergeHoldMillis`,
+a **chained** merge gets `CascadeStepMillis` (raised 195 → 300), a merge producing
+a **2048** gets a new `TerminalMergeMillis` of 520, a burst gets `RowBurstMillis`
+(raised 240 → 420), and gravity gets the handoff's `GravitySettleMillis`.
+
+**Why, and it is a measurement rather than taste.** C3a recorded the tutorial's
+scripted cascade and its 2048 burst off a device at 20fps and counted frames.
+
+- Three merges, `CHAIN x2` and `CHAIN x3` all landed inside **500ms**. A later
+  callout replaces the one before it, so consecutive chain steps — not
+  `ToastMillis` — are the real ceiling on how long a toast is readable, and at
+  195ms `CHAIN x2` was gone before it could be read. The number the player is
+  being congratulated on was never legible, and the run arrived as one flash
+  rather than as three things in order. SPEC 21 says this run is half of what the
+  game is for.
+- The **2048 was on screen for 400ms** between the merge that made it and the
+  burst that took it away. It is terminal (SPEC 5.1) — it destroys its own row —
+  so it is the one tile in the game that can never be looked at, and it is the
+  tile the game is named after.
+- `ROW BUST!` and `SWEPT!` were both announced **over an empty board**, because
+  the row cleared between two frames.
+
+**Why not one bigger number.** A step-one merge happens on most drops and has
+nothing to announce; making the common case slower to fix the rare one is the
+trade the old constant was already making in the wrong direction. Separating them
+costs the ordinary drop nothing and buys the chain the room it needs.
+
+`CascadeStepMillis`'s KDoc also corrected a claim: it called 195 "the sum-ish
+middle" of the handoff's `MergeHoldMillis` 210 and `GravitySettleMillis` 180. It
+is the arithmetic mean of the two, and the handoff describes them as a hold *then*
+a settle — two phases of one step, not two candidate values for it.
+
+**Reduce motion is unaffected in kind** (D4): `reduced()` scales all of these by
+0.4 and none of them to zero, so a player who asked for less motion still sees
+which merges happened and in what order.
+
+---
+
+## 2026-09-10 — Back does nothing on the board, and the pause overlay is the exception
+
+**Decision:** while the phase is `Playing` or `Resolving`, the system back gesture
+is swallowed. While `Paused`, it resumes. `Ready` and `StackedOut` are left to the
+system.
+
+**Why:** the game screen is the launch destination, so back popped an empty stack
+and closed the app mid-drop, with the run saved only as far as its last lock.
+Owner ruling: a game does not close from its play surface. It deliberately does
+not *pause* either — a gesture made by accident should not also stop the clock and
+put a menu in front of the player.
+
+`Ready` and `StackedOut` are not the board. The start overlay is the app's whole
+menu (C5 deleted the home screen) and swallowing back there would leave the screen
+the app opens on with no way out; the stacked-out sheet sits over a run that is
+finished and already in `run_record`, so leaving from it costs nothing. The quit
+confirmation needs nothing: `BasicDialog` registers its own handler and a nested
+one composed later wins.
+
+---
+
+## 2026-09-10 — Move and nudge are rate-limited in `Cues`, and nowhere else
+
+**Decision:** `Cues.play` drops a `Cue` whose sound is `Move` or `Nudge` if one
+has already played in the last 50ms. Every other cue is untouched. The `TimeSource`
+is a constructor parameter so the gate is testable.
+
+**Why:** `Cue.Move` fires once per engine column step and a drag steps a column
+every frame or two, so ten of them can land inside a fifth of a second. Ten clicks
+in 200ms is not steering feedback, it is a fault noise — and `Cue.Move`'s own KDoc
+already asks for "a texture, not a rhythm". It is a **throttle rather than a
+debounce**: the first click of a drag always plays, because that is the one that
+tells the player the board took the gesture; only its followers wait.
+
+It lives in `Cues` rather than in `GameViewModel` because `Cues` is the one place
+that sees every cue in the app, and because the ViewModel would need a second
+clock beside the one it already has for `run_record`. 50ms is above any human tap
+rate and below a drag's, so a deliberate press is never swallowed.
+
+The nudge also stopped borrowing `Sound.Move`. SPEC 9 lists them as two effects,
+and a player who cannot tell them apart cannot hear that a nudge registered when
+the block was already resting.
+
+---
+
+## 2026-09-10 — `GameUiState.best` is the pre-run record, not a running maximum
+
+**Decision:** `published()` no longer folds the live score into `best`. It is the
+value the run store last returned — read on entry, and again in `endRun` after the
+run has been recorded.
+
+**Why:** as `maxOf(best, score)` the header read "BEST 736" during a run sitting
+at 736, which is the game congratulating a player on a record they are in the
+middle of setting and then disagreeing with itself on the next launch. L44 already
+recorded the other half: a value derived to always include the current one cannot
+be the baseline you compare the current one against, which is why C3b had to add
+`bestBeforeRun` beside it. The moment the number is genuinely beaten is now the
+moment the stacked-out sheet says so, which is where "new best!" already lives.
+
+Cheaper than the `todos.md` entry feared: nothing animates `best`. The header
+draws it as plain text and only the live score has a `ScoreCounter` on it.
+
+---
+
 ## 2026-09-10 — Score achievements are priced off the scoring coefficients, never typed
 
 **Decision:** the five score badges take their targets from `ScoreLadder`, which

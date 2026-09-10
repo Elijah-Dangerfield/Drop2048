@@ -31,6 +31,16 @@ data class Cue(
         /** One column of sideways movement. Very short; a run of these is a texture, not a rhythm. */
         val Move = Cue(Sound.Move, HapticIntensity.Light)
 
+        /**
+         * ▼, or the downward flick.
+         *
+         * Its own sample rather than [Move]'s, which is what SPEC 9 asks for:
+         * they are both "very short click" and they are two different things, and
+         * a player who cannot hear the difference cannot hear that the nudge
+         * registered when the block was already against a wall.
+         */
+        val Nudge = Cue(Sound.Nudge, HapticIntensity.Light)
+
         val HardDrop = Cue(Sound.HardDrop, HapticIntensity.Medium)
 
         val Lock = Cue(Sound.Lock, HapticIntensity.Light)
@@ -54,6 +64,9 @@ data class Cue(
 
         val Bomb = Cue(Sound.Bomb, HapticIntensity.Heavy)
 
+        /** SPEC 7's board-cleared bonus, which it says gets "a distinct sound". */
+        val BoardCleared = Cue(Sound.BoardCleared, HapticIntensity.Heavy)
+
         val DangerEnter = Cue(Sound.DangerEnter, HapticIntensity.Light)
 
         val DangerExit = Cue(Sound.DangerExit, HapticIntensity.None)
@@ -67,27 +80,46 @@ data class Cue(
 
         val UiBack = Cue(Sound.UiBack, HapticIntensity.Light)
 
-        /** An octave. Past it a cascade stops climbing and starts squeaking. */
+        /**
+         * An octave. Past it a cascade stops climbing and starts squeaking.
+         *
+         * C2 chose the number for that reason and nobody had checked it against
+         * an engine. It survives, and it turns out to be the only value the two
+         * platforms agree on for free: both pitch by playback rate, and both cap
+         * that rate at 2.0x, which is exactly twelve semitones. A thirteenth step
+         * would be silently clamped on Android and iOS alike, so the cap belongs
+         * here where it can be seen rather than in whichever engine hits it
+         * first. See [SoundBank.rate].
+         */
         const val MaxPitchSteps = 12
     }
 }
 
-/** The effects named in SPEC 9. One key per sample; the files arrive with the audio engine. */
-enum class Sound {
-    Spawn,
-    Move,
-    HardDrop,
-    Lock,
-    Merge,
-    MergeBig,
-    Burst,
-    Bomb,
-    DangerEnter,
-    DangerExit,
-    LevelUp,
-    StackedOut,
-    UiTap,
-    UiBack,
+/**
+ * The effects named in SPEC 9.
+ *
+ * [key] is the sample's file stem on both platforms, so `Sound.MergeBig` is
+ * `merge_big.ogg` everywhere and nothing has to map one to the other. Written out
+ * rather than derived from the enum name, because a rename of a constant should
+ * not silently rename a file the owner has already recorded.
+ */
+enum class Sound(val key: String) {
+    Spawn("spawn"),
+    Move("move"),
+    Nudge("nudge"),
+    HardDrop("hard_drop"),
+    Lock("lock"),
+    Merge("merge"),
+    MergeBig("merge_big"),
+    Burst("burst"),
+    Bomb("bomb"),
+    BoardCleared("board_cleared"),
+    DangerEnter("danger_enter"),
+    DangerExit("danger_exit"),
+    LevelUp("level_up"),
+    StackedOut("stacked_out"),
+    UiTap("ui_tap"),
+    UiBack("ui_back"),
 }
 
 /**

@@ -7,7 +7,7 @@
         block downward. The copy says so plainly rather than hinting.
     -->
     <string name="tutorial_steer_title">Slide it over</string>
-    <string name="tutorial_steer_body">Drag the block onto the other 2.</string>
+    <string name="tutorial_steer_body">Drag anywhere on the board. The block follows your finger.</string>
     <string name="tutorial_first_nudge_title">Bring it down</string>
     <string name="tutorial_first_nudge_body">Nothing falls on its own. Tap ▼.</string>
     <string name="tutorial_keep_nudging_body">Keep tapping ▼ until it lands.</string>

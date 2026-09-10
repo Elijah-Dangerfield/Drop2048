@@ -74,6 +74,34 @@ class StatsScreenScreenshotTest {
         )
     }
 
+    /**
+     * The page after exactly one finished run, which is the version of it the
+     * most people will ever see and the only one nobody had drawn.
+     *
+     * A one-entry bar chart used to give its single bar the whole width, because
+     * every bar takes an equal share and one share is all of it. A card-wide
+     * block under "RECENT" reads as a progress bar, not as a score. The bar is
+     * now capped at `BarChartDefaults.MaxBarWidth`, and this frame is what would
+     * move if that cap were ever removed.
+     */
+    @Test
+    fun afterOneRun() = compose.captureScreen("stats-first-run") {
+        StatsState(
+            loading = false,
+            stats = RunStats(
+                runsPlayed = 1,
+                bestScore = 2_410,
+                averageScore = 2_410,
+                highestTier = 64,
+                totalMerges = 47,
+                totalBlocksPlaced = 62,
+                longestCascade = 3,
+                totalPlaytimeMs = 214_000,
+                recentScores = listOf(2_410L),
+            ),
+        )
+    }
+
     private companion object {
         val Played = RunStats(
             runsPlayed = 14,

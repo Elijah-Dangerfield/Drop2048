@@ -209,6 +209,67 @@ class GameViewModelTest : CoroutineTest() {
         }
     }
 
+    /**
+     * The header's BEST is the record the run is being played *against*, and it
+     * only moves when the run store says it has.
+     *
+     * It used to be `maxOf(best, score)` on every publish (L44), so a player two
+     * hundred points into a run they were never going to win watched the header
+     * congratulate them on a record that was really just their own live score
+     * being echoed back one line lower. It also cost the "new best!" comparison
+     * its baseline, which is why `bestBeforeRun` had to exist beside it.
+     */
+    @Test
+    fun best_isThePreRunRecordUntilTheRunEnds() = runUnitTest {
+        playing(
+            picture = """
+                .  .  2  .  .
+            """,
+            fallingAt = Cell(2, 0),
+            best = PreviousBest,
+        ) {
+            assertEquals(PreviousBest, state.best)
+
+            land()
+            waitOutResolution()
+
+            assertTrue(state.score > 0, "the run scored something")
+            assertTrue(state.score < PreviousBest, "and it is nowhere near the record")
+            assertEquals(PreviousBest, state.best, "so the header still shows the record")
+        }
+    }
+
+    /**
+     * The other side of it: a run that really does beat the record says so, and
+     * says so on the frame the run is recorded rather than while it is in flight.
+     */
+    @Test
+    fun best_movesOnceTheRunThatBeatItIsRecorded() = runUnitTest {
+        playing(
+            picture = """
+                .  .  4  .  .
+                .  .  8  .  .
+                .  .  16 .  .
+                .  .  32 .  .
+                .  .  64 .  .
+                .  .  128 . .
+                .  .  256 . .
+            """,
+            fallingAt = Cell(2, 0),
+            config = EngineConfig.Default.copy(rows = 8),
+            best = 1L,
+        ) {
+            assertEquals(1L, state.best)
+
+            land()
+            waitOutResolution()
+
+            assertPhase(GamePhase.StackedOut)
+            assertEquals(state.score, state.best, "the record is the run that just set it")
+            assertTrue(state.newBest, "and the sheet says so")
+        }
+    }
+
     @Test
     fun stackedOut_writesTheRunRecord() = runUnitTest {
         playing(
@@ -243,6 +304,9 @@ class GameViewModelTest : CoroutineTest() {
 
         /** Far enough to prove the fall accelerated, far short of the block landing. */
         const val SoftDropRows = 3
+
+        /** A record no single scripted merge in these fixtures can get near. */
+        const val PreviousBest = 50_000L
     }
 
     @Test

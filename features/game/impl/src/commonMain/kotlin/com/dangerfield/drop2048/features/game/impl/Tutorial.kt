@@ -167,6 +167,23 @@ object Tutorial {
      * while they are looking at it. Drops 5 and 6 are set pieces and arrive with
      * a card in front of them, which is what makes the board change read as a
      * scene rather than as a glitch.
+     *
+     * **Every partner sits beside the spawn column, and that is load-bearing.**
+     * The scripted merge has to happen for a player who only ever presses ▼,
+     * because that is the player L49 deliberately produces — with the clock
+     * frozen, ▼ is the only input that makes progress, so most first-timers never
+     * steer at all. A partner the block cannot reach without a drag would let the
+     * merge be missed, and the next drop's board would then arrive already
+     * holding the tier that merge was supposed to make. The lesson would not
+     * fail; it would silently correct itself, which is worse, because a board
+     * that fixes itself behind the player is exactly what makes a scripted run
+     * read as arbitrary.
+     *
+     * Drop 4 used to break this by placing a second 2 three columns over. It was
+     * reachable, so the merge still happened, but the tile appeared out of
+     * nowhere on a beat with no card in front of it. It is now the same 16 the
+     * player just made, merged with a 16, which keeps the ladder reading
+     * 2 → 4 → 8 → 16 → 32 and puts nothing on the board they did not put there.
      */
     fun drop(index: Int, config: EngineConfig): TutorialDrop {
         val floor = config.rows - 1
@@ -175,11 +192,7 @@ object Tutorial {
             1 -> TutorialDrop(mapOf(at(1) to tier(BlockValue.V2)), tier(BlockValue.V2), 1..2)
             2 -> TutorialDrop(mapOf(at(1) to tier(BlockValue.V4)), tier(BlockValue.V4), 1..2)
             3 -> TutorialDrop(mapOf(at(1) to tier(BlockValue.V8)), tier(BlockValue.V8), 1..2)
-            4 -> TutorialDrop(
-                placed = mapOf(at(1) to tier(BlockValue.V16), at(3) to tier(BlockValue.V2)),
-                falling = tier(BlockValue.V2),
-                allowedColumns = 2..4,
-            )
+            4 -> TutorialDrop(mapOf(at(1) to tier(BlockValue.V16)), tier(BlockValue.V16), 1..2)
 
             5 -> TutorialDrop(
                 placed = mapOf(

@@ -71,8 +71,34 @@ object Motion {
     /** A column compacting downward after a merge. */
     const val GravitySettleMillis: Int = 180
 
-    /** A 2048 clearing its row. The longest thing in the game, and the only one that earns it. */
-    const val RowBurstMillis: Int = 240
+    /**
+     * A 2048 clearing its row. The longest thing in the game, and the only one
+     * that earns it.
+     *
+     * **Raised from the handoff's 240 in C3a, after watching one.** At 240 the
+     * row vanished between two frames and `ROW BUST!` was announced over an empty
+     * board, so the loudest event in the game had no picture attached to it — the
+     * whole burst, from the 2048 appearing to the board being clear, took 400ms.
+     * SPEC 9 says in as many words not to undersell this. It is now the longest
+     * hold in [Motion] other than [TerminalMergeMillis], which is the beat
+     * immediately before it.
+     */
+    const val RowBurstMillis: Int = 420
+
+    /**
+     * The merge that makes a 2048, held on its own.
+     *
+     * 2048 is terminal: it bursts its own row, so the tile the game is named
+     * after is the one tile that can never be looked at. Measured on device it
+     * was on screen for four tenths of a second between the merge that made it
+     * and the burst that took it away. This is the beat that lets a player see
+     * the thing they spent the run building.
+     *
+     * It is the only place in this file where a duration depends on *what*
+     * merged rather than on which kind of step it is, and that is the point: no
+     * other merge in the game ends the object it produced.
+     */
+    const val TerminalMergeMillis: Int = 520
 
     /** `CHAIN xN`, `ROW BUST!`, `LEVEL N`. In and out, once. */
     const val ToastMillis: Int = 900
@@ -111,19 +137,30 @@ object Motion {
     const val HardDropMillis: Int = 90
 
     /**
-     * One step of a cascade: the merge, its pop, and the gravity that follows.
-     *
-     * The handoff splits this into [MergeHoldMillis] and [GravitySettleMillis],
-     * which is the same beat described as two. This stays as the number the
-     * ViewModel paces the transcript by, and it is deliberately the sum-ish
-     * middle of those two rather than either — the engine hands out frames, and
-     * the renderer decides how much of each frame is hold and how much is fall.
+     * How long one **chained** merge is held: step two of a cascade and every
+     * step after it.
      *
      * The one number in here allowed to be watched rather than waited through.
      * SPEC 21 says the ascending run of merges is half of what makes this game
-     * worth playing. Rushing it is the cheapest possible way to throw that away.
+     * worth playing, and rushing it is the cheapest possible way to throw that
+     * away.
+     *
+     * **Raised from 195 in C3a, and the criterion is legibility rather than
+     * taste.** SPEC 8.2 puts a `CHAIN xN` over every chained merge and
+     * [ToastMillis] gives it most of a second to be read — but a later callout
+     * replaces the one before it, so consecutive chain steps are the real
+     * ceiling on how long a toast is on screen. At 195 a three-step cascade on
+     * device put `CHAIN x2` up and took it away again inside 200ms: the number
+     * the player is being congratulated on was never readable, and the whole run
+     * arrived as one flash rather than as three things happening in order. 300 is
+     * about the shortest a short word and a numeral can be shown and still be
+     * read.
+     *
+     * A **step-one** merge is not this. It has no chain to announce, it happens
+     * on most drops, and it gets [MergeHoldMillis] — the handoff's own number,
+     * and cheap enough that a fast level does not feel like it keeps stopping.
      */
-    const val CascadeStepMillis: Int = 195
+    const val CascadeStepMillis: Int = 300
 
     /** How far a pressed element scales down. Matches `bounceClick`'s default. */
     const val PressScale: Float = 0.90f

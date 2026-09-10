@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -88,6 +89,7 @@ fun <ID, Payload> BarChart(
     chartHeight: Dp = 180.dp,
     spacing: Dp = Dimension.D500,
     minBarHeightFraction: Float = 0.02f,
+    maxBarWidth: Dp = BarChartDefaults.MaxBarWidth,
     selectedEntryId: ID? = null,
     onEntryClick: ((BarChartEntry<ID, Payload>) -> Unit)? = null,
     drawGuides: Boolean = true,
@@ -149,6 +151,7 @@ fun <ID, Payload> BarChart(
                     axis = axis,
                     spacing = spacing,
                     minBarHeightFraction = minBarHeightFraction,
+                    maxBarWidth = maxBarWidth,
                     selectedEntryId = selectedEntryId,
                     onEntryClick = onEntryClick,
                     barContent = barContent,
@@ -170,6 +173,7 @@ private fun <ID, Payload> BarChartBars(
     axis: BarChartAxis,
     spacing: Dp,
     minBarHeightFraction: Float,
+    maxBarWidth: Dp,
     selectedEntryId: ID?,
     onEntryClick: ((BarChartEntry<ID, Payload>) -> Unit)?,
     barContent: (@Composable (
@@ -212,6 +216,7 @@ private fun <ID, Payload> BarChartBars(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 val sizedModifier = Modifier
+                    .widthIn(max = maxBarWidth)
                     .fillMaxWidth()
                     .fillMaxHeight(visualFraction)
                     .thenIf(onEntryClick != null) {
@@ -256,6 +261,21 @@ private fun BarChartGuides(
 }
 
 object BarChartDefaults {
+
+    /**
+     * How wide one bar is allowed to get, however few there are.
+     *
+     * Without a ceiling every bar takes an equal share of the whole chart, which
+     * is right from about four entries and absurd below it: a player who has
+     * finished exactly one run opens the stats page and is shown a single bar as
+     * wide as the card, which reads as a progress meter or a loading state rather
+     * than as one score. That is the first chart anyone in this game ever sees.
+     *
+     * Sized just above the widest bar the five-run chart draws, so the frame a
+     * regular player looks at is untouched and only the sparse ones change.
+     */
+    val MaxBarWidth: Dp = 56.dp
+
     @Composable
     fun Axis(axis: BarChartAxis) {
         if (axis.ticks.isEmpty()) return

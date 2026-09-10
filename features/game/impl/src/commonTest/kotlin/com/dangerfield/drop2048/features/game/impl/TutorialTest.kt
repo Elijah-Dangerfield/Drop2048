@@ -62,6 +62,47 @@ class TutorialTest : CoroutineTest() {
         }
     }
 
+    /**
+     * **Every scripted merge happens for a player who never steers.**
+     *
+     * This is the property the whole script rests on and it had no test. With the
+     * clock frozen, ▼ is the only input that makes progress (L49), so the player
+     * the tutorial is designed to produce is one who reaches for ▼ and never
+     * drags at all — and every partner therefore sits beside the spawn column so
+     * that dropping straight down still merges.
+     *
+     * If it did not, the merge would be missed and the *next* drop's board would
+     * arrive already holding the tier it was supposed to make. Nothing would look
+     * broken and nothing would be: the board would just have corrected itself
+     * behind the player, which is what makes a scripted run read as arbitrary.
+     *
+     * The ladder is asserted at each rung rather than at the end, so a board that
+     * is moved fails on the drop that moved it.
+     */
+    @Test
+    fun everyScriptedMerge_landsWithoutASingleSteer() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            val ladder = Cell(1, 7)
+
+            playDrop(TutorialStep.Steer)
+            assertEquals(NumberBlock(BlockValue.V4), state.board[ladder])
+            act(GameAction.TutorialAdvance)
+
+            playDrop(TutorialStep.SecondDrop)
+            assertEquals(NumberBlock(BlockValue.V8), state.board[ladder])
+
+            playDrop(TutorialStep.ThirdDrop)
+            assertEquals(NumberBlock(BlockValue.V16), state.board[ladder])
+
+            playDrop(TutorialStep.FourthDrop)
+            assertEquals(
+                BlockValue.V32.points,
+                state.biggestTier,
+                "the fourth drop doubles the ladder rather than merging a tile nobody placed",
+            )
+        }
+    }
+
     @Test
     fun steering_isClampedToTheScriptedColumns() = runUnitTest {
         playing(teach = true, pressPlay = false) {
@@ -94,7 +135,6 @@ class TutorialTest : CoroutineTest() {
             cues.clear()
             playDrop(TutorialStep.CascadeDrop)
             assertEquals(CascadeDepth - 1, cues.maxOf { it.pitchSteps }, "a three-step cascade")
-            assertEquals(BlockValue.V32.points, state.biggestTier, "which ends in a 32")
             assertEquals(TutorialStep.BurstIntro, state.tutorial?.step)
             act(GameAction.TutorialAdvance)
 
@@ -249,23 +289,26 @@ class TutorialTest : CoroutineTest() {
 
     /**
      * The scripted run scores about 11,600 points and is deliberately never
-     * recorded, so the number the header shows as "best" the moment the tutorial
-     * hands over has to come from `run_record` and not from the script.
+     * recorded, so the number the header shows as "best" has to come from
+     * `run_record` and not from the script — during the tutorial as well as after
+     * it.
      *
-     * `GameUiState.best` is `maxOf(best, score)` on every publish (L44), so it
-     * had absorbed the tutorial's score and a brand-new player's first real run
-     * opened under a best they had never set — which then quietly corrected
-     * itself on the next launch.
+     * C3c fixed the second half of that and C3a fixed the first. `best` was
+     * `maxOf(best, score)` on every publish (L44), so a brand-new player watched
+     * the header count their scripted 11,598 up as a record they had never set,
+     * and it corrected itself to zero the moment the script handed over. Both
+     * assertions here are the same bug, one before the handoff and one after.
      */
     @Test
-    fun theHandoff_doesNotCarryTheScriptedScoreIntoTheBest() = runUnitTest {
+    fun theScriptedScore_isNeverThePlayersBest() = runUnitTest {
         playing(teach = true, pressPlay = false) {
             playWholeScript()
-            assertTrue(state.best > 0, "the script really does run the number up")
+            assertTrue(state.score > 0, "the script really does run the number up")
+            assertEquals(0L, state.best, "and none of it reaches the header's best")
 
             act(GameAction.TutorialAdvance)
 
-            assertEquals(0L, state.best, "and none of it is the player's best")
+            assertEquals(0L, state.best)
         }
     }
 

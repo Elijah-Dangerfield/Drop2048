@@ -457,6 +457,12 @@ Universal, all schemes:
 A block locking in a full column lands in row 0, resolution runs, and if row 0 is still occupied
 the run ends. No special case.
 
+**System back does nothing while a block is falling or a cascade is playing.** Added in C3a on an
+owner ruling: the game screen is the launch destination, so back closed the app mid-drop. It does
+not pause either — a gesture made by accident should not stop the clock and raise a menu. Back on
+the pause overlay closes it. The start overlay and the stacked-out sheet are not the board and are
+left to the system.
+
 ## 7. Scoring
 
 | Event | Points |
@@ -562,6 +568,17 @@ Sound and haptic ship as **one `Cue`**, never as two calls that can drift apart.
 cascade step 4 is a single call that knows its pitch offset and its buzz.
 
 The burst is the release valve for the whole game. Do not undersell it.
+
+**The playback path is built and the samples are not.** C3a put a real engine behind `SoundPlayer`
+on both platforms — Android `SoundPool`, iOS pooled `AVAudioPlayer` — pitched per cascade step by
+playback rate, wired to the effects switch, and covered by tests that pin which cue fires at which
+transcript step. What is missing is a sample bank, which is the owner's and is the only remaining
+step: one `.ogg` per `Sound`, named after its `key`, in a folder called `audio` —
+`libraries/ui/src/androidMain/assets/audio/` on Android and the app bundle on iOS. A sample that is
+absent is logged by name at launch and leaves that one effect silent; nothing else changes. See
+`SoundBank`'s KDoc and `decisions.md`.
+
+The music track and its intensity layers are not built either, and are not a sample bank.
 
 ## 10. Remote config
 
