@@ -103,7 +103,10 @@ platform icon set if it reads better natively.
 | **Sentry DSN** | C8 | Per environment. |
 | **Grafana / OTel endpoint + token** | C8 | The two dashboards that matter: median level reached, and highest-tier-reached distribution. |
 | **App Store Connect + Play Console apps** | C9, C10 | Bundle IDs and signing. Leaderboards are configured store-side before any code can submit. |
-| **Game Center + Play Games IDs** | C9 | 24 achievements, 3 leaderboards. |
+| **Game Center leaderboard IDs** | C9 | **Exact ids, already in code:** `com.dangerfield.drop2048.leaderboard.score_alltime`, `…score_weekly` (recurring weekly), `…daily` (recurring daily, rolling at **00:00 UTC** — SPEC 14's boundary). Until these exist every submission fails silently, exactly like a signed-out player's. Also enable the Game Center capability on the iOS target. |
+| **Decide whether Play Games is in v1** | C9 | SPEC 15 names it; C9 shipped an inert Android seam. Yes means a Play Games Services project, a second id per board, and replacing `NoGameServices`. |
+| **Badge art** | C9 | The 24 achievement glyphs are placeholder emoji, and the locked treatment (35% alpha) reads weakly on colour emoji. |
+| **Confirm `drop2048.app`** | C9 | It is in the share footer and in the default privacy/terms URLs. If the domain is not yours, change `share_footer` and the `legal.*` config defaults. |
 | **AdMob account, app + unit IDs** | C10 | Test IDs work until then. |
 | **Pro IAP product** | C10 | Non-consumable, $2.99 at current scope (SPEC 2 — thinner than the original $3.99 because coins, powerups and Zen are cut). |
 | **Privacy policy + terms, hosted** | C11 | The gate does legal re-accept, so the version matters, not just the text. |
