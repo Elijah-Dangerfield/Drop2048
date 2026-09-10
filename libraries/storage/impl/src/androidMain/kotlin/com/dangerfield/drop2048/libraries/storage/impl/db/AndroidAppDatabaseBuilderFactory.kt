@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.libraries.storage.impl.db
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
@@ -18,6 +19,6 @@ class AndroidAppDatabaseBuilderFactory @Inject constructor(
         return Room.databaseBuilder<AppDatabase>(
             name = "drop2048.db",
             context = context,
-        )
+        ).setDriver(BundledSQLiteDriver())
     }
 }

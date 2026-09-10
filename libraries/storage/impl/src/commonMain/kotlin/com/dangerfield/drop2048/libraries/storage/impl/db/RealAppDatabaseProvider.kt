@@ -1,6 +1,5 @@
 package com.dangerfield.drop2048.libraries.storage.impl.db
 
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import com.dangerfield.drop2048.libraries.flowroutines.DispatcherProvider
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -17,7 +16,6 @@ class RealAppDatabaseProvider @Inject constructor(
     override val database: AppDatabase by lazy {
         builderFactory
             .create()
-            .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(dispatcherProvider.io)
             // Only the pre-game template schemas may be dropped. Everything from
             // AppDatabase.FIRST_PLAYER_DATA_VERSION up migrates, because there is

@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.libraries.storage.impl.db
 
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.cinterop.ExperimentalForeignApi
 import me.tatarka.inject.annotations.Inject
 import platform.Foundation.NSDocumentDirectory
@@ -30,6 +31,6 @@ class IosAppDatabaseBuilderFactory @Inject constructor() : AppDatabaseBuilderFac
         val dbPath = requireNotNull(dbUrl?.path)
         return Room.databaseBuilder<AppDatabase>(
             name = dbPath
-        )
+        ).setDriver(BundledSQLiteDriver())
     }
 }
