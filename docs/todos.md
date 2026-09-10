@@ -12,6 +12,22 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### The app looks like two products
+
+`:features:stats` and `:features:daily` render in the **light palette with Roboto body text** while
+the game screen is dark Fredoka/Nunito to the handoff's spec. Consistent with what C4 shipped, so
+neither chunk was wrong, but the two halves do not look like one app — and the owner's original
+complaint was exactly that the design looked bad.
+
+Neither module has design-fidelity goldens against the handoff. **This is the next visual chunk.**
+
+### One saved-run slot loses a Daily attempt
+
+A Daily attempt abandoned and then overwritten by starting an Endless run is **lost, and the day is
+spent**. Fix is a second slot in `SavedRunStore` with its own format version. Real bug, found by C6,
+not fixed by it.
+
+
 ### Decide whether the ▼ nudge pays any score
 
 SPEC 7's hard drop bonus (`2 x rowsSkipped`) has nothing left to fire on once D11 lands. The bonus

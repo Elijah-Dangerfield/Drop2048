@@ -26,7 +26,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
 | C3a · Feel | not started | Needs audio assets from the owner |
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
-| C6 · Daily Challenge | **IN PROGRESS** | Seeded engine makes it cheap |
+| C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | not started | |
@@ -254,6 +254,30 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D18 · A Daily run pins `EngineConfig.Default` and ignores remote config entirely
+
+C7's rule — sample config at run start, never mid-run — keeps a single run coherent and **does not
+deliver SPEC 14's promise.** Two players opening the same seed ten minutes apart either side of a
+config push would each get an internally coherent run and a *different board*. The seed would
+match, the scores would not be comparable, and nothing anywhere would say so.
+
+Comparability wins. Endless is unchanged and still takes remote config at run start.
+
+**Accepted cost:** a live spawn-table fix does not reach the Daily until the next release. That is
+the right boundary — a remote push is invisible and instant, a release is versioned and deliberate.
+
+Rejected (in `decisions.md`): using whatever config the player has; a separately frozen
+`EngineConfig.Daily` with its own literals, which would drift and be permanently worse-tuned than
+Endless; stamping a config version into the seed, which creates invisible cohorts.
+
+**What this makes immovable, and it is new:** `EngineConfig.Default` is now a leaderboard-visible
+constant. From the first recorded Daily score, any release that moves a field of it splits that
+day's board between app versions. So are `dailySeedFor`'s stride and salt (moving either re-rolls
+every past and future day), `daily_result`'s ISO-UTC date format, and the `GameMode` enum names.
+
+`PINNED_DIGEST` and `level.blocksPerLevel` were theoretical hazards while no scores existed. They
+are now real.
 
 ### D16 · The danger ring arms on row 1, at any board height
 
@@ -515,6 +539,36 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L51 · Assert on outputs, not on the inputs you think produce them
+
+`DailyConfigPinningTest` proves a Daily run ignores remote config by comparing **block sequences**,
+not config objects.
+
+Comparing configs would pass a refactor that reads remote config and happens to get the same
+numbers back — which is the exact bug the test exists to catch, since that refactor would break the
+day a remote value actually differs.
+
+It also carries a positive control (L35): the same fetched config demonstrably **does** change an
+Endless run, so the rejection assertion cannot be vacuously true.
+
+Both halves generalise. Test the thing the player experiences, and prove your negative by showing
+the positive.
+
+### L52 · How to commit without clobbering a concurrent agent
+
+C6 needed to commit seven files that C11 was editing at the same time. Rather than a repo-wide
+operation (banned, L38) or committing the other agent's half-finished work, it staged
+**reconstructed** versions — HEAD's content plus its own edits — directly into the index with
+`git hash-object` and `git update-index`, leaving the working tree untouched.
+
+Then it verified the *committed* tree in a separate `git worktree`, because the shared checkout at
+that moment had another agent's uncompilable module in it.
+
+That is the technique when two agents genuinely must touch the same file. It also explains a
+confusing class of report: C6 saw `:features:gate:impl` failing to compile and three
+`:features:settings:impl` goldens failing, and correctly attributed both to the concurrent agent
+rather than to itself (L14).
 
 ### L49 · Teach a habit, not a fact: make the thing you are teaching the only way forward
 
