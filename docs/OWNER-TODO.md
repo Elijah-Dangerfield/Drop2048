@@ -111,17 +111,19 @@ platform icon set if it reads better natively.
 | **Privacy policy + terms, hosted** | C11 | The gate does legal re-accept, so the version matters, not just the text. |
 | **Revoke dead Supabase secrets** | Housekeeping | `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on Fly and in GitHub Actions. **Keep `DATABASE_URL`** — the config server still uses that Postgres. |
 
-## Telemetry: the one decision that matters most
+## The Grafana credentials are now the single highest-value thing you can supply
 
-**Instrument the player's decision time and tap rate** (time from spawn to first sideways input,
-and inter-tap interval).
+The instrument is **built**. `steer_ms_p50` and `tap_gap_ms_p50` ship on every `run.end`, and the
+per-drop values ride the 10th-drop sample so they arrive next to `level` — which answers "do players
+slow down as the board speeds up", a question the offline sweep structurally could not.
 
-Every clocked balance number in this project rests on a modelled 250ms decision time that nobody
-has measured, and it is worth **five levels of median** and a 3x swing in the 1024 rate — more than
-the drop clock, the spawn table and every curve change put together. Until it is measured, every
-tuning conversation is conditional on a guess.
+**One week of real data retires an assumption that every clocked number in this project rests on.**
+The modelled 250ms decision time is worth five levels of median and a 3x swing in the 1024 rate,
+which is more than the drop clock, the spawn table and every speed-curve change put together.
 
-**Needed by:** C8.
+Once the endpoint and token land, create the two dashboards from
+`docs/practices/observability.md` — they are defined query-for-query. Expect `unwrap level` to need
+a tweak on first contact with real ingest; that is the most likely thing to not work first time.
 
 ## Art and audio
 
