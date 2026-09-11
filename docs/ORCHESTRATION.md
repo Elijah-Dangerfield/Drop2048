@@ -25,7 +25,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
 | C3c · One product + player bugs | **DONE** | `e049f95`. Dark design system (D20). Found L56 |
-| C3a · Feel + polish | **IN PROGRESS** | Haptics, motion, player-visible defects |
+| C3a · Feel + polish | **DONE** | `1e1959a`. Cascade re-paced (L58). Haptics fired (L59) |
 | C12 · Debug menu | **IN PROGRESS** | Plus the first Room-backed test |
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
@@ -620,6 +620,53 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L58 · The cascade was too fast, and only a frame count could say so
+
+C3a recorded the tutorial's scripted cascade and its 2048 burst off the emulator and counted frames
+at 20fps. Three findings, all measured:
+
+- Three merges and two chain callouts fitted inside **500ms**. A later callout replaces the earlier
+  one, so **consecutive chain steps, not `ToastMillis`, are the real ceiling on readability** —
+  `CHAIN ×2` was on screen for *3 frames*. The number the player is being congratulated on was
+  never legible.
+- **The 2048 existed for 400ms**, between the merge that made it and the burst that took it away.
+  It is terminal, so it is the one tile in the game that can never be looked at — and it is the
+  tile the game is named after.
+- `ROW BUST!` and `SWEPT!` were both announced **over an already-empty board.**
+
+Playback is now paced per step kind: first merge gets the handoff's hold, a chained merge 300ms, a
+merge producing a 2048 its own 520ms beat, a burst 240 → 420, gravity unchanged. Re-measured:
+`CHAIN ×2` holds ~350ms over 7 frames and the three-step cascade runs 1.1s and reads as three
+things in order.
+
+**The general lesson:** one duration constant covering merge, chain, terminal and burst was making
+the common case fast at the cost of the rare one, which is backwards — the rare one is the payoff.
+And "does it feel fast" is not a judgement anyone can make reliably at 60fps; count frames.
+
+### L59 · Run the control before claiming the fix
+
+`VIBRATE` was missing from the manifest and C3a added it — then **deleted it again and confirmed
+the haptics still played.** On API 36 the missing permission was never what kept them quiet;
+nothing had, because nobody had ever executed the code.
+
+The declaration stays, because the API contract asks for it and a platform that *does* enforce it
+fails silently. But the report says "this was not the cause", which is the difference between a fix
+and a coincidence.
+
+Haptics fired for the first time in the project's life, and `dumpsys vibrator_manager` confirmed
+the Off/Light/Strong setting scaling end to end: `amplitude=0.17` for Light, `0.32` for Medium,
+exactly the configured values halved.
+
+### L60 · Goldens are not task inputs, so swapping one leaves the test UP-TO-DATE
+
+The sharper edge under L39. With verification enabled, C3a swapped a golden and re-ran — **green and
+UP-TO-DATE**, because the PNGs are not declared inputs to the test task, so nothing invalidated it.
+Only `--rerun` surfaced the failure.
+
+So "prove the verifier runs" needs `--rerun`, or the proof proves nothing. L39 was about the
+capture being a no-op; this is the layer below it, where the capture works and the comparison never
+executes.
 
 ### L56 · Nobody installed a build for eight chunks, and the app was unplayable the whole time
 

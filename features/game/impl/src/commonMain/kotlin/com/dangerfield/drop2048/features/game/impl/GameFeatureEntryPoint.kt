@@ -1,6 +1,9 @@
 package com.dangerfield.drop2048.features.game.impl
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -107,9 +110,13 @@ class GameFeatureEntryPoint(
                     showMergeArrows = diagnosticsSettings.showMergeArrows,
                 ),
             ) {
-                Box {
+                Box(modifier = Modifier.fillMaxSize()) {
                     GameScreen(state = state, onAction = viewModel::takeAction)
-                    DiagnosticsPanel(settings = diagnosticsSettings, cascadeStep = state.chainStep)
+                    DiagnosticsPanel(
+                        settings = diagnosticsSettings,
+                        cascadeStep = state.chainStep,
+                        modifier = Modifier.align(Alignment.BottomStart),
+                    )
                 }
             }
         }
@@ -124,16 +131,30 @@ class GameFeatureEntryPoint(
      * cell, so none of it belongs in `GameBoard` — the two things that are
      * (coordinates and merge arrows) are drawn there instead.
      *
+     * **Bottom-aligned, and that was a correction.** It started at the top, where
+     * it covered SCORE and LEVEL — which is the wrong half to lose, because "what
+     * did that cascade pay" is most of what somebody reading a transcript wants
+     * to know, and it is only on screen while the run is alive. At the bottom it
+     * covers the three control buttons instead, and the board's own drag control
+     * (`ControlScheme.Both` is the default) still steers and still flicks, so the
+     * run stays playable with the overlay up. Found by turning it on and looking
+     * at it.
+     *
      * Composed unconditionally and drawn only when something is switched on, so
      * the state collection lives for the life of the screen rather than being
      * torn down and rebuilt every time a tester flips a switch.
      */
     @Composable
-    private fun DiagnosticsPanel(settings: DiagnosticsSettings, cascadeStep: Int) {
+    private fun DiagnosticsPanel(
+        settings: DiagnosticsSettings,
+        cascadeStep: Int,
+        modifier: Modifier = Modifier,
+    ) {
         if (!settings.anythingOn) return
         val tick = diagnostics.tick.collectAsStateWithLifecycle().value
         val transcript = diagnostics.lastResolution.collectAsStateWithLifecycle().value
         DiagnosticsOverlay(
+            modifier = modifier,
             showFrameRate = settings.showFrameRate,
             intendedTickMs = tick.intendedMs.takeIf { settings.showTick },
             actualTickMs = tick.actualMs.takeIf { settings.showTick },

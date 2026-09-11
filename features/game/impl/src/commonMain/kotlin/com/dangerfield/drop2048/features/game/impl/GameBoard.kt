@@ -273,7 +273,7 @@ private fun CellCoordinates(cols: Int, rows: Int, scale: BoardScale, pitch: Dp) 
     repeat(rows) { row ->
         repeat(cols) { col ->
             Text(
-                text = "\$col,\$row",
+                text = "$col,$row",
                 typography = AppTheme.typography.Body.B400,
                 color = AppTheme.colors.textSecondary,
                 modifier = Modifier.offset(

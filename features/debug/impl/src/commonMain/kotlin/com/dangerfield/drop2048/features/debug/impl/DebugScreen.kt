@@ -430,10 +430,6 @@ private fun StateSection(state: DebugState, onAction: (DebugAction) -> Unit) {
             ListSectionItem(
                 headlineText = DebugCopy.ResetLocalData,
                 supportingText = DebugCopy.ResetLocalDataHint,
-                accessory = ListItemAccessory.Text(
-                    text = "",
-                    color = AppTheme.colors.danger,
-                ),
                 onClick = { onAction(DebugAction.ResetAllLocalData) },
             ),
             ListSectionItem(

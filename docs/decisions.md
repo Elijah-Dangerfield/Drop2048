@@ -1350,3 +1350,97 @@ dialogs, the gates) are the design system's light theme, while the board draws i
 own dark backdrop. That is consistent with the Stats screen as it already ships,
 and it is jarring — see the `game-quit-confirm` golden, a white dialog over a dark
 board.
+
+---
+
+## C12 · Debug menu, and the first Room-backed tests
+
+### The debug *session* is the unit, not the debug run
+
+Opening the debug menu latches a process-wide flag. From that moment no run
+writes `run_record`, banks a `daily_result` or posts a leaderboard score, and
+every analytics event carries `debug_session: true` for C8 to consume. It cannot
+be switched back off from inside the app; relaunching is the reset.
+
+The tempting design is to taint individual runs — mark the one that was forced,
+leave the rest alone — and it is wrong in the only direction that matters. A
+tester who loads a preset, plays it, quits and then plays a "normal" run has
+still had their hands on a menu that can set a seed and grant Pro, so treating
+that second run as real data trusts exactly the person most likely to be
+producing junk. Per-run tainting also has to be *remembered* at four call sites,
+which is four places to forget it. The flag is read once, in `RunFactory`, and
+travels on `StartedRun` so that opening the menu mid-run cannot retroactively
+delete a legitimate run's record.
+
+The cost is real: a tester who opens the menu only to read the current seed loses
+that run's record. That is the right trade, because the alternative failure is
+silent.
+
+### There is no debug `EngineConfig`, which is why one cannot leak into a Daily
+
+D18 pins the Daily to `EngineConfig.Default` so everyone who plays a day plays the
+same game, and D5 puts the config *inside* `GameState` so a replayed seed
+reproduces the run it was recorded under. A debug override shaped like an
+`EngineConfig` would therefore travel inside a saved run, inside a `run_record`
+replay and — the moment anybody wired it up — inside a shared seed.
+
+So `DebugOverrides` contains no config. Everything it holds is either an edit to a
+*starting state* (board, level, seed, the forced queue) or a number the
+ViewModel's own clock reads (tick interval, freeze). The tick override is the
+clearest case: SPEC 5.5's speed curve is a remote key and this is deliberately not
+it, and because vertical position is not an input to the engine (L40) a changed
+interval cannot change where a block lands. `dailyRun` ignores the overrides
+outright as a second, independent guard, and `DebugRunFactoryTest` pins both
+halves — that the overrides visibly change an Endless run, and that the same
+overrides move nothing about a Daily.
+
+### Forcing and invincibility are applied after the engine, never inside it
+
+The engine stays a pure function of state and a seed (SPEC 4.1). A forced block is
+overwritten on the state the engine just returned, and invincibility rewrites a
+`STACKED_OUT` status back to `PLAYING`. Teaching the engine about a debug queue
+would mean a `GameState` no longer determines the next one, which is the property
+Daily Challenge, undo, resume, the balance harness and replay are all built on.
+The run is played honestly and then the answer is rewritten, which is also exactly
+why a run that has been through there writes nothing.
+
+### The autoplay soak reuses `tools/balance`'s policies
+
+`Policy` moved from `tools/balance` into `:libraries:cascade` (`autoplay/`), with
+the one drop helper it needs. A second scripted player in the debug menu would
+report a level that looks like the harness's and is not comparable to it, which is
+worse than no number. `tools/balance` now delegates to the same code, so the
+policies that measured SPEC 5.3's spawn table are the policies the soak runs.
+
+### Debug copy is plain constants, not `composeResources`
+
+The menu is unreachable without seven taps and, on a release build, a passphrase.
+Nobody outside the project will see it, so there is nothing for a translator to
+translate and every string added would be a real string in every locale file for
+the life of the app. The repo's string baseline stays at nine; `VerifyStrings`
+fails on a literal passed directly to `Text(...)`, and these are named values.
+
+### The Room harness runs on the framework driver, not the bundled one
+
+`sqlite-bundled`'s **android** variant loads device `.so` files through
+`System.loadLibrary`, so on a host JVM it dies with `no sqliteJni in
+java.library.path` before a statement runs. The tests use `AndroidSQLiteDriver`
+under Robolectric 4.16, which is a real SQLite build — so what they exercise is
+real SQL. What they do not pin is the exact SQLite version the app links on
+device.
+
+That is also why `setDriver` moved out of `RealAppDatabaseProvider` and into the
+two platform builder factories: a provider that hardcoded the bundled driver could
+only ever be constructed on a device, which is why L33's migration promise went
+untested for eight chunks.
+
+### What the narrowed destructive fallback actually guards
+
+Room prefers a migration to a drop, so *every* version with a path migrates
+whether or not it is on the `fallbackToDestructiveMigrationFrom` list — which
+means "the version 6 row survived" says nothing on its own about the narrowing.
+What the list decides is the versions with **no** path: 1 to 4 are emptied and
+rebuilt, and anything else (a downgrade from a rolled-back release, or a future
+bump somebody forgets to write a migration for) refuses to open and leaves every
+row where it was. Both halves are asserted, and both were proven to bite by
+mutating the production configuration and watching exactly one of them go red.

@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import com.dangerfield.drop2048.features.debug.DebugController
 import com.dangerfield.drop2048.features.debug.NoDebugController
 import com.dangerfield.drop2048.features.debug.NoDiagnostics
 import com.dangerfield.drop2048.libraries.cascade.Block
@@ -77,6 +78,7 @@ internal class GameScenario private constructor(
     val leaderboards: FakeLeaderboards,
     val lifecycle: FakeAppLifecycle,
     val clock: MutableClock,
+    private val debug: DebugController,
 ) {
     val cues = mutableListOf<Cue>()
     val effects = mutableListOf<GameEffect>()
@@ -89,7 +91,12 @@ internal class GameScenario private constructor(
     private fun launch(collectorScope: CoroutineScope) {
         viewModel = GameViewModel(
             runFactory = object : RunFactory {
-                override fun newRun() = StartedRun(state = start, seed = SCENARIO_SEED, mode = GameMode.ENDLESS)
+                override fun newRun() = StartedRun(
+                    state = start,
+                    seed = SCENARIO_SEED,
+                    mode = GameMode.ENDLESS,
+                    debug = debug.isDebugSession.value,
+                )
 
                 /**
                  * The same scripted board, flagged as a Daily. The seed is the
@@ -97,8 +104,12 @@ internal class GameScenario private constructor(
                  * state is the fixture so the board under test stays the one the
                  * scenario drew.
                  */
-                override fun dailyRun(seed: Long) =
-                    StartedRun(state = start, seed = seed, mode = GameMode.DAILY)
+                override fun dailyRun(seed: Long) = StartedRun(
+                    state = start,
+                    seed = seed,
+                    mode = GameMode.DAILY,
+                    debug = debug.isDebugSession.value,
+                )
             },
             appCache = cache,
             savedRunStore = savedRuns,
@@ -108,7 +119,7 @@ internal class GameScenario private constructor(
             leaderboards = leaderboards,
             clock = clock,
             appLifecycle = lifecycle,
-            debug = NoDebugController,
+            debug = debug,
             diagnostics = NoDiagnostics,
         )
         collectorScope.launch {
@@ -249,6 +260,13 @@ internal class GameScenario private constructor(
             daily: FakeDailyRepository = FakeDailyRepository(),
             /** What the run that ends in this scenario is told it unlocked (SPEC 15). */
             achievements: FakeAchievementsRepository = FakeAchievementsRepository(),
+            /**
+             * Whether this launch has opened the debug menu (SPEC 19).
+             *
+             * `NoDebugController` — never opened — for every scenario that is
+             * about the game, which is all of them but one.
+             */
+            debug: DebugController = NoDebugController,
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -272,6 +290,7 @@ internal class GameScenario private constructor(
                 leaderboards = FakeLeaderboards(),
                 lifecycle = FakeAppLifecycle(),
                 clock = MutableClock(),
+                debug = debug,
             )
             scenario.launch(backgroundScope)
             if (pressPlay && scenario.state.phase == GamePhase.Ready) {

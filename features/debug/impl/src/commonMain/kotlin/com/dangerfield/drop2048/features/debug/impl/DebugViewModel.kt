@@ -23,12 +23,12 @@ import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.versionString
 import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ClearableDao
+import com.dangerfield.drop2048.libraries.flowroutines.DispatcherProvider
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.flowroutines.collectIn
 import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import kotlin.random.Random
 import me.tatarka.inject.annotations.Inject
 
@@ -64,6 +64,7 @@ class DebugViewModel(
     private val daily: DailyRepository,
     private val appCache: AppCache,
     private val clearableDaos: Set<ClearableDao>,
+    private val dispatchers: DispatcherProvider,
 ) : SEAViewModel<DebugState, DebugEvent, DebugAction>(
     initialStateArg = DebugState(
         appVersion = BuildInfo.versionString(),
@@ -128,7 +129,7 @@ class DebugViewModel(
             DebugAction.ToggleFreezeTimer -> override { it.copy(freezeTimer = !it.freezeTimer) }
             is DebugAction.SetSeed -> override { it.copy(seed = action.seed) }
             DebugAction.ClearOverrides -> action.clearOverrides()
-            DebugAction.StartForcedRun -> sendEvent(DebugEvent.StartRun)
+            DebugAction.StartForcedRun -> action.startForcedRun()
 
             is DebugAction.RunSoak -> action.runSoak()
 
@@ -188,14 +189,15 @@ class DebugViewModel(
      * second, subtly different Greedy would produce a level that looks like the
      * harness's and is not.
      *
-     * It runs on the default dispatcher because a few thousand drops of a pure
-     * state machine is real work, and the main thread is drawing the menu that
-     * is about to show the answer.
+     * It runs on the injected default dispatcher because a few thousand drops of
+     * a pure state machine is real work, and the main thread is drawing the menu
+     * that is about to show the answer. Injected rather than `Dispatchers.Default`
+     * so a test sees the result on the same scheduler it asked for it on.
      */
     private suspend fun DebugAction.RunSoak.runSoak() {
         updateState { it.copy(soak = null, soaking = true) }
         val seed = state.overrides.seed ?: Random.nextLong()
-        val summary = withContext(Dispatchers.Default) {
+        val summary = withContext(dispatchers.default) {
             val result = Autoplay.soak(
                 from = Cascade.newGame(seed),
                 policy = policy,
@@ -216,6 +218,33 @@ class DebugViewModel(
             )
         }
         updateState { it.copy(soak = summary, soaking = false) }
+    }
+
+    /**
+     * Starts a run under the current overrides, and throws away the Endless save
+     * slot on the way.
+     *
+     * **This was a bug found by using the menu, not by a test.** "Start run"
+     * navigated to the game screen, which resumes a saved run if there is one —
+     * so a tester who had a run in progress got that board back and the preset
+     * they had just chosen was never applied. Nothing looked broken; the wrong
+     * board simply appeared, which is the worst shape a QA tool can fail in.
+     *
+     * The slot is cleared through [AppCache] rather than through
+     * `SavedRunStore`, which owns the format: a feature impl may not depend on
+     * another feature's impl, and the alternative — a seam on the game's api just
+     * for this — would be a production type that exists for the debug menu. What
+     * this touches is the one nullable string, and `SavedRunStore` treats a null
+     * slot as "no saved run" by construction.
+     *
+     * Only the Endless slot. A Daily attempt is spent and cannot be given back
+     * (SPEC 14), so deleting one to make room for a debug board would cost the
+     * tester's device a day it can never replay.
+     */
+    private suspend fun DebugAction.startForcedRun() {
+        Catching { appCache.update { data -> data.copy(savedRun = null) } }
+            .logOnFailure { "Could not clear the saved run before a forced one" }
+        sendEvent(DebugEvent.StartRun)
     }
 
     private suspend fun DebugAction.clearDaily() {

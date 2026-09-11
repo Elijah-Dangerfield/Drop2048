@@ -59,8 +59,8 @@ object DebugCopy {
     const val SoakRunning = "Playing..."
     const val SoakCheats = "reads a block the player cannot see"
 
-    const val StartRun = "Start a run with these"
-    const val ClearOverrides = "Clear the overrides"
+    const val StartRun = "Start run"
+    const val ClearOverrides = "Clear all"
     const val NoOverrides = "Nothing forced. A run started now is a normal run."
 
     const val Seed = "Seed"

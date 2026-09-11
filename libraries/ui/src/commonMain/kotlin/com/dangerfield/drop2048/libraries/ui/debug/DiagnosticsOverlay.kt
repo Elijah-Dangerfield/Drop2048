@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -46,6 +47,7 @@ fun DiagnosticsOverlay(
         modifier = modifier
             .fillMaxWidth()
             .background(AppTheme.colors.surfacePrimary.color.copy(alpha = ScrimAlpha))
+            .navigationBarsPadding()
             .padding(PanelPadding),
     ) {
         if (showFrameRate) FrameRateMeter()
@@ -149,6 +151,6 @@ private const val Smoothing = 0.9f
 private const val InspectionFps = 60f
 private const val ScrimAlpha = 0.85f
 private val PanelPadding = 8.dp
-private val LogHeight = 140.dp
+private val LogHeight = 120.dp
 private val MeterHeight = 18.dp
 private val MeterFontSize = 12.sp

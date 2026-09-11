@@ -90,15 +90,19 @@ enum class PresetBoard {
     /**
      * SPEC 4.3's chain, made as long as the board allows.
      *
-     * A column of doubling tiers under the spawn column: a 2 landing on the 2
-     * makes a 4 in the partner's cell, which is above the 4, which makes an 8,
-     * and so on down. The number of cascade steps is the number of rungs, which
-     * is what "force an N-step cascade" needs to be adjustable by.
+     * A column under the spawn cell whose tiers **double downward**: 2 at row 1,
+     * 4 under it, 8 under that. A 2 dropped into row 0 merges with the 2 below,
+     * the resulting 4 lands in the partner's cell (SPEC 4.3) directly above the
+     * 4, and the chain runs to the floor.
+     *
+     * The direction is the whole preset. Built the other way up — biggest tier
+     * nearest the top — the dropped 2 meets a 128 and nothing happens at all,
+     * which is a board that looks impressive and cascades zero times.
      */
     private fun cascadeChain(cols: Int, rows: Int): Map<Cell, Block?> = buildMap {
         val col = cols / 2
         var tier = BlockValue.V2
-        for (row in rows - 1 downTo 1) {
+        for (row in CHAIN_TOP_ROW until rows) {
             put(Cell(col, row), blockOf(tier))
             tier = tier.doubled ?: break
         }
@@ -141,4 +145,5 @@ enum class PresetBoard {
  * declaration.
  */
 private const val FIRST_FREE_ROWS = 2
+private const val CHAIN_TOP_ROW = 1
 private const val PRESET_DANGER_ROW = 1

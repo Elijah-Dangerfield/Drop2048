@@ -12,6 +12,18 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### A haptic can be cancelled by the next one a millisecond later
+
+Observed in `dumpsys`: a `Move` and the `Merge` behind it landed 1ms apart and the first came back
+`cancelled_superseded`. The `Cues` throttle covers Move→Move and does **not** cover Move→Merge.
+Needs a priority or a queue, not a longer gate.
+
+### Decide whether a step-1 merge should pop the score louder
+
+With the new per-step pacing (L58) the chain steps read well, and the single merge is now the one
+beat that looks plain by comparison.
+
+
 ### ▼ becomes a hard drop, soft drop is deleted (D21) — DO THIS FIRST
 
 Owner ruling from play. `Input.Lock` already locks at the landing cell, so the engine side is
@@ -33,24 +45,6 @@ the fold is tested properly, so the Kotlin is covered and the SQL is not.
 
 Needs an in-memory Room harness. Worth a chunk, not a line — and it would cover every DAO, not just
 this one.
-
-### `BarChart` draws one full-width bar at n=1
-
-Looks wrong on the stats page after a player's first run, which is exactly when they look at it.
-Cosmetic, in `:libraries:ui`.
-
-### Tutorial drops 2-4 do not force a steer
-
-A player who only taps ▼ drops everything down the spawn column, so the scripted merges never
-happen and the boards read as arbitrary. It still teaches ▼, which is the point (L49), but the
-lesson looks broken. Either force the steer or build those boards around the spawn column.
-
-### `GameUiState.best` still absorbs the live score
-
-`maxOf(best, score)`, so the header reads "best 736" during a run at 736 (L44). C3c fixed it where
-it actively lied (the tutorial's score briefly became the player's best) and left the rest, because
-changing it touches the score counter's animation.
-
 
 ### Decide whether the ▼ nudge pays any score
 
@@ -94,11 +88,6 @@ test that passed at 700ms by luck and NPE'd at 500ms (L31). There may be others.
 D8 deferred this. It matters now: Stones start arriving at level 12 and clocked runs regularly
 reach 19-22, so board congestion is real and `clutter` deliberately does not see it. Not a change
 to `clutter` — a second count.
-
-### Confirm `Cue.Move` does not machine-gun
-
-It fires on every column step, including when the buffered move replays. A fast left-left-left
-could stutter. Needs real audio to judge, so it belongs with C3a.
 
 ### A screenshot-test harness
 
@@ -216,12 +205,6 @@ invasive later** — the transcript step types are young and nothing consumes th
 `:libraries:cascade` has a test-only `kotlinx-serialization-json` dependency. It is what makes the
 byte-level determinism pin and the SPEC 18.9 round-trip possible, so it earns its place. Recorded
 so it is a conscious choice rather than a surprise to whoever next audits "zero dependencies".
-
-### Build the real `SoundPlayer` (C3a)
-
-C2 built the seam (`SoundPlayer`, defaulting to `Silent`) and the pitch decision, and no audio
-engine exists behind it. Also confirm `Cue.MaxPitchSteps = 12` sounds right on a long cascade —
-C2 capped the climb at an octave, which SPEC 9 does not mention and nobody has agreed to.
 
 ### `dragAcrossCells` has no test
 
