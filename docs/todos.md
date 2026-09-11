@@ -12,6 +12,16 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### No in-app QA config overrides, and it is now blocking verification
+
+`ConfigOverrideRepository` exists and **nothing in the debug menu writes to it.** That is why the
+interstitial has never been seen: the three-day install suppression makes it unreachable on a fresh
+install, and an emulator refuses `date` on a non-userdebug build.
+
+A QA config screen would also unblock the launch gates and every kill switch. This is the cheapest
+remaining unlock for on-device verification.
+
+
 ### The ▼ button is drawn recessive and is now the decisive control
 
 The handoff painted it quiet because it was an accelerator. D21 made it the only irreversible input
@@ -23,14 +33,6 @@ level 4). Visual change only, and it is the handoff's call to override.
 `Cue.HardDrop` existed with no caller for four chunks and now fires on **every drop of every run**.
 It is on the missing-samples list with the other fifteen, but it is the one whose absence is most
 audible.
-
-
-### Unify the two `ProEntitlement` seams before C10
-
-Settings has one (`StateFlow`, in `:features:settings`) and the Daily has another (`fun interface`,
-in `:libraries:progress`). The debug menu's Pro grant folds into the first and **cannot reach the
-second**, because a library impl may not read a feature's api. C10 must keep that fold or the Pro
-switch silently stops working for the Daily.
 
 
 ### A haptic can be cancelled by the next one a millisecond later

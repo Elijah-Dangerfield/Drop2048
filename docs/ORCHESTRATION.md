@@ -31,11 +31,11 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
-| C8 · Telemetry | not started | |
+| C8 · Telemetry | **IN PROGRESS** | The decision-time instrument is the point (L41) |
 | C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
-| C10 · Ads + billing | **IN PROGRESS** | Continue-after-loss and Pro |
+| C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
-| C13 · Store prep | not started | |
+| C13 · Store prep | **IN PROGRESS** | Manifests, data safety, listings |
 
 ---
 
@@ -650,6 +650,43 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L66 · An unbuilt platform path must be incapable of the reward, not merely missing it
+
+Sodogku shipped an iOS ad stub that answered `Rewarded`, so every log read a free grant as a
+watched ad. C10's iOS path is equally unbuilt and answers `AdShowResult.NotShown` with
+`errorKind = "ad_network_not_wired"` and **can never return `Rewarded`** — pinned by a test.
+
+The distinction is the whole thing. Both are "not implemented"; one pays out anyway. When a seam
+stands in for something that grants value, **make the stub's type unable to express the grant**,
+the same way `DebugOverrides` holds no `EngineConfig` so it cannot leak one (L63).
+
+Pro is unbuyable on iOS the same way: `NoStoreBilling` returns `Unknown`, never `Owned`.
+
+### L67 · A debug gate that blocks a *write* is worth having; one that blocks a *screen* is not
+
+C10 first refused rewarded continues during a debug session, then reversed it after installing the
+build — because the only practical way to reach a stacked-out board by hand is the debug menu's
+presets, so the rule made the new screen unreachable on the very chunk whose risk was a screen
+nobody had looked at.
+
+L63's taint list is four **writes**, and a continue is none of them; `endRun` already refuses all
+four for a debug run. So a debug session now sees every ad surface and still records nothing.
+
+The general shape: a debug restriction should protect data, not hide UI. If it hides UI, the tester
+is paying for a rule that is already enforced somewhere else.
+
+### L68 · Every test double answers instantly, so a gate on a slow dependency is invisible to tests
+
+C10's paywall was **blank for ~35 seconds** on a device where Play Billing cannot connect, because
+it gated the whole sheet on a price it does not actually need. Ninety-four passing tests could not
+see it: every fake returns immediately.
+
+Found by installing it. The fix was deleting the `loading` gate rather than adding a timeout.
+
+**Anywhere UI waits on a network, a store, or an SDK handshake, the test suite is structurally
+blind to how it behaves while waiting.** That is a case for a deliberately slow double, and in its
+absence, for installing the build.
 
 ### L64 · Animating a move by mutating engine state silently deleted the score it was paying for
 
