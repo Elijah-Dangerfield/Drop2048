@@ -128,24 +128,37 @@ tuning conversation is conditional on a guess.
 
 The longest lead time in the project.
 
-### Audio, and this is the important one
+### Author the sample bank — this is now the only thing between you and a game with sound
 
-SPEC 21 says the cascade-step pitched merge sound is one of two things to keep if everything else
-is cut. It cannot be faked with a generic pop.
+The playback path is **built and live on both platforms** (Android `SoundPool`, iOS pooled
+`AVAudioPlayer`), wired to the sound setting, with per-cascade-step pitch. Verified on an emulator,
+which logged all sixteen samples missing by name.
 
-- A merge sample that survives being pitched across ten semitones without sounding pitch-shifted.
-- The row burst: the longest, most cinematic sample in the game.
-- Spawn, move click, lock, heavy merge (256+), bomb, danger enter/exit, stacked out, level up, UI
-  tap, UI back. Plus `BOOM!`, `WILD!` and `SWEPT!` now have callouts and no sounds.
-- One music track, three intensity layers, plus a filtered danger variant.
+**16 files, one `.ogg` per sound, mono, short, named by its key** (`merge.ogg`, `merge_big.ogg`,
+`burst.ogg`, `spawn.ogg`, `move.ogg`, `nudge.ogg`, `lock.ogg`, `bomb.ogg`, `board_cleared.ogg`,
+`danger_enter.ogg`, `danger_exit.ogg`, `stacked_out.ogg`, `level_up.ogg`, `ui_tap.ogg`,
+`ui_back.ogg`, plus the remaining one listed in `SoundBank`'s KDoc).
 
-**Blocks C3a**, which is the chunk where the game either feels good or does not. The seam exists
-and defaults to silent; placeholders will not close it.
+Drop them in `libraries/ui/src/androidMain/assets/audio/` and the Xcode project's resources. **No
+code changes.** A missing sample logs its name and leaves that one effect silent.
 
-### Haptics need hands on hardware
+**The merge sample is the one that matters.** It gets resampled up to a full octave, so it has to
+survive being played at 2x speed without sounding like a pitch-shifted sample. That single sound is
+half of what SPEC 21 says makes this game feel good.
 
-Nothing about the haptic engine is tested or observed — both platform implementations compile and
-that is the entire guarantee. The burst envelope and the stacked-out double are guesses.
+Music is not built — that is streaming, not a sample bank.
+
+### Confirm the iOS audio session category
+
+Currently `Ambient`: the game honours the ring/silent switch and does not stop the player's music.
+The alternative is `Playback`, which overrides both. `Ambient` is the right default for a puzzle
+game; say if you disagree.
+
+### Haptics: Android confirmed working, iOS still unfelt
+
+Android fired for the first time and the Off/Light/Strong setting was confirmed scaling end to end
+in `dumpsys`. **iOS Core Haptics compiles and links and has never executed** — the burst envelope
+and the stacked-out double are still guesses there.
 
 ### Art
 
