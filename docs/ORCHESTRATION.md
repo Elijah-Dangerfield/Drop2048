@@ -24,9 +24,10 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
+| D21 · ▼ becomes a hard drop | **IN PROGRESS** | Owner ruling from play. Digest moves a 3rd time |
 | C3c · One product + player bugs | **DONE** | `e049f95`. Dark design system (D20). Found L56 |
 | C3a · Feel + polish | **DONE** | `1e1959a`. Cascade re-paced (L58). Haptics fired (L59) |
-| C12 · Debug menu | **IN PROGRESS** | Plus the first Room-backed test |
+| C12 · Debug menu | **DONE** | `d47bb2e`. First Room tests ever (L61). See L62-L63 |
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
@@ -620,6 +621,49 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L61 · Room prefers a migration to a drop, so "the row survived" proves nothing
+
+L33 narrowed `fallbackToDestructiveMigration` so a failure from `AppDatabase` v6 on fails loudly
+rather than wiping a player's history. C12 wrote the first test of that promise and found the
+obvious assertion is vacuous:
+
+**Room migrates wherever a path exists, list or no list.** So a v6 → v8 run keeping its rows proves
+only that the auto-migrations work. What the narrow list actually decides is **versions with no
+migration path**: v4 is emptied and rebuilt; anything off the list refuses to open and leaves every
+row intact.
+
+C12 proved both directions bite by mutating the production configuration and watching exactly one
+go red each time.
+
+It also found *why* the promise went untested for eight chunks: `sqlite-bundled`'s Android variant
+cannot load on a host JVM, and `setDriver` lived inside `RealAppDatabaseProvider` where a test could
+not reach it. Moving it into the platform factories is what made any of this testable.
+
+### L62 · Gradle reported `BUILD SUCCESSFUL` through a Kotlin compiler crash
+
+A JVM backend ICE in `SyntheticAccessorLowering` (a `private companion object` const read from
+inside a `buildMap` lambda in an enum) killed the daemon. Gradle retried the compile out of process
+and **reported the build green**, so it surfaced as an alarming stack trace over a passing build.
+
+Third member of the family with L24 (a failed iOS link reporting `BUILD SUCCEEDED` and silently
+running the previous framework) and L46 (a test that never ran). **A green build is a claim, not a
+proof** — read the log when something looks wrong, even when the summary line says otherwise.
+
+### L63 · Make the debug *session* the taint, not the run
+
+A debug menu can pollute `run_record`, `daily_result`, leaderboard submissions and achievement
+facts. C12 latched a process-wide flag when the menu opens; `RunFactory` reads it once and it
+travels on `StartedRun.debug`, gating all four writes at `endRun`.
+
+Per-run tainting was rejected on a good argument: **a tester who has had their hands on a seed
+switch is not a source of real data afterwards either**, and per-run needs remembering at four call
+sites. Relaunching is the reset.
+
+The second hazard — a debug-forced `EngineConfig` leaking into a saved run or a shared Daily — is
+answered **by absence rather than a guard**: `DebugOverrides` contains no `EngineConfig` at all, so
+there is nothing that could travel inside a `GameState`. A guard you can forget to apply is weaker
+than a shape that cannot express the mistake.
 
 ### L58 · The cascade was too fast, and only a frame count could say so
 

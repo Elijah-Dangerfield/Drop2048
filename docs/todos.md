@@ -12,6 +12,14 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### Unify the two `ProEntitlement` seams before C10
+
+Settings has one (`StateFlow`, in `:features:settings`) and the Daily has another (`fun interface`,
+in `:libraries:progress`). The debug menu's Pro grant folds into the first and **cannot reach the
+second**, because a library impl may not read a feature's api. C10 must keep that fold or the Pro
+switch silently stops working for the Daily.
+
+
 ### A haptic can be cancelled by the next one a millisecond later
 
 Observed in `dumpsys`: a `Move` and the `Merge` behind it landed 1ms apart and the first came back
@@ -36,15 +44,6 @@ with the clock frozen, ▼ is still the only way to make progress, and now it ta
 drop); SPEC 6, 7 and 13; `docs/reference/design-handoff-deltas.md`, since the packet's control
 scheme is now overridden on this point too.
 
-
-### The first Room-backed test in the repo
-
-`bestScore()`'s `WHERE mode = 'ENDLESS'` filter has **no direct coverage**, and there is no
-Room-backed test anywhere in this project on any platform. `FakeRunRecordDao` mirrors the filter and
-the fold is tested properly, so the Kotlin is covered and the SQL is not.
-
-Needs an in-memory Room harness. Worth a chunk, not a line — and it would cover every DAO, not just
-this one.
 
 ### Decide whether the ▼ nudge pays any score
 
