@@ -228,8 +228,16 @@
     <string name="settings_credits">Made by Elijah Dangerfield</string>
     <string name="settings_debug_unlocked">Debug menu unlocked.</string>
 
+    <!--
+        The list below this copy is generated, not written. C11's version was a
+        sentence ending "Every one of them is Apache 2.0 or MIT", which was true
+        when it was written and stopped being true when C10 added the ad and
+        billing stack (17 modules on proprietary Google terms). The copy names no
+        licence now, because naming one is the thing that goes stale.
+    -->
     <string name="licenses_title">Open source licences</string>
-    <string name="licenses_body">Drop 2048 is built on Kotlin Multiplatform, Compose Multiplatform, AndroidX (Navigation, Lifecycle, Room, Startup), kotlinx coroutines, serialization and datetime, Ktor, kotlin-inject and kotlin-inject-anvil, Kermit, Sentry and Roborazzi. Every one of them is Apache 2.0 or MIT. Full licence text ships with the app listing.</string>
+    <string name="licenses_body">Drop 2048 is built on work other people gave away. Below is every third-party component in the release build, grouped by the licence it is published under, with the address where you can read that licence in full. The two fonts are listed too, though they are not code.</string>
+    <string name="licenses_count">%1$d components</string>
 
     <!--
         The launch gates (C11). Rendered instead of the nav host, never navigated

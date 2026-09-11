@@ -15,8 +15,8 @@ Regenerate with:
 ## Why this is an init script and not a licence plugin
 
 `app.cash.licensee` and `com.mikepenz.aboutlibraries` are the obvious answers and neither is
-applied. A licence report is a **release artefact, not a build input** — nothing the app
-compiles depends on it — so putting a plugin on the shared build classpath makes every
+applied. A licence report is a **release artefact, not a build input**, nothing the app
+compiles depends on it, so putting a plugin on the shared build classpath makes every
 `detekt` run, every screenshot test and every CI job carry a configuration-time dependency
 for a file that is regenerated a few times a year. Both plugins are also written against
 the Android/JVM variant model, and this is a Kotlin Multiplatform build on Gradle 9 with the
@@ -45,21 +45,26 @@ running this will notice.
 | Apache 2.0 | 1 |
 | The MIT License | 1 |
 
-### Read the totals before you copy C11's sentence
+### Read the totals before you write a sentence about them
 
-`LicensesScreen`'s KDoc says "every dependency this app ships is Apache 2.0 or MIT". The
-generated table says otherwise, and this is the single most useful thing this report
-produced. Every module listed under **Android Software Development Kit License** or **Play
-Core Software Development Kit Terms of Service** is on proprietary Google terms, not an OSI
+Every module listed under **Android Software Development Kit License** or **Play Core
+Software Development Kit Terms of Service** is on proprietary Google terms, not an OSI
 licence: the billing client, the whole `play-services-ads` tree, the UMP consent SDK and the
-in-app review SDK. They are perfectly fine to ship — that is what those terms are for — but
-they are not satisfied by an Apache-2.0 attribution block, and the in-app attribution copy
-should not claim they are.
+in-app review SDK. They are perfectly fine to ship, that is what those terms are for, but
+they are not satisfied by an Apache-2.0 attribution block.
+
+This report was written because `LicensesScreen`'s copy claimed otherwise, and it was right
+to. The claim was true when C11 wrote it and stopped being true when C10 added the ad and
+billing stack two chunks later, and nothing failed in between (ORCHESTRATION L73). **C13a
+removed the claim rather than correcting it**: the screen now reads the generated
+`files/licenses.txt` this same task writes, and the copy above the list names no licence,
+because naming one is the part with a shelf life. Regeneration is still a release-checklist
+step and nothing enforces it.
 
 Two of them are worth a second look for a different reason: `play-services-location` and
 `play-services-places-placereport` arrive transitively under `play-services-ads`. **Nothing
 in this app requests a location permission** (`docs/store/data-safety.md` §2.8, §2.10), so no
-location is read — but their presence on the classpath is exactly the kind of thing that
+location is read, but their presence on the classpath is exactly the kind of thing that
 looks alarming in a dependency audit, and it is better to have the answer written down here
 than to work it out under review.
 

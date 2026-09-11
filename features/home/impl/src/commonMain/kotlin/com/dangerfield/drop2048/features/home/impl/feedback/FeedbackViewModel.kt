@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.features.home.impl.feedback
 
 import com.dangerfield.drop2048.libraries.core.BuildInfo
 import com.dangerfield.drop2048.libraries.core.Catching
+import com.dangerfield.drop2048.libraries.core.DeviceInfo
 import com.dangerfield.drop2048.libraries.core.eitherWay
 import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.versionString
@@ -68,7 +69,8 @@ class FeedbackViewModel(
         updateState { it.copy(isSubmitting = true, errorMessage = null) }
         repository.submitFeedback(
             message = current.message.trim().withDiagnostics(current.diagnosticsOptIn),
-            isBugReport = false
+            isBugReport = false,
+            attachSessionLog = current.diagnosticsOptIn,
         ).eitherWay {
             appCache.update { it.copy(feedbacksGiven = it.feedbacksGiven + 1) }
             updateState { it.copy(isSubmitting = false) }
@@ -84,10 +86,30 @@ class FeedbackViewModel(
  * Appended to the message rather than sent as a side channel, so what is
  * attached is exactly what the copy beside the switch says is attached, and the
  * player could read it back if they wanted to.
+ *
+ * `settings_diagnostics_hint` promises "your device model and build number", and
+ * until C13a this line carried the build and not the model — the copy was ahead
+ * of the code in both directions at once. [DeviceInfo] is here for this one
+ * caller.
  */
-private fun String.withDiagnostics(optedIn: Boolean): String =
-    if (!optedIn) this
-    else "$this\n\n---\n${BuildInfo.platform} · ${BuildInfo.versionString()} · ${BuildInfo.releaseChannel}"
+internal fun String.withDiagnostics(optedIn: Boolean): String =
+    if (!optedIn) {
+        this
+    } else {
+        buildString {
+            append(this@withDiagnostics)
+            append("\n\n---\n")
+            append(DeviceInfo.model)
+            append(" · ")
+            append(DeviceInfo.osVersion)
+            append(" · ")
+            append(BuildInfo.platform)
+            append(" · ")
+            append(BuildInfo.versionString())
+            append(" · ")
+            append(BuildInfo.releaseChannel)
+        }
+    }
 
 data class FeedbackState(
     val message: String = "",

@@ -18,7 +18,6 @@ import co.touchlab.kermit.Severity as KermitSeverity
 import io.sentry.kotlin.multiplatform.Attachment
 import io.sentry.kotlin.multiplatform.Sentry
 import io.sentry.kotlin.multiplatform.SentryOptions
-import io.sentry.kotlin.multiplatform.protocol.User
 import io.sentry.kotlin.multiplatform.protocol.UserFeedback
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -112,20 +111,6 @@ private class ConfiguredTelemetry(
         }
     }
 
-    override fun setUser(
-        email: String?,
-        name: String?,
-        id: String?
-    ) {
-        Sentry.setUser(
-            User(
-                id = id,
-                email = email,
-                username = name
-            )
-        )
-    }
-
     override fun setCurrentRoute(route: String) {
         // Best-effort: when Sentry isn't initialized (e.g. disabled
         // environment) configureScope has no scope to mutate, so skip quietly
@@ -165,8 +150,7 @@ private class ConfiguredTelemetry(
         isBugReport: Boolean,
         eventId: String?,
         errorCode: Int?,
-        email: String?,
-        screenshots: List<ByteArray>,
+        attachSessionLog: Boolean,
     ) {
         val payload = message.trim()
         if (payload.isBlank()) {
@@ -186,7 +170,6 @@ private class ConfiguredTelemetry(
         }
 
         val typeTag = if (isBugReport) "bug_report" else "feedback"
-        val sanitizedEmail = email?.trim()?.takeIf { it.isNotBlank() }
 
         // The legacy User Feedback API only persists feedback attached to an
         // event Sentry has already ingested — an empty or unknown event id is
@@ -198,26 +181,21 @@ private class ConfiguredTelemetry(
         // ride along in the comment for correlation back to the logs.
         // Mint a unique id for this report and stamp it on a LOCAL scope for
         // just the carrier event: beforeSend reads it to fingerprint the event
-        // into its own issue (see init), and the in-memory log buffer rides
-        // along as an attachment — the fine-grained Debug/Verbose we never ship
-        // as breadcrumbs, captured only when the user actually files feedback.
-        // Local scope means none of this leaks onto later events.
-        val logDump = sentryLogTree?.snapshot()?.takeIf { it.isNotBlank() }
+        // into its own issue (see init). Local scope means none of this leaks
+        // onto later events.
+        val logDump = if (attachSessionLog) {
+            sentryLogTree?.snapshot()?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
         val feedbackId = Uuid.random().toString()
         val sentryId = Sentry.captureMessage(if (isBugReport) "Bug report" else "User feedback") { scope ->
+            scope.clearBreadcrumbs()
             scope.setTag(FEEDBACK_EVENT_TAG, feedbackId)
+            scope.setTag(FEEDBACK_DIAGNOSTICS_TAG, attachSessionLog.toString())
             if (logDump != null) {
                 scope.addAttachment(Attachment(logDump.encodeToByteArray(), "session-log.txt", "text/plain"))
             }
-            // User-attached screenshots ride along as image attachments, so a
-            // triager sees the report and what it's about side by side. Capped
-            // and skip-empty defensively; the picker already downscales them.
-            screenshots.asSequence()
-                .filter { it.isNotEmpty() }
-                .take(MAX_FEEDBACK_SCREENSHOTS)
-                .forEachIndexed { index, bytes ->
-                    scope.addAttachment(Attachment(bytes, "screenshot-${index + 1}.jpg", "image/jpeg"))
-                }
         }
 
         val feedback = UserFeedback(sentryId).apply {
@@ -233,7 +211,6 @@ private class ConfiguredTelemetry(
                 append('\n')
                 append(payload)
             }
-            sanitizedEmail?.let { this.email = it }
         }
 
         Sentry.captureUserFeedback(feedback)
@@ -245,7 +222,7 @@ private class ConfiguredTelemetry(
                 errorCode?.let { scope.extra("error_code", it) }
             }
             scope.extra("payload_length", payload.length)
-            scope.extra("has_email", sanitizedEmail != null)
+            scope.extra("session_log_attached", logDump != null)
             "Feedback forwarded to Sentry ($typeTag)"
         }
     }
@@ -272,10 +249,10 @@ private const val COMMIT_BRANCH_KEY = "commit_branch"
 private const val FEEDBACK_EVENT_TAG = "feedback_event"
 private const val FEEDBACK_FINGERPRINT = "feedback"
 
-// Hard cap on attached screenshots, mirrored on the UI side. Defensive: the
-// picker already limits selection, this just guarantees a malformed caller
-// can't flood Sentry.
-private const val MAX_FEEDBACK_SCREENSHOTS = 3
+// Whether the player's diagnostics opt-in was on for this report. A tag rather
+// than an extra so triage can filter to the reports that have a session log
+// before opening any of them.
+private const val FEEDBACK_DIAGNOSTICS_TAG = "diagnostics_opt_in"
 
 data class SentryRuntimeConfig(
     val dsn: String,

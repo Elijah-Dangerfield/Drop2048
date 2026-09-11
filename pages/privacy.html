@@ -13,40 +13,78 @@
         <header>
             <a href="index.html" style="border: none;"><img src="app-icon.png" alt="Drop 2048 app icon" class="logo"></a>
             <h1>Privacy Policy</h1>
-            <p class="muted">Last updated: 2026-09-09</p>
+            <p class="muted">Last updated: 2026-09-10</p>
         </header>
 
         <main>
-            <p>Drop 2048 is designed to collect as little information about you as possible. This page explains what is and isn't collected.</p>
+            <p>Drop 2048 is a single-player puzzle game. There is no sign-in, no account and no profile. This page says what the app stores, what it sends, and who it sends it to. It is written to match what the code actually does.</p>
 
-            <h2>What's stored on your device</h2>
-            <p>The app stores data locally on your phone, and nowhere else. If you delete the app, this data is deleted with it.</p>
+            <h2>There is no account, so there is no name attached to any of this</h2>
+            <p>The app never asks for your name, your email address or a password, and there is no server of ours that holds a record of you. The only identifier involved is an <strong>install ID</strong>: a random number the app generates on your device the first time it runs. It is not your advertising ID, not a hardware ID, and not derived from anything about you or your phone. It identifies the installation, not the person.</p>
+            <p>You can replace it at any time. Settings → Delete local data erases everything the app has stored and generates a new install ID, which breaks the link between this device and anything sent before.</p>
 
-            <h2>What's sent off your device</h2>
-            <p>The app may send a small amount of information to a third-party service called <a href="https://sentry.io/privacy/">Sentry</a> when the app crashes or encounters an error. This helps find and fix bugs. The information includes:</p>
+            <h2>What stays on your device</h2>
+            <p>Your runs, scores, stats, achievements, settings and whether you have bought Pro are stored on the device and nowhere else. There is no sync and no backup: if you delete the app, or delete your local data in Settings, it is gone and cannot be restored.</p>
+
+            <h2>What the app sends, and where</h2>
+
+            <h3>Our configuration server</h3>
+            <p>On launch the app asks our server which settings to use. That request carries the install ID, the country and language your device is set to, and the app version. The country and language come from your device's own locale setting, not from GPS and not from your IP address. The app makes no other request to a server of ours.</p>
+
+            <h3>Analytics (Grafana Cloud, processing on our behalf)</h3>
+            <p>The app records how the game is being played, so we can tell whether it is too hard, too slow or broken. These records carry the install ID and a session ID, and they contain things like:</p>
             <ul>
-                <li>A crash log (what went wrong, where in the code it happened).</li>
-                <li>Your device model and operating system version.</li>
-                <li>The version of the app you're running.</li>
+                <li>When a run starts and ends, its score, level, how many blocks were dropped and how it ended.</li>
+                <li>Daily Challenge attempts and results.</li>
+                <li>Which tutorial steps you reached, and whether you skipped it.</li>
+                <li>Whether an ad or a purchase screen was shown, and what happened next. Never a payment detail.</li>
+                <li>Reliability events: the app being unable to reach our server, dropped frames, slow startup.</li>
             </ul>
-            <p>This data is <strong>not</strong> tied to your identity.</p>
+            <p>It is gameplay measurement. It contains nothing you have typed, nothing about other apps, and nothing about where you are. It is sent to <a href="https://grafana.com/legal/privacy-policy/">Grafana Cloud</a>, which stores it for us and does nothing else with it.</p>
 
-            <h2>What isn't collected</h2>
-            <p>The app does <strong>not</strong>:</p>
+            <h3>Crash reporting (Sentry, processing on our behalf)</h3>
+            <p>When the app crashes or hits an error, a report goes to <a href="https://sentry.io/privacy/">Sentry</a>. It contains the stack trace, your device model and OS version, the app version, and the install ID. The app is configured not to send your IP address or user agent to Sentry.</p>
+
+            <h3>Ads (Android)</h3>
+            <p>The Android version shows ads through Google AdMob. The Google Mobile Ads SDK reads your device's <strong>advertising ID</strong> and sends it to Google; the app never reads it directly. You can reset or turn off that ID in your device's Android settings, under Privacy → Ads. If you are in the EEA, the UK or Switzerland, a consent form appears before the first ad request and your answer controls whether ads are personalised. Google's use of this data is covered by the <a href="https://policies.google.com/technologies/partner-sites">Google Privacy Policy</a>.</p>
+            <p>The iOS version currently contains no ad SDK and reads no advertising identifier. If that changes, this page will be updated before the version that changes it ships.</p>
+            <p>Buying Pro removes the interstitial ads. The rewarded videos you choose to watch stay available, and they go through the same SDK.</p>
+
+            <h3>Purchases (Android)</h3>
+            <p>Pro is sold through Google Play. Google handles the payment; the app never sees your card, your billing address or your order details. All it learns is whether you own Pro, which it records on the device as a yes or no. We record that a purchase succeeded or failed, and nothing about the purchase itself.</p>
+
+            <h3>Game Center (iOS)</h3>
+            <p>On iOS, scores are submitted to Apple Game Center leaderboards under your Game Center identity. Only the score goes; we do not receive your Game Center ID, alias or nickname, and we store nothing from it. Apple's handling of Game Center data is covered by the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>. On Android there are no leaderboards.</p>
+
+            <h3>Feedback you send us</h3>
+            <p>If you use Send feedback or Report a bug, we receive exactly what you typed, plus the app version and build the report came from. That text goes to Sentry along with the rest of the crash reports.</p>
+            <p>Settings has a <strong>Send diagnostics with feedback</strong> switch. It is off unless you turn it on. With it on, a feedback report also carries your device model, the build number, and a log of what the app itself printed during the session — the names of things that happened, not their contents. Your board, your scores and anything you typed elsewhere in the app are not in it.</p>
+            <p>The free-text box is yours to write in. If you put your email address or your name in it, we will have it, because you sent it.</p>
+
+            <h2>What the app never collects</h2>
+            <p>No location of any kind. No contacts, calendar, photos, files, microphone or camera. No name, email address, phone number or postal address. No browsing or search history. No list of your other apps. No payment details. None of these has a read path in the app.</p>
+
+            <h2>Permissions</h2>
             <ul>
-                <li>Use advertising or analytics SDKs (no Google Analytics, no Facebook SDK, no ad networks).</li>
-                <li>Track your location.</li>
-                <li>Sell or share any data.</li>
-                <li>Require an account (unless your project adds one).</li>
+                <li><strong>Vibrate</strong> (Android): the haptic feedback when a block lands or merges. Turn it off in Settings.</li>
+                <li><strong>Notifications</strong> (iOS, only if you allow it): occasional updates from the app.</li>
+            </ul>
+            <p>That is the whole list. The app declares no camera, microphone, location, contacts or storage permission.</p>
+
+            <h2>Your choices</h2>
+            <ul>
+                <li><strong>Delete local data</strong> (Settings): erases everything on the device and issues a new install ID.</li>
+                <li><strong>Reset progress</strong> (Settings): clears runs, scores and stats, keeps your settings.</li>
+                <li><strong>Advertising ID</strong> (Android): reset or opt out in your device settings.</li>
+                <li><strong>Uninstall</strong>: removes everything the app stored.</li>
+                <li>To ask us to delete analytics or crash records already sent, email the address below.</li>
             </ul>
 
-            <h2>Permissions the app asks for</h2>
-            <ul>
-                <li><strong>Notifications</strong> (iOS, if granted): used to show timely updates from the app.</li>
-            </ul>
+            <h2>Children</h2>
+            <p>Drop 2048 is intended for a general audience aged 13 and over. It is not directed at children, and it is not enrolled in Google Play's Designed for Families programme or Apple's Kids category.</p>
 
             <h2>Changes to this policy</h2>
-            <p>If this policy ever changes, the new version will be posted here and the "Last updated" date at the top will be revised.</p>
+            <p>If this policy changes, the new version will be posted here and the "Last updated" date at the top will be revised. Material changes are also shown in the app, which asks you to accept them before you carry on playing.</p>
 
             <h2>Contact</h2>
             <p>Questions? Reach out at <a href="mailto:contact@nightjarlabs.llc">contact@nightjarlabs.llc</a>.</p>

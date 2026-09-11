@@ -124,79 +124,88 @@ exist. Flagged, not built.
 
 ---
 
-## 5. Baseline Profile: ran it, and it fails for a knowable reason
+## 5. Baseline Profile and R8: both run, and both pass
 
-**Ran, 2026-09-10, first time in this project.**
+**C13 ran `generateBaselineProfile` for the first time in this project and it
+failed. C13a fixed it and ran R8.** The original diagnosis is kept below §5.4
+because the *reason* it failed is the reusable part.
+
+### 5.1 Where it stands
 
 ```
 ./gradlew :apps:compose:generateBaselineProfile
 ```
 
-`BUILD FAILED in 9m 8s`. The managed device worked, the AOSP system image booted, the
-non-minified release APK built and installed, and the instrumentation ran. **All three tests failed
-with the same cause:**
+`BUILD SUCCESSFUL in 5m 43s`, 3 tests, 0 failed, 0 skipped. Committed at
+`apps/compose/src/androidRelease/generated/baselineProfiles/`:
+**34,268 baseline rules and 29,573 startup rules**, with the engine
+(`libraries/cascade`, 795), the game (`features/game`, 917), Room (680),
+kotlinx-serialization (1,622) and each visited screen all present.
 
 ```
-com.dangerfield.drop2048.baselineprofile.JourneyProfileGenerator > generate[pixel6Api34] FAILED
-com.dangerfield.drop2048.baselineprofile.StartupProfileGenerator > generate[pixel6Api34] FAILED
-com.dangerfield.drop2048.baselineprofile.MinifiedReleaseSmokeTest > theMinifiedAppReachesHomeAndNavigates[pixel6Api34] FAILED
+./gradlew :apps:baselineprofile:pixel6Api34BenchmarkReleaseAndroidTest
+```
 
+`BUILD SUCCESSFUL`. **R8 has now run against this app and broke nothing.** The
+result XML says `skipped="2"` — the two generators, which `BaselineProfileRule`
+refuses to run against a minified variant, exactly as that class's KDoc warns —
+and `theMinifiedAppReachesTheMenuAndNavigates` with `time="18.729"` and no
+`<skipped/>`. **It RAN.** Check that every time: a skip reads like a pass.
+
+```
+apps/baselineprofile/build/outputs/androidTest-results/managedDevice/benchmarkrelease/pixel6Api34/
+```
+
+No keep rules were added. `apps/compose/proguard-rules.pro` is untouched.
+`docs/decisions.md` has the entry on why that is a result rather than luck, and
+on the parts of the app the one journey does not cover.
+
+### 5.2 What the journey is now
+
+`BenchmarkJourney` walks the tutorial — steer, hard-drop, acknowledge the card,
+hard-drop — takes "Skip tutorial" when it appears at drop 3, pauses the run it
+lands in, and visits Stats, Daily Challenge and Settings. The destination is the
+**pause** overlay and not the start overlay, because `finishTutorial` starts a
+live run rather than returning to a menu. Five emulator runs went into learning
+that and the three anchoring rules that came out of them are in `decisions.md`.
+
+Achievements is deliberately not on the journey: it is reachable only from the
+fourth of eight Settings sections, and the scroll-then-tap proved unreliable
+across two runs. It has no profile and no R8 coverage as a result.
+
+### 5.3 Before you cut a release
+
+Both commands above must pass, and the profile in
+`apps/compose/src/androidRelease/generated/baselineProfiles/` must be the one
+they produced. `.github/workflows/baseline-profile.yml` now **opens an issue when
+it fails** rather than failing silently, and its sanity check no longer requires
+coverage of `features/onboarding`, a module deleted in C5 — which would have
+failed the job on a perfectly good profile.
+
+### 5.4 The original failure, kept because the reason generalises
+
+C13's run: `BUILD FAILED in 9m 8s`. The managed device worked, the AOSP system
+image booted, the non-minified release APK built and installed, and the
+instrumentation ran. All three tests failed with the same cause:
+
+```
 java.lang.IllegalStateException: Never reached Home. [foreground=com.dangerfield.drop2048]
   screen: SCORE | 0 | best 0 | LEVEL | 1 | II | 2 | ×2 | ◀ | ▼ | ▶ | Slide it over |
           Drag anywhere on the board. The block follows your finger.
   at BenchmarkJourney.reachHome(BenchmarkJourney.kt:72)
 ```
 
-**The infrastructure is fine. The journey is the template's.** `BenchmarkJourney.reachHome()` taps
-through "Continue as guest" / "Continue" / "Setting things up…" and waits for a Home screen
-containing "Send Feedback". None of that is Drop 2048: the identity stack was deleted in C0, and
-SPEC 13 drops first launch **straight into the scripted tutorial**. The error message is the
-tutorial's first coach mark, word for word from `strings.xml:10-11`.
+**The infrastructure was fine. The journey was the template's.** It tapped
+through "Continue as guest" and waited for a Home screen containing "Send
+Feedback". None of that is Drop 2048: the identity stack was deleted in C0 and
+SPEC 13 drops first launch straight into the tutorial. The error message is the
+tutorial's first coach mark, word for word from `strings.xml`.
 
-Note what the failure output is doing: `describeScreen()` printed exactly what was on screen, and
-that is the only reason this took one nine-minute run to diagnose rather than four. Its KDoc says
-that is what it is for. It was right.
-
-### What the fix is, specifically
-
-`BenchmarkJourney` needs Drop 2048's journey, and the tutorial makes it non-trivial: "Skip
-tutorial" only appears from drop 3 (`Tutorial.SkippableFromDrop = 3`), so reaching it means
-actually playing, drag on the board (`Steered`), tap ▼ (`Dropped`), tap the card (`Tapped`), ▼
-again, before the skip affordance exists. The anchors it should use, all from
-`libraries/resources/.../strings.xml`:
-
-- tutorial cards: `tutorial_steer_title` "Slide it over", `tutorial_first_drop_title` "Drop it"
-- skip: `tutorial_skip` "Skip tutorial"
-- the game screen itself: "SCORE", "LEVEL", and the `◀ ▼ ▶` glyphs
-- `visitDetailScreens` should become Stats / Achievements / Settings rather than the template's two
-  feedback forms
-
-Keep the two things the KDoc asks you to keep: the adaptive structure, and `describeScreen()`.
-
-### The consequence nobody has written down yet
-
-`MinifiedReleaseSmokeTest` fails for the same reason, which means **R8 has never been validated on
-this app.** `isMinifyEnabled = true` and `isShrinkResources = true` are on for the release build
-(`ApplicationConventionPlugin.kt:98-111`), and this app has all three of the KMP shapes R8 breaks
-by name: `@Serializable` models, `@Serializable` nav routes, and the generated DI graph. A release
-AAB that builds cleanly proves nothing about any of them.
-
-**Do not ship a release build until this test has run and passed**, on the variant its KDoc names:
-
-```
-./gradlew :apps:baselineprofile:pixel6Api34BenchmarkReleaseAndroidTest
-```
-
-and confirm the result XML says the test RAN. `BaselineProfileRule` reports SKIPPED against a
-minified variant, and a skip reads like a pass (L46, and the class KDoc says so itself).
-
-### Also worth knowing
-
-`.github/workflows/baseline-profile.yml` runs `generateBaselineProfile` on a monthly schedule
-(03:17 on the 3rd) and opens a PR with the diff. **It will fail every month until the journey is
-fixed**, and it opens no PR when it fails, so the failure is quiet.
-
----
+Note what the failure output is doing: `describeScreen()` printed exactly what
+was on screen, and that is the only reason this took one nine-minute run to
+diagnose rather than four. Its KDoc says that is what it is for. It was right,
+and it was right four more times in C13a — every one of that chunk's five runs
+was diagnosed from the one line it printed.
 
 ## 6. Order of operations for the first release
 
@@ -236,8 +245,11 @@ or a file.
 2. **Kids theming / age rating**, decides the ad SDK configuration, the consent flow, the Play
    target-audience answer and whether Apple permits third-party analytics at all. Carried on
    `OWNER-TODO.md` since before ads were wired. `age-rating.md` §2.
-3. **`android:allowBackup`**, currently `true`, which makes the in-app copy "There is no backup"
-   false and weakens the privacy declarations. `data-safety.md` §7.3.
+3. ~~**`android:allowBackup`**~~ **Settled in C13a: it is `false`.** The install id is the only
+   identity this app has and Auto Backup would restore it onto a second device, so two phones would
+   report as one install and share one config-targeting bucket; and it made the in-app copy "There
+   is no backup" false. The cost — run history does not move phones — is what the Settings copy
+   already promises. `data-safety.md` §7.3. Nothing is blocked on this any more.
 4. **Whether to show the install id** somewhere copyable, so Play's "users can request deletion"
    answer is fully true rather than nearly. `data-safety.md` §7.1.
 5. **The support email**, `pages/privacy.html` currently says `contact@nightjarlabs.llc`. Confirm
@@ -277,9 +289,12 @@ or a file.
     §2.
 18. **Badge art**, the 24 achievement glyphs are placeholder emoji, and two of them (🩸 and 🃏)
     are the ones a content-rating reviewer would look twice at (`age-rating.md` §1).
-19. **Privacy policy and terms**, rewritten from `data-safety.md` §2 and hosted. The current pages
-    deny that the app uses ad or analytics SDKs, which is false. The gate does legal re-accept, so
-    the **version** matters and not only the text.
+19. **Host the privacy policy and terms, and bump the legal version.** `pages/privacy.html` was
+    rewritten in C13a from `data-safety.md` §2 and no longer denies the ad and analytics SDKs the
+    app ships; what is left is an owner job, not a writing one. Confirm the support address
+    (item 5), publish the page at the URL `legal.privacyUrl` compiles to (item 6), and **bump the
+    legal version**, because the launch gate re-asks for acceptance on the version and not on the
+    text. `pages/terms.html` was not touched and should be read once before it goes up.
 20. **Store screenshots.** Play: the goldens are admissible but soft, see `screenshots.md` §2.
     iOS: blocked on item 21.
 
@@ -290,7 +305,12 @@ or a file.
     `OWNER-TODO.md`'s first blocking item; it now also blocks every iOS store screenshot.
 22. **Add `PrivacyInfo.xcprivacy` to the app target's Copy Bundle Resources phase.** The file is
     written and valid (`plutil -lint` passes); it is not in the target.
-23. **Replace the Apple Sign In entitlement with Game Center** in `iosApp.entitlements`.
+23. **Enable the Game Center capability on the App ID**, and confirm the provisioning profile
+    carries it. The file half was done in C13a — `iosApp.entitlements` now holds
+    `com.apple.developer.game-center` and nothing else — but an entitlements file is a claim about
+    a profile, and nobody here can archive or sign to check it. Until this is done, every
+    `GKLeaderboard.submitScore` fails silently, which is indistinguishable from a signed-out
+    player.
 24. **Confirm `sentry-cocoa` ships its own signed privacy manifest** on the resolved version, and
     the same for Google Mobile Ads whenever that package is added.
 
@@ -298,7 +318,15 @@ or a file.
 
 25. **Fix `BenchmarkJourney`** so the profile generators and the R8 smoke test run (§5). Until then
     R8 is unvalidated on a build that ships with `isMinifyEnabled = true`.
-26. **Reconcile `licenses_body`** with the generated report (§6, step 6).
-27. **Delete the camera permission** (§4 row 9).
+26. ~~**Reconcile `licenses_body`**~~ **Done in C13a, structurally rather than by editing the
+    sentence.** `LicensesScreen` reads a generated `files/licenses.txt` written by the same init
+    script run that writes `licenses.md`, and the copy above it names no licence at all — naming
+    one is the thing that goes stale. What survives is the step: **regenerate before filing**
+    (§6, step 6), because nothing in the build does it for you.
+27. ~~**Delete the camera permission**~~ **Done in C13a**, along with the `uses-feature` and the
+    nine `:libraries:ui` files it existed for. `:libraries:ui`'s `iosMain` `NativeViewFactory`
+    still declares the camera bridge and `IOSNativeViewFactory.swift` still implements it, with no
+    Kotlin caller; that is dead code in the iOS binary rather than a store problem, and it was left
+    because it cannot be build-verified here (`data-safety.md` §8.3).
 28. **Re-derive `data-safety.md`** against the tree at submission time. C8 landed mid-chunk and is
     already folded in (§2.3a), so this is about whatever lands next.

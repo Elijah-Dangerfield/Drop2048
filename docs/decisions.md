@@ -6,6 +6,185 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-11 — R8 has now run, and it broke nothing
+
+**What happened:** `MinifiedReleaseSmokeTest` ran against the minified
+`benchmarkRelease` variant for the first time in the project's life, walked the
+tutorial, a cascade, three routes and a Room-backed screen, and passed in 18.7
+seconds. **Zero keep rules were added.** `apps/compose/proguard-rules.pro` is
+unchanged.
+
+That is a result and not a non-result, because the app has all three of the KMP
+shapes R8 is known to break by name, and every one of them was exercised:
+
+- **kotlinx-serialization.** The tutorial writes a `GameState` through its
+  generated serializer on the first landing, and the run is read back on the next
+  launch. `@Serializable`'s companion-based serializer lookup survived.
+- **kotlin-inject / anvil.** The graph is built before the first frame and it
+  built. The generated component is ordinary Kotlin with no reflection, which is
+  exactly why it is fine — the family R8 breaks is *reflective* DI, and this is
+  not that, however much it looks like it.
+- **`@Serializable` navigation routes.** Stats, Daily and Settings were each
+  pushed and popped by type. A renamed route fails with an argument error rather
+  than a missing class, which is the failure mode hardest to attribute in the
+  wild, and it did not happen.
+- **Room** was read on the way into Stats and the Daily.
+
+**Why nothing broke, stated so the next person does not read this as luck.**
+Every one of these ships consumer ProGuard rules in its own artefact, and AGP
+applies them automatically. The risk was never that nobody had written rules; it
+was that nobody had ever checked whether the ones that arrive by default cover
+this app's shape. Now someone has.
+
+**What this does not prove.** The smoke test walks one journey. It does not touch
+the ad or billing SDKs, the paywall, sharing, leaderboards, achievements, the
+launch gates or remote config, all of which contain `@Serializable` models that
+R8 could rename without anything failing until a player hits them. The 15 "R8: An
+error occurred when parsing kotlin metadata" warnings in the build log are also
+unexplained and unexplored; R8 is older than this Kotlin version, and the
+warnings are consistent with that rather than with a problem, but nobody has
+checked which classes they refer to.
+
+## 2026-09-11 — The benchmark journey's destination is the pause overlay, not a home screen
+
+**Decision:** `BenchmarkJourney.reachMenu` walks to any overlay carrying
+`MenuOptions`, and the predicate is "Stats and Settings are both on screen"
+rather than any single overlay's headline.
+
+**Why not the start overlay**, which is the obvious answer and was tried twice:
+`finishTutorial` calls `resetToRun`, which sets the phase to `Playing` and starts
+the clock. Skipping the tutorial drops the player into a live run, not a menu.
+Every iteration after the first has a saved run and resumes into `Playing` for
+the same reason. The start overlay belongs to a launch with no saved run and no
+tutorial, which a generation run is almost never in.
+
+**Why a predicate and not a headline:** the same `MenuOptions` composable is
+drawn by the start, paused and stacked-out overlays, and which one an iteration
+lands on is not something the journey gets to choose. A later iteration resumed a
+board that was already near the top, hard-dropped twice and stacked out — and the
+loop sat tapping a Pause button that is disabled on a finished run, with Stats
+and Settings plainly on screen the whole time.
+
+**Three anchoring rules came out of five runs**, and they generalise past this
+file:
+
+1. **Anchor on a string that identifies the screen, not one that appears on it.**
+   The tutorial's last card and the start overlay's primary button both read
+   "Play". Tapping the button alone started a real run and hard-dropped through
+   it; all three tests failed holding a board at level 2. A coach mark is now
+   identified by its *title*.
+2. **Arrival checks wait; only action checks ask.** `hasObject` with no timeout
+   asks whether something is on screen this instant, and an overlay fading in
+   over the board is not.
+3. **Do not put a scroll in the path if there is a route that does not need
+   one.** Achievements is only reachable from the fourth of eight Settings
+   sections. Two runs were spent on a swipe that worked, a row that was found,
+   and a tap that reported success while the screen never changed. The Daily
+   Challenge is one tap from the same menu and buys the same route coverage.
+
+**Cost, named:** the achievements grid now has no baseline-profile coverage and
+no R8 coverage. `docs/todos.md` should carry it.
+
+## 2026-09-11 — Splitting the profile generators is not enough; the startup one must stop at the first frame
+
+`StartupProfileGenerator` and `JourneyProfileGenerator` were already separate
+classes with `includeInStartupProfile` set on only one, which is the fix the
+class KDoc describes. They still shared `reachMenu`, which on this app means
+playing the scripted tutorial — so the generated `startup-prof.txt` came out at
+**31,233 rules against the journey's 34,673**. Ninety percent of the whole app,
+in the file Android's guidance says must not be the whole app, from two
+correctly separated generators.
+
+`StartupProfileGenerator` now walks `awaitFirstFrame` and stops, because that is
+what "launch" means. It dropped to 29,573 of 34,268.
+
+**The interesting part is that it only dropped 5%.** Drop 2048 has no home
+screen: launch builds the whole DI graph and renders the game, so a *correct*
+startup profile really is 86% of the journey profile here. A size-ratio check in
+CI was written, measured against both numbers, and thrown away — the correct
+value is 86% and the broken one was 91%, and a threshold in that gap is a coin
+toss that fails monthly in the dark, which is the exact thing this chunk was
+fixing. The guard that shipped instead asserts what actually differs: a launch
+cannot reach Settings, so `startup-prof` must carry fewer `features/settings`
+rules than `baseline-prof` does. Sharing the journey makes the two equal.
+
+## 2026-09-11 — The diagnostics toggle now gates what it says it gates, and the code moved rather than the copy
+
+`settings_diagnostics_hint` promises "Attaches your device model and build
+number. Never your board, your scores or anything you typed elsewhere." Neither
+half was true. **The copy is what the player consented to when they turned an
+opt-in switch on, so the code is what moves.**
+
+Four changes, and the third is the one nobody had spotted:
+
+1. `session-log.txt` rides only when `diagnosticsOptIn` is on. `attachSessionLog`
+   defaults to `false`, so a caller that forgets it sends *less*.
+2. `BugReportViewModel` reads the preference at all, which it never did.
+3. **The feedback carrier event clears its breadcrumbs.** Breadcrumbs are
+   Info-and-above in release, `logEvent` is Info, and `SentryLogTree` copies an
+   entry's extras onto the breadcrumb — so every feedback report was carrying
+   `extra.score`, `extra.level` and `extra.highest_tier` from the last `run.end`,
+   switch or no switch. `data-safety.md` §8.2 found the attachment and missed
+   this, which was the larger leak.
+4. The buffered line format is `internal` and pinned by a test, because the
+   attachment's safety rests entirely on it writing the level, tag and **message**
+   and never the context. An app event's message is its *name*, so a `run.end`
+   buffers as "run.end".
+
+And `DeviceInfo` in `:libraries:core` exists for one caller, because the other
+half of the promise — "your device model" — was never implemented either.
+
+**`Telemetry.setUser` is deleted**, along with `captureUserFeedback`'s dead
+`email` and `screenshots` parameters. `NoIdentitySeamsTest` uses JVM reflection
+rather than a compile-time shape, because a re-added parameter *with a default
+value* breaks no caller and is exactly how this comes back.
+
+## 2026-09-11 — Android Auto Backup is off
+
+`android:allowBackup="false"`. `AppData` holds `installId`, which is the only
+identity this app has: the bucketing key our config server targets rollouts on,
+the `install_id` on every OTLP record, and a Sentry scope tag. Auto Backup
+restoring it onto a second device means two phones reporting as one install and
+sharing one targeting bucket — a device-scoped identifier silently becoming
+person-scoped, which is the reasoning the whole of `data-safety.md` §5 rests on.
+
+It also makes the Settings copy true. "There is no backup and no way to undo
+this" is what a player reads before erasing their data, and Auto Backup hands it
+back.
+
+**The cost is real and accepted:** a player who changes phones loses their run
+history. With no account and no server-side copy (SPEC 20), that is what the
+Settings copy already promises them. `data-safety.md` §7.3 carried this as an
+undetermined owner decision; it is decided.
+
+## 2026-09-11 — The licences screen reads a generated file; the copy names no licence
+
+`LicensesScreen` reads `files/licenses.txt`, written by the same
+`scripts/licenses/license-report.init.gradle` run that writes
+`docs/store/licenses.md`, from the same POMs, so the screen and the document
+cannot disagree. 363 entries: 361 classpath modules plus the two fonts, which a
+classpath scan structurally cannot see and whose OFL attribution clause is the
+one obligation a generator would silently drop.
+
+**Curated was considered and rejected on its own history.** C11's sentence was
+true when written and stopped being true two chunks later when C10 added the ad
+and billing stack, and nothing failed in between (L73). Correcting the sentence
+would buy exactly as long as the next dependency. The copy above the list now
+names no licence at all, because naming one is the part with a shelf life.
+
+**A licence plugin on the shared build was still rejected**, on C13's argument
+rather than a new one: a report is a release artefact, not a build input, so a
+plugin would put a configuration-time dependency on every detekt run and every
+screenshot test for a file regenerated a few times a year. The cost is named:
+regeneration is a release-checklist step and adding a dependency fails nothing.
+That is strictly better than a sentence, which could not be refreshed at all.
+
+Grouped by licence **name**, not by name-and-URL, which was the first attempt:
+modules under the same licence cite it at different addresses, and pairing the
+two split "The Apache Software License, Version 2.0" into one heading of 243 and
+an identical one of 157.
+
+
 ## 2026-09-10 — There is one `ProEntitlement`, it lives in `:libraries:billing`, and the debug grant folds in above the store
 
 **Decision:** both `ProEntitlement` types are deleted. `Entitlements` in the new

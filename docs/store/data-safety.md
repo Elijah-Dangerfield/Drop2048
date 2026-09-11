@@ -5,8 +5,10 @@ from what this tree actually does. Every row names the file and the mechanism th
 Where the honest answer is "not determined", it says so and says where to look, because a guess
 here is a policy violation rather than a typo.
 
-Derived 2026-09-10 for C13, against `75cb605`, and re-checked against `5244bbe` when C8 landed
-mid-chunk (§2.3a).
+Derived 2026-09-10 for C13, against `75cb605`, re-checked against `5244bbe` when C8 landed
+mid-chunk (§2.3a), and **revised in C13a**, which fixed the five findings §8 recorded rather than
+leaving them for the store build. Every §8 entry now says what was done. The rows that moved as a
+result are §2.1's lifetime, §2.5's feedback attachment, §2.7, §2.10 and §2.11.
 
 **Do not fill a store form straight out of this file.** Treat the citations as a map of where to
 look and re-open them. Sodogku's own history is the argument: it shipped a data-safety document
@@ -90,7 +92,7 @@ answer set for each branch rather than picking one. Everything in §4 and §5 is
 | **Leaves the device, 2** | As the `install_id` attribute on **every** OTLP log record sent to Grafana Cloud (`GrafanaLogTree.kt`). |
 | **Leaves the device, 3** | As a Sentry scope **tag** named `install_id` (`AppTelemetry.kt:150-152`, wired by `SessionTelemetryBinder.kt:55`). Because it is on the scope, a native crash symbolicated on the next launch still carries it. |
 | **What our server does with it** | Bucketing key for config rollouts and allow/deny targeting, and lifted into logging MDC / OTel spans / the server's Sentry scope. Not written to Postgres. |
-| **Lifetime** | Until the app is uninstalled **or** the player uses "Delete local data". **Qualified by Android Auto Backup, which is on. See §7.3.** |
+| **Lifetime** | Until the app is uninstalled **or** the player uses "Delete local data". Unqualified since C13a set `android:allowBackup="false"`; before that Auto Backup could restore it onto a second device. See §7.3. |
 | **Shown to the user** | Never. `grep -rn "installId" features apps/compose/src` returns no UI reference, including the debug menu. This matters for §7.1. |
 
 ### 2.2 Advertising identifier: Android only, today
@@ -191,17 +193,28 @@ Product Interaction row now cover a good deal more, which is what those rows are
 - What is sent, on a carrier event minted by `captureMessage`:
   - the player's **verbatim free text**, in the `UserFeedback.comments` body,
   - build version, commit sha and branch,
-  - **the in-memory session log buffer as a `session-log.txt` attachment**, unconditionally. In
-    release the buffer holds Debug and above (`logPolicy.minBufferLevel`), which includes the
-    `logEvent` lines in §2.3, so scores, levels and run outcomes are in it.
-- Callers: `FeedbackViewModel.kt` (message only) and `BugReportViewModel.kt` (message plus a log id
-  and error code). **No caller passes `email` and no caller passes `screenshots`**, and no email
-  field is rendered anywhere (`grep -rln email features` returns nothing). The parameters exist and
-  are dead. See §8.1.
-- **`diagnosticsOptIn` is not an analytics opt-out and must not be described as one on a form.** It
-  is off by default, and all it does is append platform / version / channel to the *feedback message
-  text* (`FeedbackViewModel.kt:88-90`). It has no effect on Grafana, on Sentry, or on the session-log
-  attachment. The settings copy that describes it is currently wrong; see §8.2.
+  - **the in-memory session log buffer as a `session-log.txt` attachment, only when the player
+    has turned `diagnosticsOptIn` on.** C13a gated it; it used to ride on every report. The buffer
+    holds Debug and above in release (`logPolicy.minBufferLevel`) and writes one line per entry as
+    timestamp, level, tag and **message** — never the entry's context. An app event's message is
+    its *name*, so a `run.end` buffers as "run.end" and its `score`, `level` and `highest_tier`
+    do not. `SentryLogTreeTest` pins that.
+
+    C13a also **clears breadcrumbs on the feedback carrier event**. Breadcrumbs are Info-and-above
+    in release, `logEvent` is Info, and a breadcrumb *does* carry the event's attributes — so every
+    feedback report was shipping scores by that route regardless of the switch. That was the larger
+    of the two leaks and the one §8.2 had not spotted.
+- Callers: `FeedbackViewModel.kt` and `BugReportViewModel.kt`, both of which now read
+  `diagnosticsOptIn` and pass it. **The `email` and `screenshots` parameters are gone**, deleted in
+  C13a along with `Telemetry.setUser`, and `NoIdentitySeamsTest` fails the build if any of the three
+  returns. See §8.1.
+- **`diagnosticsOptIn` is still not an analytics opt-out and must not be described as one on a
+  form.** It is off by default and has no effect on Grafana or on Sentry's own crash pipeline. What
+  it now governs, and did not before C13a, is what a **feedback report** carries: with it off, the
+  message text alone; with it on, the device model, OS version, platform, version and channel
+  appended to the message, plus the `session-log.txt` attachment. That is what
+  `settings_diagnostics_hint` says, and `DiagnosticsOptInTest` asserts both directions on both the
+  feedback and the bug-report form. See §8.2.
 - The free-text box is user-typed. A player may put their name or email in it. Both stores treat
   that as user-generated content, which is why the "User content" rows are present even though the
   app asks for nothing identifying.
@@ -228,8 +241,8 @@ Product Interaction row now cover a good deal more, which is what those rows are
 - `AppData`: settings, the in-progress run snapshots (`savedRun`, `savedDailyRun`), the Pro
   boolean, legal acceptance versions, the install id.
 - There is no sync, no account of ours and no server-side copy (SPEC 20). Settings says as much on
-  screen, "There is no backup and no way to undo this" (`strings.xml:210`), and **Android Auto
-  Backup makes that sentence false on Android today** (§7.3).
+  screen, "There is no backup and no way to undo this" (`strings.xml:210`), and since C13a set
+  `android:allowBackup="false"` that sentence is true on both platforms (§7.3).
 
 ### 2.8 Locale and country, and what is *not* location
 
@@ -249,13 +262,13 @@ Product Interaction row now cover a good deal more, which is what those rows are
 
 ### 2.10 Permissions, and the one that should not be there
 
-- `apps/compose/src/androidMain/AndroidManifest.xml` declares **two** permissions:
-  - `android.permission.VIBRATE`, for SPEC 9's haptics. Correct and needed.
-  - **`android.permission.CAMERA`, plus `<uses-feature android:name="android.hardware.camera"
-    android:required="false"/>`.** Nothing in the app uses a camera. `CameraPreview`,
-    `PhotoSaver` and `rememberCameraPermissionLauncher` are template scaffolding in
-    `:libraries:ui` with **zero call sites** under `features/` or `apps/` (grepped). **This is a
-    finding and it has store consequences**. See §8.3.
+- `apps/compose/src/androidMain/AndroidManifest.xml` declares **one** permission:
+  `android.permission.VIBRATE`, for SPEC 9's haptics. Correct and needed.
+
+  It declared `android.permission.CAMERA` and a matching `uses-feature` until C13a, which deleted
+  both along with the template scaffolding they existed for: `CameraPreview`, `PhotoSaver` and
+  `PermissionLauncher` are gone from `:libraries:ui` in all three source sets. See §8.3 for what
+  survives.
 - iOS declares one usage string, `NSUserNotificationsUsageDescription` (`Info.plist:19`). There is
   no remote-notification registration, no device token, no camera or photo-library usage string,
   and **no `NSUserTrackingUsageDescription`**, which is consistent with there being no ad SDK.
@@ -272,10 +285,12 @@ Product Interaction row now cover a good deal more, which is what those rows are
   `leaderboard.submitted` with `board` and `value`, which carries a score and a board name and no
   identity.
 - On Android there is no path at all: `NoGameServices` reports unavailable from construction.
-- **The Game Center capability is not enabled on the iOS target.** `iosApp.entitlements` contains
-  one key, and it is `com.apple.developer.applesignin` (§8.4). Until Game Center is added there,
-  authentication fails and every submission is silently refused, which is indistinguishable from a
-  signed-out player and is what the fail-open design is for.
+- **`iosApp.entitlements` now asks for Game Center and no longer asks for Sign in with Apple**
+  (C13a, §8.4). That is a file edit, not a build: nobody on this machine can open Xcode
+  (`OWNER-TODO.md`'s first blocking item), so the entitlement is **unproven** until someone
+  archives the app against a provisioning profile that carries the Game Center capability. If it
+  is wrong, authentication fails and every submission is silently refused, which is
+  indistinguishable from a signed-out player and is what the fail-open design is for.
 - What this does to the Apple label is the one open question in §7.4.
 
 ---
@@ -287,9 +302,9 @@ SMS, call logs, health, fitness, location of any kind, browsing history, search 
 installed-app inventory, payment instruments, credit info, push tokens. None of these has a read
 path in the tree with a call site, and none has a usage string declared on iOS.
 
-The single qualification is `android.permission.CAMERA`, which is **declared without being used**
-(§2.10, §8.3). Declaring a permission is not collecting data, but it puts a camera line on the Play
-listing and invites the question.
+There is no longer a qualification. `android.permission.CAMERA` was declared without being used
+until C13a removed it (§2.10, §8.3); a declared permission is not collected data, but it put a
+camera line on the Play listing and invited the question.
 
 ---
 
@@ -501,7 +516,24 @@ When `GoogleMobileAds` is added to `apps/ios/iosApp.xcodeproj`, apply all of thi
 5. Confirm the Google Mobile Ads and Sentry Swift packages each ship their **own signed** privacy
    manifest. That half of the requirement is theirs, not ours, and our file cannot satisfy it.
 
-### 7.3 Android Auto Backup is **on**, and three sentences depend on it being off
+### 7.3 Android Auto Backup was on, and is now off
+
+**Settled in C13a.** `apps/compose/src/androidMain/AndroidManifest.xml` sets
+`android:allowBackup="false"`, with the reasoning in an XML comment on the line itself. Everything
+below is what the decision was made against; it is kept because the reasoning is what a reviewer
+will ask for, not the answer.
+
+The deciding argument was the one the rest of this document rests on. `installId` is the only
+identity this app has: it is the bucketing key our config server targets rollouts on, the
+`install_id` on every OTLP record, and a Sentry scope tag. Auto Backup restoring it onto a second
+device means two phones reporting as one install and sharing one targeting bucket — an identifier
+this document describes as device-scoped, silently becoming person-scoped. The Settings copy is the
+second argument and it is the one a player can read.
+
+The cost is real and accepted: a player who changes phones loses their run history. With no account
+and no server-side copy, that is exactly what the Settings copy already promises them.
+
+#### The state it was in, and why it mattered
 
 `apps/compose/src/androidMain/AndroidManifest.xml` has `android:allowBackup="true"`, with no
 `fullBackupContent` or `dataExtractionRules` exclusion anywhere in the tree. So on Android:
@@ -515,12 +547,8 @@ When `GoogleMobileAds` is added to `apps/ios/iosApp.xcodeproj`, apply all of thi
   gets it back.
 - Whether Auto Backup is itself a declarable transfer is a question you then have to answer.
 
-Sodogku set `allowBackup="false"` and wrote up the reasoning. Doing the same here removes all four
-problems at once and is a one-line change; the cost is that a player who changes phones loses their
-run history, which for a game with no account is arguably the point of the Settings copy.
-
-**Not determined. This is an owner decision, not a bug**, and it must be made before the Data
-safety form is filed because it changes what is true.
+Sodogku set `allowBackup="false"` and wrote up the reasoning. Doing the same here removed all four
+problems at once.
 
 ### 7.4 Game Center, which neither form has an obvious row for
 
@@ -547,7 +575,10 @@ construction, because a DSN is an HTTPS URL. **Confirm the Grafana value when th
 
 ## 8. Findings for whoever owns the code
 
-Written down rather than fixed, per this chunk's scope. All five are live at `75cb605`.
+C13 wrote these down rather than fixing them, because a manifest edit and a telemetry-seam deletion
+were outside a documentation chunk's scope and the gate is shared. **C13a fixed all five.** Each
+entry below keeps the finding as it was written and adds what was done, because the finding is the
+part worth reading: it is the shape of the mistake, and the fix is only ever an instance of it.
 
 ### 8.1 `Telemetry.setUser` exists, with no caller, in an app with no users
 
@@ -558,8 +589,14 @@ true of `captureUserFeedback`'s `email` parameter and its `screenshots` paramete
 That is a worse state than it sounds: a one-line call is the natural thing to write the day someone
 adds a contact field, and nothing would fail. Sodogku deleted both seams and added
 `NoIdentitySeamsTest`, which fails the build if either returns. **Doing the same here would turn
-"no identity reaches Sentry" from a claim into a property.** Until then, §1's first paragraph is
-true of this tree and not enforced by anything.
+"no identity reaches Sentry" from a claim into a property.**
+
+**Done, C13a.** `Telemetry.setUser` and its `Sentry.setUser` implementation are deleted, and so are
+`captureUserFeedback`'s `email` and `screenshots` parameters and the attachment code behind the
+latter. `NoIdentitySeamsTest` asserts by JVM reflection that the seam declares no `setUser*`, that
+`captureUserFeedback` takes five parameters, and that none of them is a `List` — reflection rather
+than a compile-time shape, because a re-added parameter *with a default value* breaks no caller and
+is exactly the way this comes back.
 
 ### 8.2 The diagnostics toggle promises something the feedback path does not honour
 
@@ -573,6 +610,26 @@ output, which includes the `logEvent` lines carrying score, level, highest tier 
 Either the copy changes, or the attachment gets gated on the toggle. The copy is the cheaper fix
 and the attachment is the more useful behaviour, so the copy is probably what should move, but
 "never your scores" is an explicit promise on screen and it is currently not kept.
+
+**Done, C13a, and the code moved rather than the copy.** The toggle is opt-in, so the copy is what
+the player consented to; weakening it after the fact is not a fix. Four changes:
+
+1. The `session-log.txt` attachment rides only when the player opted in. `attachSessionLog`
+   defaults to `false`, so a caller that forgets it sends *less*.
+2. `BugReportViewModel` reads the preference at all, which it never did — the bug report form was
+   attaching a session log from players who had left the switch off.
+3. The carrier event clears its breadcrumbs. **This was the bigger leak and the finding above
+   missed it:** breadcrumbs are Info-and-above in release, `logEvent` is Info, and
+   `SentryLogTree.addBreadcrumb` copies the entry's extras onto the breadcrumb. Every feedback
+   report ever filed would have carried `extra.score`, `extra.level` and `extra.highest_tier` from
+   the last `run.end`, switch or no switch.
+4. The buffered line format is now `internal` and pinned by a test, because the attachment's safety
+   rests entirely on it writing the message and not the context. An app event's message is its
+   name.
+
+And the half of the copy nobody had noticed was also unkept: it promises "your device model", and
+the appended line carried the build and not the model. `DeviceInfo` in `:libraries:core` exists for
+that one caller.
 
 ### 8.3 `android.permission.CAMERA` is declared and nothing uses a camera
 
@@ -593,11 +650,37 @@ Deleting both lines is a one-line-each change with no code impact. It was not do
 is a manifest change outside this chunk's scope and the gate is shared, but it should be done
 before any store build.
 
+**Done, C13a.** Both manifest lines are gone, and so is the scaffolding they existed for:
+`CameraPreview`, `PhotoSaver` and `PermissionLauncher` are deleted from `:libraries:ui` in
+commonMain, androidMain and iosMain — nine files. `PermissionLauncher` went with them because its
+other half, `rememberMicrophonePermissionLauncher`, was equally uncalled and `RECORD_AUDIO` was
+never declared.
+
+**What survives, and why.** `NativeViewFactory` in `:libraries:ui`'s `iosMain` still declares
+`createCameraPreview`, `capturePhoto`, `toggleCameraFlash`, `CameraGuidanceState` and the Apple
+Sign In button factory, and `IOSNativeViewFactory.swift` still implements all of them in 544 lines.
+Nothing in Kotlin calls any of it. It was left because it is a bridge protocol implemented on the
+Swift side, nobody on this machine can open Xcode to prove a build after editing it, and a large
+unverifiable Swift deletion is a bad trade in a chunk whose subject is correctness. It ships dead
+code in the iOS binary and declares no permission, so it is a tidiness item rather than a store
+one. `docs/todos.md` should carry it.
+
 ### 8.4 The iOS entitlements file still asks for Sign in with Apple
 
 `apps/ios/iosApp/iosApp.entitlements` contains exactly one key,
 `com.apple.developer.applesignin`, left over from the identity stack C0 deleted. There is no
 sign-in anywhere in the app.
+
+**Done, C13a.** The file now contains exactly `com.apple.developer.game-center` set to `true`, and
+`plutil -lint` passes. That is the capability C9's `GKLeaderboard.submitScore` path needs and could
+never have had.
+
+**Unproven, and say so.** An entitlements file is a claim about a provisioning profile, and neither
+half can be checked here: `xcode-select` points at nothing on this machine, so no agent can build,
+archive or sign the iOS target. What has been verified is that the file is valid plist and that
+`project.pbxproj` points `CODE_SIGN_ENTITLEMENTS` at it from both configurations. What has not is
+that the App ID has the Game Center capability enabled, which is an Apple Developer portal setting
+and an owner item (§7 of `release-checklist.md`, item 23).
 
 This is an App Review risk of exactly the kind SPEC 20 warns about ("dead auth code in a game with
 no accounts is a liability at App Store review"), and it will also require the capability to exist

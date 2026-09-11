@@ -25,6 +25,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # An issue is the only thing anybody reads. See "Report a failure" below.
+  issues: write
 
 jobs:
   generate:
@@ -69,7 +71,15 @@ jobs:
       - name: Sanity-check the profile
         env:
           MIN_RULES: "2000"
-          REQUIRED_PACKAGES: "features/home features/onboarding"
+          # The journey's actual destinations. `features/onboarding` was on this
+          # list until C13a and that module was deleted in C5, so the check would
+          # have failed on a perfectly good profile — one more thing that had
+          # been red in the dark. `libraries/cascade` is here because the tutorial
+          # runs a real cascade, and if the engine is missing from the profile the
+          # generator did not play the game. `features/achievements` is deliberately NOT
+          # here: the journey stopped visiting it in C13a and the rules that remain
+          # come from the DI graph, so it would assert nothing.
+          REQUIRED_PACKAGES: "features/game libraries/cascade features/settings features/daily"
         run: |
           DIR=apps/compose/src/androidRelease/generated/baselineProfiles
           PROFILE=$DIR/baseline-prof.txt
@@ -81,13 +91,35 @@ jobs:
             echo "::error::Only $RULES rules — the journey probably broke. Expected >$MIN_RULES."
             exit 1
           fi
-          # The startup profile must be a launch path, not the whole app. When
-          # both generators shared one deep journey these files came out
-          # byte-identical, and an oversized startup profile spills into later
-          # DEX files and slows the very launch it is meant to speed up.
+          # The startup profile must be a launch path, not the whole app. An
+          # oversized one spills into later DEX files and slows the very launch
+          # it is meant to speed up.
+          #
+          # A size ratio was tried here and thrown away, which is worth writing
+          # down because it is the obvious check and it does not work on this
+          # app. Drop 2048 has no home screen: launch builds the whole DI graph
+          # and renders the game, so a *correct* startup profile is 86% of the
+          # journey profile (29,573 of 34,268 when this was written) and the
+          # broken one — both generators sharing a journey — was 91%. Five points
+          # apart. A threshold in that gap is a coin toss that fails monthly in
+          # the dark, which is the exact thing this job was just fixed for.
+          #
+          # So the check is what actually differs: a launch cannot reach Settings,
+          # so its profile must carry materially fewer rules from it. Sharing the
+          # journey makes the two counts equal.
+          echo "startup-prof is $(( STARTUP_RULES * 100 / RULES ))% of baseline-prof."
           if [ "$STARTUP_RULES" -ge "$RULES" ]; then
             echo "::error::startup-prof ($STARTUP_RULES) is not smaller than baseline-prof ($RULES)."
             echo "::error::Check includeInStartupProfile — only StartupProfileGenerator should set it."
+            exit 1
+          fi
+          SETTINGS_STARTUP=$(grep -c "features/settings" "$STARTUP" || true)
+          SETTINGS_BASELINE=$(grep -c "features/settings" "$PROFILE" || true)
+          echo "features/settings: $SETTINGS_STARTUP in startup, $SETTINGS_BASELINE in baseline."
+          if [ "$SETTINGS_BASELINE" -gt 0 ] && [ "$SETTINGS_STARTUP" -ge "$SETTINGS_BASELINE" ]; then
+            echo "::error::startup-prof covers Settings as heavily as baseline-prof does."
+            echo "::error::StartupProfileGenerator should walk BenchmarkJourney.awaitFirstFrame and stop,"
+            echo "::error::not share reachMenu/visitDetailScreens with JourneyProfileGenerator."
             exit 1
           fi
           for PKG in $REQUIRED_PACKAGES; do
@@ -98,6 +130,44 @@ jobs:
               exit 1
             fi
           done
+
+      # A scheduled job that fails opens no PR, and nobody opens the Actions tab
+      # of a project on a monthly cadence to check. This one was failing every
+      # month for the life of the project on a journey that still tapped
+      # "Continue as guest" — a screen deleted before the first feature landed —
+      # and the only reason anyone found out was a store-prep audit running it by
+      # hand (L72).
+      #
+      # So the failure has to arrive somewhere a person already looks. It
+      # comments on the existing issue rather than filing a twelfth one, because
+      # a stack of identical issues is its own kind of invisible.
+      - name: Report a failure where someone will see it
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Baseline profile generation is failing"
+        run: |
+          BODY=$(cat <<EOF
+          \`generateBaselineProfile\` failed on $(date -u +%Y-%m-%d).
+
+          [Run $GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+
+          The usual cause is the journey: \`BenchmarkJourney\` anchors on copy from
+          \`libraries/resources/.../strings.xml\`, and a reworded button or a moved
+          screen breaks it. The assertion message carries \`describeScreen()\`, which
+          prints what was actually on screen — read that first.
+
+          **This also means \`MinifiedReleaseSmokeTest\` cannot run**, so R8 is
+          unvalidated on a build that ships with \`isMinifyEnabled = true\`. Do not
+          cut a release while this is red.
+          EOF
+          )
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
 
       - name: Open a PR if the profile changed
         uses: peter-evans/create-pull-request@v6
@@ -112,8 +182,8 @@ jobs:
 
             The profile lists classes and methods compiled ahead of time, so a
             user's first run of a code path is not interpreted. It is captured by
-            walking the app on an emulator: onboarding to Home, then Home into
-            the detail screens and back.
+            walking the app on an emulator: the scripted tutorial as far as the
+            skip, then Stats, Settings and Achievements from the start overlay.
 
             **What to look at:** the rule count and which packages are covered. A
             large drop means the journey broke rather than the app shrinking — a

@@ -1,5 +1,6 @@
 /*
- * Generates docs/store/licenses.md. Run it, do not read it as configuration:
+ * Generates docs/store/licenses.md AND the list the in-app licences screen
+ * reads. Run it, do not read it as configuration:
  *
  *   ./gradlew -I scripts/licenses/license-report.init.gradle \
  *       :apps:compose:licenseReport --no-configuration-cache
@@ -16,6 +17,13 @@
  * module's POM and reads the <licenses> block out of it. A module whose POM
  * declares nothing comes out as UNDECLARED rather than being guessed at.
  */
+// Not on the classpath and never will be. `libraries/ui/licenses/` holds the
+// full OFL text for both.
+def FONT_ROWS = [
+        "Fredoka (font)\t\tSIL Open Font License 1.1\thttps://openfontlicense.org",
+        "Nunito (font)\t\tSIL Open Font License 1.1\thttps://openfontlicense.org",
+]
+
 gradle.projectsEvaluated {
     // An init script is applied to every build in the composite, and
     // `build-logic` is included via `includeBuild`. Without this guard the
@@ -27,11 +35,18 @@ gradle.projectsEvaluated {
 
     target.tasks.register('licenseReport') {
         group = 'reporting'
-        description = 'Writes docs/store/licenses.md from the Android release runtime classpath.'
+        description = 'Writes docs/store/licenses.md and libraries/resources/.../files/licenses.txt.'
 
         doLast {
             def rootDir = gradle.rootProject.projectDir
             def outputFile = new File(rootDir, 'docs/store/licenses.md')
+            // The in-app screen's data. Same run, same POMs, so the screen and
+            // the document cannot disagree. C13a's whole reason for existing is
+            // that they did: the screen claimed every dependency was Apache or
+            // MIT while this report counted 17 on proprietary Google terms.
+            def resourceFile = new File(
+                    rootDir,
+                    'libraries/resources/src/commonMain/composeResources/files/licenses.txt')
 
             def modules = target.configurations
                     .getByName('releaseRuntimeClasspath')
@@ -118,15 +133,19 @@ gradle.projectsEvaluated {
             out << "**${rows.size()} external modules.** Licence totals:\n\n"
             out << "| Licence | Modules |\n|---|---|\n"
             tallyRows.each { out << "| ${it.key} | ${it.value} |\n" }
-            out << "\n### Read the totals before you copy C11's sentence\n\n"
-            out << "`LicensesScreen`'s KDoc says \"every dependency this app ships is Apache 2.0 or MIT\". The\n"
-            out << "generated table says otherwise, and this is the single most useful thing this report\n"
-            out << "produced. Every module listed under **Android Software Development Kit License** or **Play\n"
-            out << "Core Software Development Kit Terms of Service** is on proprietary Google terms, not an OSI\n"
+            out << "\n### Read the totals before you write a sentence about them\n\n"
+            out << "Every module listed under **Android Software Development Kit License** or **Play Core\n"
+            out << "Software Development Kit Terms of Service** is on proprietary Google terms, not an OSI\n"
             out << "licence: the billing client, the whole `play-services-ads` tree, the UMP consent SDK and the\n"
             out << "in-app review SDK. They are perfectly fine to ship, that is what those terms are for, but\n"
-            out << "they are not satisfied by an Apache-2.0 attribution block, and the in-app attribution copy\n"
-            out << "should not claim they are.\n\n"
+            out << "they are not satisfied by an Apache-2.0 attribution block.\n\n"
+            out << "This report was written because `LicensesScreen`'s copy claimed otherwise, and it was right\n"
+            out << "to. The claim was true when C11 wrote it and stopped being true when C10 added the ad and\n"
+            out << "billing stack two chunks later, and nothing failed in between (ORCHESTRATION L73). **C13a\n"
+            out << "removed the claim rather than correcting it**: the screen now reads the generated\n"
+            out << "`files/licenses.txt` this same task writes, and the copy above the list names no licence,\n"
+            out << "because naming one is the part with a shelf life. Regeneration is still a release-checklist\n"
+            out << "step and nothing enforces it.\n\n"
             out << "Two of them are worth a second look for a different reason: `play-services-location` and\n"
             out << "`play-services-places-placereport` arrive transitively under `play-services-ads`. **Nothing\n"
             out << "in this app requests a location permission** (`docs/store/data-safety.md` §2.8, §2.10), so no\n"
@@ -163,7 +182,33 @@ gradle.projectsEvaluated {
 
             outputFile.parentFile.mkdirs()
             outputFile.setText(out.toString(), 'UTF-8')
+
+            // Tab-separated: coordinate, version, licence name, licence URL.
+            // One line per module, sorted by coordinate, so a regeneration diff
+            // is readable and a new dependency is one added line.
+            //
+            // Deliberately data with no prose in it. Everything a reader sees
+            // around the list is a string resource, because it is the half that
+            // gets translated and the half a generator has no business owning.
+            def resourceOut = new StringBuilder()
+            rows.each { row ->
+                def licence = row.licenses ? row.licenses[0] : null
+                def name = licence ? licence.name : 'UNDECLARED'
+                def url = licence ? licence.url : ''
+                resourceOut << "${row.coordinate}\t${row.version}\t${name}\t${url}\n"
+            }
+            // The two fonts. A classpath scan structurally cannot find them —
+            // they are resources, not modules — and the OFL's attribution clause
+            // is the one obligation in this project that a generator would
+            // silently drop. Hardcoded here rather than omitted, and named as
+            // such rather than dressed up as a scan result.
+            FONT_ROWS.each { resourceOut << "${it}\n" }
+
+            resourceFile.parentFile.mkdirs()
+            resourceFile.setText(resourceOut.toString(), 'UTF-8')
+
             logger.lifecycle("Wrote ${rows.size()} modules to docs/store/licenses.md")
+            logger.lifecycle("Wrote ${rows.size() + FONT_ROWS.size()} entries to ${resourceFile.name}")
         }
     }
 }

@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.CAMERA" />
-
     <!--
       SPEC 9's five haptic intensities go through HapticEngine.android.kt, which
       calls Vibrator directly rather than View.performHapticFeedback. That call
@@ -18,11 +16,26 @@
     -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!--
+      Auto Backup is off, and that is a data decision rather than a tidy-up.
 
+      `AppData` holds `installId`, which is the only identity this app has: it
+      is the `X-Install-Id` header our config server buckets rollouts on, the
+      `install_id` attribute on every OTLP record, and a Sentry scope tag. Auto
+      Backup would restore it onto a second device, so two phones would report
+      as one install and land in one targeting bucket.
+
+      It also makes the Settings copy true. "There is no backup and no way to
+      undo this" (`settings_reset_warn_body`) is what the player reads before
+      erasing their data, and with Auto Backup on, a restore hands it all back.
+
+      The cost is real and accepted: a player who changes phones loses their run
+      history. There is no account and no server-side copy (SPEC 20), so that is
+      what the Settings copy already promises.
+    -->
     <application
         android:name=".Drop2048Application"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

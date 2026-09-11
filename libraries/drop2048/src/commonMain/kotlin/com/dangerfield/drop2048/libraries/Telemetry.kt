@@ -1,13 +1,18 @@
 package com.dangerfield.drop2048.libraries.drop2048
 
+/**
+ * The app's crash-reporting and feedback seam.
+ *
+ * **There is deliberately no `setUser`, no `email` and no `screenshots` here.**
+ * All three existed as template scaffolding with no caller, which is a worse
+ * state than it sounds: a one-line call is the natural thing to write the day
+ * someone adds a contact field, and nothing would fail. §1 of
+ * `docs/store/data-safety.md` claims no identity of a person reaches Sentry;
+ * the absence of these three is what makes that a property rather than a habit,
+ * and `NoIdentitySeamsTest` fails the build if any of them comes back.
+ */
 interface Telemetry {
     fun initialize()
-
-    fun setUser(
-        email: String?,
-        name: String?,
-        id: String?
-    )
 
     /**
      * Records the user's current navigation route on the crash-reporting
@@ -60,17 +65,36 @@ interface Telemetry {
     fun setContext(key: String, value: String?)
 
     /**
-     * [screenshots] are JPEG-compressed image bytes the user chose to attach
-     * (already downscaled by the picker). Each rides along on the carrier event
-     * as its own image attachment, so a triager sees exactly what the reporter
-     * saw. Empty by default.
+     * Sends what the player typed, and only what the player agreed to send with
+     * it.
+     *
+     * [attachSessionLog] is `PlayerSettings.diagnosticsOptIn`, off by default.
+     * `settings_diagnostics_hint` is the copy the player read before deciding:
+     * *"Attaches your device model and build number. Never your board, your
+     * scores or anything you typed elsewhere."* Two things follow, and both are
+     * the implementation's job rather than the caller's:
+     *
+     * 1. The session log rides only when this is `true`. It used to ride on
+     *    every report, gated by nothing.
+     * 2. The carrier event carries no breadcrumbs. Breadcrumbs are Info-and-above
+     *    in release, `logEvent` is Info, and a breadcrumb carries the event's
+     *    attributes — so `run.end` would have put `score`, `level` and
+     *    `highest_tier` on every feedback report ever filed. That is "your
+     *    scores" in the plainest sense, and it was arriving whether or not the
+     *    switch was on.
+     *
+     * The session log itself holds log **messages**, never event attributes;
+     * `SentryLogTreeTest` pins that, because it is the other half of the same
+     * promise.
+     *
+     * Defaulting to `false` is the point: a caller that forgets the parameter
+     * sends less, not more.
      */
     fun captureUserFeedback(
         message: String,
         isBugReport: Boolean,
         eventId: String?,
         errorCode: Int?,
-        email: String? = null,
-        screenshots: List<ByteArray> = emptyList(),
+        attachSessionLog: Boolean = false,
     )
 }

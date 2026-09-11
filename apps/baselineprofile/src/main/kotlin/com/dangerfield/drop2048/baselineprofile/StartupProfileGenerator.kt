@@ -3,7 +3,7 @@ package com.dangerfield.drop2048.baselineprofile
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.PACKAGE
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.launchIntent
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.reachHome
+import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.awaitFirstFrame
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,6 +23,13 @@ import org.junit.Test
  * matching MD5). The startup profile was carrying the whole app, and was
  * actively working against cold start. Splitting them is the fix, and mirrors
  * what Now in Android does.
+ *
+ * **Splitting the generators is not sufficient on its own**, which C13a found by
+ * reading the output rather than trusting the structure. Both classes shared
+ * `reachMenu`, which on this app means playing the scripted tutorial — so the
+ * startup profile came out at 31,233 rules against the journey's 34,673, ninety
+ * percent of the whole app, from two correctly separated generators. It walks
+ * `awaitFirstFrame` now and stops there.
  *
  * Deliberately does NOT stub the network. Every real cold start runs the HTTP
  * client, session restore, deserialization and crash-reporter init, and that
@@ -47,6 +54,6 @@ class StartupProfileGenerator {
     ) {
         pressHome()
         startActivityAndWait(launchIntent())
-        reachHome()
+        device.awaitFirstFrame()
     }
 }

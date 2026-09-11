@@ -3,7 +3,7 @@ package com.dangerfield.drop2048.baselineprofile
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.PACKAGE
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.launchIntent
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.reachHome
+import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.reachMenu
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.visitDetailScreens
 import org.junit.Rule
 import org.junit.Test
@@ -37,7 +37,7 @@ class JourneyProfileGenerator {
     ) {
         pressHome()
         startActivityAndWait(launchIntent())
-        reachHome()
-        visitDetailScreens()
+        device.reachMenu()
+        device.visitDetailScreens()
     }
 }

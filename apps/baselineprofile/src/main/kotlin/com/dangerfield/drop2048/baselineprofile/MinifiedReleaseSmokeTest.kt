@@ -5,17 +5,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.CONTINUE
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.CONTINUE_AS_GUEST
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.MESSAGE
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.REPORT_A_BUG
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.SEND_FEEDBACK
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.ciAnyOf
+import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.STATS
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.ciText
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.describeScreen
 import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.launchIntent
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.tapMatching
-import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.tapRequired
+import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.reachMenu
+import com.dangerfield.drop2048.baselineprofile.BenchmarkJourney.visitDetailScreens
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -39,11 +34,18 @@ import org.junit.runner.RunWith
  * one breaks type-safe nav with an argument error, not a missing-class error),
  * and the generated DI graph.
  *
- * Walking launch, onboarding, Home and two pushed routes exercises all three:
- * the graph on launch, routes on every navigation, models on every persisted
- * read and server call. This is also the reason the profile journey should keep
- * hitting a real backend — stub it and this test stops testing what it was
- * written for.
+ * Drop 2048 puts all three on the shortest journey it has. The tutorial writes a
+ * `GameState` through its generated serializer on the first drop, every screen
+ * this visits is a `@Serializable` route, and the graph is built before the
+ * first frame. Stats reads Room.
+ *
+ * ## It shares the journey rather than copying it
+ *
+ * It used to keep its own copy of the walk, and the copy drifted: it was still
+ * tapping "Continue as guest" after the identity stack was deleted, exactly like
+ * the generators. The journey lives in [BenchmarkJourney] as `UiDevice`
+ * extensions so that this test and the two generators cannot disagree about what
+ * the app looks like.
  *
  * ```
  * ./gradlew :apps:baselineprofile:pixel6Api34BenchmarkReleaseAndroidTest
@@ -56,7 +58,7 @@ class MinifiedReleaseSmokeTest {
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
     @Test
-    fun theMinifiedAppReachesHomeAndNavigates() {
+    fun theMinifiedAppReachesTheMenuAndNavigates() {
         device.pressHome()
         InstrumentationRegistry.getInstrumentation().context.startActivity(
             launchIntent().addFlags(
@@ -64,44 +66,27 @@ class MinifiedReleaseSmokeTest {
             ),
         )
 
-        // Walk onboarding if it is showing. Adaptive for the same reason as the
-        // generators: a device that is already onboarted lands straight on Home.
-        val anyOnboardingCta = ciAnyOf(CONTINUE_AS_GUEST, CONTINUE)
-        repeat(BenchmarkJourney.ONBOARDING_MAX_STEPS) {
-            if (device.hasObject(ciText(SEND_FEEDBACK))) return@repeat
-            device.tapMatching(anyOnboardingCta, ONBOARDING_STEP_TIMEOUT_MS)
+        check(device.wait(Until.hasObject(BenchmarkJourney.anyOnScreenText), LAUNCH_TIMEOUT_MS) == true) {
+            "The minified app never rendered a first frame. " + device.describeScreen()
         }
 
-        // Reaching Home means the DI graph built, persisted app state
-        // deserialized through its generated serializer, and the start
-        // destination resolved — the first things R8 could have broken.
-        check(device.wait(Until.hasObject(ciText(SEND_FEEDBACK)), LAUNCH_TIMEOUT_MS) == true) {
-            "Never reached Home. " + device.describeScreen()
-        }
+        // Playing through the tutorial to the menu means the DI graph built, the
+        // engine ran a cascade, and a GameState round-tripped through its
+        // generated serializer — the first things R8 could have broken.
+        device.reachMenu()
 
         // Each push resolves a @Serializable route by type. If R8 renamed one,
         // this fails with an argument error rather than a missing class, which
         // is the failure mode hardest to attribute in the wild.
-        device.tapRequired(SEND_FEEDBACK)
-        check(device.wait(Until.hasObject(ciText(MESSAGE)), SCREEN_TIMEOUT_MS) == true) {
-            "Navigated to feedback but the form never rendered. " + device.describeScreen()
-        }
-        device.pressBack()
+        device.visitDetailScreens()
 
-        device.tapRequired(REPORT_A_BUG)
-        check(device.wait(Until.hasObject(ciText(MESSAGE)), SCREEN_TIMEOUT_MS) == true) {
-            "Navigated to bug report but the form never rendered. " + device.describeScreen()
-        }
-        device.pressBack()
-
-        check(device.wait(Until.hasObject(ciText(SEND_FEEDBACK)), SCREEN_TIMEOUT_MS) == true) {
-            "Popping back to Home failed. " + device.describeScreen()
+        check(device.wait(Until.hasObject(ciText(STATS)), SCREEN_TIMEOUT_MS) == true) {
+            "Popping back to the menu failed. " + device.describeScreen()
         }
     }
 
     private companion object {
         const val LAUNCH_TIMEOUT_MS = 30_000L
         const val SCREEN_TIMEOUT_MS = 15_000L
-        const val ONBOARDING_STEP_TIMEOUT_MS = 15_000L
     }
 }

@@ -91,8 +91,27 @@ class SentryLogTree(
     fun snapshot(): String = ringBuffer?.snapshot() ?: ""
 
     private fun appendToBuffer(entry: LogEntry) {
+        ringBuffer?.add(bufferLine(entry))
+    }
+
+    /**
+     * One buffered line: timestamp, level, tag, message. **Never the entry's
+     * context.**
+     *
+     * That omission is the promise `settings_diagnostics_hint` makes. An app
+     * event logs its *name* as the message and everything else as extras — so a
+     * `run.end` buffers as "run.end" and its `score`, `level` and `highest_tier`
+     * stay out of the dump that a player who opted in sends us. Writing the
+     * extras here would be a one-line change and would silently break the copy
+     * on screen, which is why `SentryLogTreeTest` asserts on it.
+     *
+     * Internal for that test. Breadcrumbs deliberately do the opposite and carry
+     * the extras, which is why the feedback carrier event clears them; see
+     * `Telemetry.captureUserFeedback`.
+     */
+    internal fun bufferLine(entry: LogEntry): String {
         val message = entry.message ?: entry.throwable?.message ?: DEFAULT_MESSAGE
-        ringBuffer?.add("${now()} ${entry.level.name.uppercase()} ${entry.tag ?: "-"}: $message")
+        return "${now()} ${entry.level.name.uppercase()} ${entry.tag ?: "-"}: $message"
     }
 
     private fun addBreadcrumb(entry: LogEntry) {

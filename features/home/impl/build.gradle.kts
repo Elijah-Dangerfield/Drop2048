@@ -28,6 +28,10 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
+            implementation(projects.libraries.core)
+            implementation(projects.libraries.drop2048)
+            implementation(projects.libraries.navigation)
+            implementation(projects.libraries.ui)
         }
     }
 }
