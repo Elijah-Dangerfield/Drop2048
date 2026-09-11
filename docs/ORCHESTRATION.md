@@ -36,7 +36,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
-| C13a · Make the claims true + validate R8 | **IN PROGRESS** | Five wrong claims, plus R8 never run |
+| C13a · Make the claims true + validate R8 | **DONE** | `f893a04`. **R8 passed, zero keep rules.** See L74-L76 |
 
 ---
 
@@ -660,6 +660,51 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L74 · The audit found the smaller leak
+
+`data-safety.md` §8.2 caught that feedback attaches a session log containing scores, and C13a gated
+it on the opt-in. While fixing that it found the bigger one: **breadcrumbs are Info+ in release,
+`logEvent` is Info, and `SentryLogTree` copies an entry's extras onto the breadcrumb** — so every
+report ever filed carried `extra.score`, `extra.level` and `extra.highest_tier` **whatever the
+switch said.**
+
+The attachment was the visible path. The breadcrumb was the one nobody had thought to look at, and
+it sat *underneath* the control that was supposed to govern it.
+
+When you find one leak on a consent-gated path, look for the channel that bypasses the gate
+entirely. Also worth copying: `Telemetry.setUser` was deleted and pinned by a **reflection** test,
+not a compile-time shape, because a re-added parameter *with a default value* breaks no caller and
+is exactly how this comes back.
+
+### L75 · A benchmark journey must anchor on a string that identifies a screen, not one that appears on it
+
+"Play" is shared by the tutorial's last card and the start overlay. Tapping it started a real run
+and hard-dropped through it, and all three baseline-profile tests failed holding a board at level 2.
+
+Two more from the same five runs, both non-obvious:
+
+- **Splitting profile generators is not enough if they share a journey.** Two correctly separated
+  generators produced a `startup-prof.txt` of 31,233 rules against a 34,673 baseline — **90% of the
+  app in the file Android says must not be the app.** The startup generator now walks only
+  `awaitFirstFrame`.
+- The destination after the tutorial is the **pause** overlay, because `finishTutorial` starts a
+  live run. There is no menu to return to.
+
+`describeScreen()` printing the live screen on failure diagnosed every one of the five in a single
+run each, on a ~9-minute cycle. That affordance paid for itself several times over.
+
+### L76 · A threshold is only a check when correct and broken are far apart
+
+C13a wrote a startup/baseline size-ratio guard, measured it against both the good and the broken
+profile, and **threw it away**: correct is 86% here and broken was 91%. A threshold in that gap is
+not a guard, it is a monthly coin toss that fails in the dark.
+
+The guard that shipped instead asserts a *structural* property — that one feature's coverage is
+lower in the startup profile than in the baseline — which sharing a journey makes exactly equal.
+
+Measuring the check before trusting it is the habit. So is deleting one that does not survive the
+measurement.
 
 ### L71 · The privacy policy describes a different app, and it is the compiled default URL
 
