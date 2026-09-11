@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Apple's privacy manifest for the app target.
+
+  Derived from `docs/store/data-safety.md` §5, which cites the code behind every
+  entry. Re-derive both together; a manifest that disagrees with the nutrition
+  label is worse than neither, because the two are compared on upload.
+
+  ## Two things about this file before anything else
+
+  **It is not in the target yet.** A file on disk does nothing, Xcode has to add
+  it to the app target's Copy Bundle Resources phase, and nothing outside Xcode
+  can do that. Until an owner opens the project and adds it, this file ships
+  nowhere. That is on `docs/store/release-checklist.md`.
+
+  **It describes the iOS build that exists**, which has no ad SDK. There is no
+  `GoogleMobileAds` Swift package in `project.pbxproj` (only `sentry-cocoa`), no
+  `GADApplicationIdentifier` in `Info.plist` and no `NSUserTrackingUsageDescription`,
+  so no IDFA is read and no tracking happens. `NSPrivacyTracking` is `false` and
+  `NSPrivacyTrackingDomains` is empty *because that is true today*, not because
+  the question was skipped. `data-safety.md` §7.2 is the pre-written diff for the
+  day the SDK lands; apply all five of its steps at once.
+
+  ## The SDK half of the requirement is not ours
+
+  Apple requires bundled third-party SDKs to ship their **own signed** manifests.
+  This file cannot satisfy that on their behalf. `sentry-cocoa` ships one; confirm
+  it on the version actually resolved, and confirm the same for Google Mobile Ads
+  when it arrives.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<!--
+		  The install id: a random UUID minted by CachedInstallIdProvider and
+		  stored in AppData. Not the IDFA, not a hardware id. It rides on every
+		  OTLP record and sits on the Sentry scope as a tag, so it is linked to
+		  the device by construction, see data-safety.md §5, "the linked to the
+		  user note", for why Linked is the conservative and correct answer.
+		-->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Gameplay and funnel events. The registry is docs/practices/app-events.md. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Sentry, via the sentry-cocoa Swift package. sendDefaultPii is false. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+
+		<!-- Sentry performance traces and IosJankMonitor. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+
+		<!--
+		  GrafanaLogTree forwards Warn-and-above KLog lines with the logger tag
+		  and exception type/message. The body is whatever our own code logged.
+		-->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+
+		<!--
+		  Free-text feedback and bug reports, plus the session-log.txt attachment
+		  that rides with every submission. The app asks for nothing identifying
+		  and renders no email field, but the box is user-typed, and both stores
+		  treat user-typed text as user content regardless of what it contains.
+
+		  Purpose is AppFunctionality alone. Apple's purpose vocabulary is six
+		  values: Third-Party Advertising, Developer's Advertising or Marketing,
+		  Analytics, Product Personalization, App Functionality and Other
+		  Purposes. There is no "customer support" or "developer communications"
+		  among them, on either the manifest or the nutrition label. Play has
+		  that purpose and Apple does not; do not carry Play's answer across.
+		-->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+
+	<!--
+	  Required-reason APIs.
+
+	  Two are declared and two known categories are deliberately absent:
+
+	  - **UserDefaults** is real and ours. IosPreviousExitProvider persists the
+	    MetricKit exit classification in NSUserDefaults.standardUserDefaults so
+	    the next launch can report it exactly once. CA92.1 is the right reason:
+	    access is limited to this app's own defaults.
+
+	  - **File timestamp** is declared conservatively rather than because a
+	    Kotlin call site was found. There is none: grepping iosMain for
+	    attributesOfItemAtPath, NSFileModificationDate and friends returns
+	    nothing. It is here because the Room/SQLite native layer and the
+	    telemetry disk buffer both touch files the app itself created, and the
+	    check Apple runs is on symbols in the linked binary rather than on our
+	    source. C617.1 (files created by the app) is the accurate reason if it
+	    fires at all. Over-declaring is not a violation; being surprised by an
+	    ITMS-91053 email after a submission is a wasted day.
+
+	  - **System boot time** is absent and that is a deliberate, documented
+	    design choice, not an oversight. IosProcessStartTimeProvider is a no-op
+	    precisely so the app never calls sysctl for a boot or process start
+	    time; read its KDoc, which says so and says what the right replacement
+	    is (MetricKit's MXAppLaunchMetric, which needs no declaration).
+
+	  - **Disk space** is absent because nothing reads NSFileSystemFreeSize or
+	    volumeAvailableCapacity anywhere in the tree.
+
+	  If an upload ever warns about either absent category, add it rather than
+	  arguing: the reason codes are C617.1 / CA92.1 style strings from Apple's
+	  published table, and adding one costs nothing.
+	-->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
