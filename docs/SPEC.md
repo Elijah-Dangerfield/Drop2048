@@ -15,17 +15,24 @@ against real play data. None of them are truths.**
 
 ## 0. Status
 
-C0, C1, C2 and C3 are done. The game is playable end to end and a run can be lost. The Supabase identity stack is gone; the Ktor + Postgres server
-and the Compose-for-web admin console remain, for remote config only (see 10).
+**Feature complete, 2026-09-11.** Every chunk in `BUILD-PLAN.md` has landed. The full gate is
+green: **1,017 tests, 0 failures, 0 skipped**, both platforms building, detekt clean, R8 validated.
 
-`:libraries:cascade` is the engine and is complete and tested, including on Kotlin/Native.
-`:libraries:ui` has the five block palettes, the cue pairing, the board geometry and the four HUD
-primitives.
+The game is playable end to end: tutorial, Endless, Daily Challenge, persistence with mid-cascade
+resume, stats, achievements, platform leaderboards, sharing, settings with the five palettes and
+the accessibility block, launch gates, remote config, telemetry, ads, Pro, and a debug menu.
 
-`:features:game` is the playable screen: the drop timer, the lock delay, transcript playback, the
-buttons scheme, the HUD, the danger state, pause and the stacked-out sheet. Audio is silent — the
-cue calls are all in place and the sample bank is C3a. See `BUILD-PLAN.md` for the order and
-`ORCHESTRATION.md` for where each chunk stands.
+**What is not done, and none of it is code:**
+
+- **No audio.** The playback path is live on both platforms with per-cascade-step pitch; the sample
+  bank does not exist. See `OWNER-TODO.md`.
+- **iOS is compile-verified only.** Nothing has ever been rendered or run on it — the screenshot
+  harness is Robolectric. Ads and billing are unwired there (and, deliberately, *incapable* of
+  paying out rather than merely absent). Blocked on `xcode-select`.
+- **Placeholder art.** Every icon surface still reads "YOUR APPS IMAGE HERE".
+- **No store accounts**, so no live ad units, no purchasable IAP, no Game Center boards.
+
+See `ORCHESTRATION.md` for where every decision came from and what it cost.
 
 ## 1. Pitch
 
