@@ -35,7 +35,8 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
 | C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
-| C13 · Store prep | **IN PROGRESS** | Manifests, data safety, listings |
+| C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
+| C13a · Make the claims true + validate R8 | **IN PROGRESS** | Five wrong claims, plus R8 never run |
 
 ---
 
@@ -659,6 +660,55 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L71 · The privacy policy describes a different app, and it is the compiled default URL
+
+`pages/privacy.html` states the app uses **no ad or analytics SDKs**. It ships AdMob and an OTLP
+pipe to Grafana. That page is already the compiled default for `legal.privacyUrl`, so the app
+currently points players at a false statement about itself.
+
+Four more of the same shape, all found by deriving the store forms from the code rather than from
+memory:
+
+- **`android.permission.CAMERA` is declared with zero call sites** — a camera permission on the Play
+  listing for a falling-block puzzle.
+- **`android:allowBackup="true"`** lets Auto Backup restore the install id to a second device,
+  contradicting the Settings copy that says "There is no backup".
+- **`iosApp.entitlements` still asks for Sign in with Apple** (deleted in C0) and does **not** ask
+  for Game Center, which C9 needs.
+- **The diagnostics toggle promises "never your scores"** while every feedback submission
+  unconditionally attaches a session log containing them.
+
+The general lesson: **the store forms are a differential audit of what the app actually does**, and
+nothing else in the process compares the claims to the code. Filling them from memory would have
+missed all five.
+
+### L72 · R8 has never been validated, and CI was failing silently every month
+
+`:apps:compose:generateBaselineProfile` fails: `BenchmarkJourney` is still the template's, tapping
+"Continue as guest" and waiting for a Home screen with "Send Feedback". Drop 2048 opens straight
+into the tutorial.
+
+Two consequences nobody had written down:
+
+- **`MinifiedReleaseSmokeTest` fails with it, so R8 has never once run against this app** — while
+  `isMinifyEnabled` and `isShrinkResources` are both **on** for release, in an app with all three of
+  the KMP shapes R8 is known to break by name.
+- `.github/workflows/baseline-profile.yml` runs **monthly and opens no PR on failure**, so it has
+  been red in the dark for the life of the project.
+
+Same family as L46 (a test that never ran) and L62 (a green build over a compiler crash): the
+signal existed and nothing was reading it.
+
+### L73 · "Every dependency is Apache or MIT" was a comment, not an audit
+
+C11's `LicensesScreen` KDoc said so. The generated report found **17 on proprietary Google terms** —
+the billing client, the whole `play-services-ads` tree, UMP, and the Play review SDK — across 361
+modules.
+
+Nobody was careless: the claim was true of the dependency set when it was written, and C10 added the
+ad and billing stack afterwards. **A claim about a dependency set has a shelf life measured in
+chunks**, and the only durable version is generated.
 
 ### L69 · Two ways the decision-time instrument would have lied, both caught before shipping
 
