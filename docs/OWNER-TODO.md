@@ -45,16 +45,24 @@ The game is playable, persisted, and now looks like the handoff. Nobody but an a
 Changes the ad SDK configuration, the consent flow and the store questionnaire. Getting it wrong
 is a policy problem, not a bug. **Cheaper to answer now than at C10.**
 
-### The digest freeze date
+### The digest freeze — the window is closing
 
-`PINNED_DIGEST` has moved twice, and both times were free because no scores exist. Once Daily
-Challenge ships (C6), changing it silently invalidates every posted score.
+`PINNED_DIGEST` has now moved **three** times (the merge-position ruling, cutting hard drop, and
+reinstating it), and every one was free because **no Daily score has ever been recorded.** Daily
+Challenge is built and shipped; the moment a real score exists, changing the digest silently
+invalidates every posted score, because those players competed on a different block sequence.
 
-Also frozen at that moment: **`level.blocksPerLevel`**, which is now remote-configurable and moves
-the digest. The admin console warns loudly and requires a typed confirmation in prod, but **nothing
-enforces it server-side.**
+Frozen at that same moment:
+- **`EngineConfig.Default`** — D18 pins the Daily to it for comparability, so any release that moves
+  a field of it splits that day's board between app versions.
+- **`level.blocksPerLevel`** — remote-configurable and digest-moving. The console warns loudly and
+  requires a typed confirmation in prod, but **nothing enforces it server-side.**
+- **`dailySeedFor`'s stride and salt** — moving either re-rolls every past and future day.
 
-Safe to keep tuning live, measured: the speed curve, `nudgeRows`, the spawn table.
+Measured safe to keep tuning live: the speed curve, the spawn table.
+
+**Decide the rule now.** The obvious one is that the digest is versioned alongside the leaderboard
+and changing it retires the old board.
 
 ### `SAVE_FORMAT_VERSION` ownership
 
