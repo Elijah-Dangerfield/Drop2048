@@ -46,9 +46,4 @@ class SpeedCurveTest {
         val readings = (1..300).map(curve::msPerRow)
         assertTrue(readings.zipWithNext().all { (a, b) -> b <= a })
     }
-
-    @Test
-    fun softDropIsFlatAtEveryLevel() {
-        assertEquals(40, curve.softDropMsPerRow)
-    }
 }

@@ -19,7 +19,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * At the **start of the next run**, and never mid-run. [current] is a snapshot
  * read, called once by `RunFactory.newRun()`; nothing else in the app calls it.
  * Everything the screen needs while a run is alive — the speed curve, the level
- * bar's denominator, the nudge distance — is read off `GameState.config`, which
+ * bar's denominator, the spawn table — is read off `GameState.config`, which
  * travels *inside* the state (D5) and is therefore frozen at the moment the run
  * started. A config refresh landing on the app's next foreground cannot reach a
  * run that is already in flight, and a run resumed from the saved blob comes
@@ -50,8 +50,6 @@ class RemoteEngineConfig(
     private val speedCurve: SpeedCurveMsPerRow,
     private val speedFloorMs: SpeedFloorMs,
     private val speedTailStepMs: SpeedTailStepMs,
-    private val softDropMsPerRow: SoftDropMsPerRow,
-    private val nudgeRows: NudgeRows,
     private val wildcardPerMille: WildcardPerMille,
     private val wildcardFirstLevel: WildcardFirstLevel,
     private val bombPerMille: BombPerMille,
@@ -67,7 +65,6 @@ class RemoteEngineConfig(
 
     private fun assemble(): EngineConfig = EngineConfig(
         rows = boardRows.within(MIN_ROWS..MAX_ROWS),
-        nudgeRows = nudgeRows.within(1..MAX_NUDGE_ROWS),
         blocksPerLevel = blocksPerLevel.within(1..MAX_BLOCKS_PER_LEVEL),
         spawnCapDivisor = spawnCapDivisor.within(1..MAX_CAP_DIVISOR),
         spawnTable = spawnTable.value,
@@ -76,7 +73,6 @@ class RemoteEngineConfig(
             msPerRow = curve(),
             tailStepMs = speedTailStepMs.within(0..MAX_TAIL_STEP_MS),
             floorMs = speedFloorMs.within(1..MAX_MS_PER_ROW),
-            softDropMsPerRow = softDropMsPerRow.within(1..MAX_MS_PER_ROW),
         ),
     )
 
@@ -118,7 +114,6 @@ class RemoteEngineConfig(
     private companion object {
         const val MIN_ROWS = 4
         const val MAX_ROWS = 16
-        const val MAX_NUDGE_ROWS = 8
         const val MAX_BLOCKS_PER_LEVEL = 500
         const val MAX_CAP_DIVISOR = 1024
         const val MAX_MS_PER_ROW = 10_000

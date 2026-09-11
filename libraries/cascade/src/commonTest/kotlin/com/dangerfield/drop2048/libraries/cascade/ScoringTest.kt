@@ -49,15 +49,15 @@ class ScoringTest {
     }
 
     /**
-     * Decision D11's scoring ruling, asserted rather than described. Hard drop's
-     * `2 x rowsSkipped` is gone and the ▼ nudge did not inherit it, so no input
-     * puts a point on the board any more. See `Scoring`'s KDoc for the argument.
+     * Decision D21 pays exactly one input and no others. Steering and gravity put
+     * nothing on the board, which is what D13's honesty argument was really
+     * protecting — see `Scoring`'s KDoc.
      */
     @Test
-    fun noInputScoresAnything() {
+    fun noTouchOfTheBoardScoresAnything() {
         var state = stateOf(flatBottom, FallingBlock(value(2), Cell(0, 0)))
 
-        listOf(Input.MoveRight, Input.MoveLeft, Input.Tick, Input.Nudge, Input.Nudge).forEach { input ->
+        listOf(Input.MoveRight, Input.MoveLeft, Input.Tick, Input.Tick).forEach { input ->
             val transition = Cascade.apply(state, input)
             assertTrue(
                 transition.transcript.isEmpty,
@@ -69,15 +69,38 @@ class ScoringTest {
     }
 
     /**
-     * The only steps a lock can add outside a cascade. Pinned as a set so a
-     * future award that pays for an input has to change this test on the way in.
+     * SPEC 7's hard drop bonus (decision D21): two points a row, and the rows are
+     * the ones the block skipped rather than the height of the board. The falling
+     * block starts in row 0 and the stack is one deep, so it passes six.
      */
     @Test
-    fun aDropOnAnEmptyBoardScoresSurvivalAndNothingElse() {
+    fun aHardDropPaysTwiceTheRowsItSkipped() {
+        val state = stateOf(flatBottom, FallingBlock(value(2), Cell(0, 0)))
+
+        val bonus = Cascade.apply(state, Input.Lock)
+            .transcript
+            .steps
+            .filterIsInstance<ResolutionStep.HardDropBonus>()
+            .single()
+
+        assertEquals(6, bonus.rows)
+        assertEquals(12, bonus.points)
+    }
+
+    /**
+     * The only steps a lock can add outside a cascade. Pinned as a list so a
+     * future award that pays for an input has to change this test on the way in,
+     * and so the hard drop bonus is visibly the only one that does.
+     */
+    @Test
+    fun aDropOnAnEmptyBoardScoresTheDropAndSurvivalAndNothingElse() {
         val transition = drop(stateOf(flatBottom, level = 3), value(2), col = 0)
 
         assertEquals(
-            listOf(ResolutionStep.Survival(level = 3, points = 30)),
+            listOf(
+                ResolutionStep.HardDropBonus(rows = 6, points = 12),
+                ResolutionStep.Survival(level = 3, points = 30),
+            ),
             transition.transcript.steps,
         )
     }
@@ -148,7 +171,7 @@ class ScoringTest {
     @Test
     fun theScoreOnlyEverMovesByTheTranscriptTotal() {
         var state = Cascade.newGame(seed = 4_815_162_342L)
-        val script = listOf(Input.MoveLeft, Input.Nudge, Input.Lock, Input.MoveRight, Input.Nudge, Input.Lock)
+        val script = listOf(Input.MoveLeft, Input.Tick, Input.Lock, Input.MoveRight, Input.Tick, Input.Lock)
 
         repeat(60) { round ->
             val input = script[round % script.size]

@@ -49,6 +49,12 @@ private fun ResolutionStep.describe(): TranscriptLine = when (this) {
         points = points,
     )
 
+    is ResolutionStep.HardDropBonus -> TranscriptLine(
+        step = step,
+        text = "hard drop, $rows row${if (rows == 1) "" else "s"} skipped",
+        points = points,
+    )
+
     is ResolutionStep.Detonation -> TranscriptLine(
         step = step,
         text = "bomb $bomb took ${destroyed.size} (${destroyed.joinToString(" ")})",

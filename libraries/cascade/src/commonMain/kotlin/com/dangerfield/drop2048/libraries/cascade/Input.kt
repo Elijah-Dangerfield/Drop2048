@@ -9,15 +9,13 @@ import kotlinx.serialization.Serializable
  * bug report attaches, what the debug menu replays, and what the balance
  * harness generates.
  *
- * There is no soft-drop input. Soft drop is the same [Tick] arriving on a
- * shorter interval, and the interval is the ViewModel's business — the engine
- * has no idea time exists. There is no undo input either; undo restores a whole
- * snapshot from [UndoRing] rather than running the machine backwards.
+ * There is no soft-drop input, and since decision D21 there is no soft drop at
+ * all. There is no undo input either; undo restores a whole snapshot from
+ * [UndoRing] rather than running the machine backwards.
  *
- * `HardDrop` and `Hold` were removed by decision D11. The design handoff governs
- * interaction and says both were tried and cut, along with the next-block
- * preview that hold was built around. [Nudge] is what replaced hard drop, and it
- * is a weaker thing on purpose.
+ * `Hold` was removed by decision D11 along with the next-block preview it was
+ * built around. `Nudge`, D11's two-tick accelerator, was removed by D21: ▼ is a
+ * hard drop again, and a hard drop is [Lock].
  */
 @Serializable
 sealed interface Input {
@@ -33,26 +31,16 @@ sealed interface Input {
     data object MoveRight : Input
 
     /**
-     * The ▼ control, and a downward flick: advance the fall by
-     * [EngineConfig.nudgeRows] ticks and nothing else (SPEC 6, decision D11).
-     *
-     * It is an accelerator, not an instant drop. It does not lock, it does not
-     * score, and it stops early against whatever is underneath — a nudge into a
-     * blocked cell is a no-op rather than a rejection, exactly as [Tick] is,
-     * because the player pressing ▼ on a resting block has not done anything
-     * wrong.
-     */
-    @Serializable
-    data object Nudge : Input
-
-    /**
-     * Lock where the block rests. The lock delay that precedes it lives in the
+     * Lock where the block rests, and **this is also the hard drop** (SPEC 6,
+     * decision D21). The lock delay that precedes an unhurried lock lives in the
      * ViewModel.
      *
      * "Where it rests" is the landing cell of the block's current column, not the
      * cell it currently occupies, so a `Lock` from mid-air places the block at the
-     * bottom of its column. That is what hard drop used to be minus the bonus, and
-     * it is why removing hard drop cost the engine no code path.
+     * bottom of its column. That has always been true, which is why hard drop
+     * could be deleted in D11 without touching a code path and reinstated in D21
+     * without adding one: the two differ only in how many rows were skipped, and
+     * the engine reads that off the state it already has.
      */
     @Serializable
     data object Lock : Input

@@ -32,28 +32,6 @@ With the new per-step pacing (L58) the chain steps read well, and the single mer
 beat that looks plain by comparison.
 
 
-### ▼ becomes a hard drop, soft drop is deleted (D21) — DO THIS FIRST
-
-Owner ruling from play. `Input.Lock` already locks at the landing cell, so the engine side is
-nearly free. Retire `Input.Nudge`, `EngineConfig.nudgeRows`, `GameAction.SoftDropStart/End`,
-`softDropOnHold` and the `softDropping` field. Re-pin the determinism digest by **running the
-engine**, not by pasting the assertion's actual (L17).
-
-Also update: the tutorial teaches ▼ as "drop it" rather than "nudge it" (L49's mechanism survives —
-with the clock frozen, ▼ is still the only way to make progress, and now it takes one tap per
-drop); SPEC 6, 7 and 13; `docs/reference/design-handoff-deltas.md`, since the packet's control
-scheme is now overridden on this point too.
-
-
-### Decide whether the ▼ nudge pays any score
-
-SPEC 7's hard drop bonus (`2 x rowsSkipped`) has nothing left to fire on once D11 lands. The bonus
-existed to reward confident play; a two-tick nudge is a weaker claim to that, and paying nothing is
-defensible.
-
-Whichever way it goes, **scoring lives in the engine, so this moves the determinism digest** — fold
-it into C1d rather than doing it separately.
-
 ### Move the board-aware cap to landing time
 
 D11 removes the preview, which is the *only* reason SPEC 5.3 evaluates the cap at draw time ("a
@@ -66,21 +44,6 @@ digest too, so it should ride along with the other engine changes rather than mo
 
 The special marks render correctly at real cell size — the star reads, the bomb fuse is legible
 but is the smallest of the three marks. One constant in `BlockFace.kt`.
-
-### C5: teach hard drop as load-bearing, not incidental
-
-Measured in C1c: time to reach level 4 is **34 seconds** for a hard-dropping player and **289
-seconds** for a patient one, on the same curve. The drop control is worth more than every
-speed-curve change combined (L29).
-
-SPEC 13's drops 2-4 already introduce hard drop. C5 should treat it as the tutorial's most
-important job rather than one of three things it mentions.
-
-### Scan for other tests that advance a full tick and assert on the falling block
-
-`GameScenario.tick()` advances one drop interval, which is not a safe unit while soft-dropping — at
-40ms per row a full tick is twelve rows, so the block lands, locks and resolves. C1c found one such
-test that passed at 700ms by luck and NPE'd at 500ms (L31). There may be others.
 
 ### A second metric for permanent obstructions
 
@@ -218,11 +181,6 @@ and `ShareButton` for C9.
 
 **Do not port them up front.** An unported component costs nothing; a ported-and-unused one costs
 maintenance forever.
-
-### Soft drop is dead during the tutorial
-
-It is a *hold* of ▼, and soft drop is the ticker running faster — and the tutorial's ticker is off
-(L49). If C3a's feel pass wants soft drop taught, it needs its own beat after the handoff.
 
 ### Check `:libraries:review` is still wanted
 

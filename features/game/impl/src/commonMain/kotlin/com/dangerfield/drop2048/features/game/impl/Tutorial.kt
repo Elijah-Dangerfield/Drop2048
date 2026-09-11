@@ -19,11 +19,10 @@ import com.dangerfield.drop2048.libraries.cascade.Rng
 enum class TutorialStep {
     /** Drop 1. Two 2s, one of them already on the board. */
     Steer,
-    FirstNudge,
-    KeepNudging,
+    FirstDrop,
     FirstMerge,
 
-    /** Drops 2-4. The nudge, again, until it is a habit. */
+    /** Drops 2-4. The drop control, again, until it is a habit. */
     SecondDrop,
     ThirdDrop,
     FourthDrop,
@@ -48,10 +47,14 @@ enum class TutorialAwait {
     /** The player moved the falling block sideways, by drag or by arrow. */
     Steered,
 
-    /** The player pressed ▼. */
-    Nudged,
-
-    /** The block landed and its whole cascade finished playing. */
+    /**
+     * The block landed and its whole cascade finished playing.
+     *
+     * Since decision D21 this is also "the player pressed ▼", because with the
+     * clock frozen a hard drop is the only thing that can produce a landing. The
+     * separate `Nudged` signal retired with the nudge: it existed so drop 1 could
+     * ask for the *first* of several presses, and there is only one press now.
+     */
     Dropped,
 }
 
@@ -64,7 +67,7 @@ enum class TutorialFocus {
     Board,
 
     /** The ▼ control, which is the one thing this tutorial exists to teach. */
-    Nudge,
+    Drop,
 }
 
 /**
@@ -126,15 +129,18 @@ data class TutorialDrop(
  * land.** A player cannot reach the end of six drops without pressing it, and
  * they will never once have watched a block come down on its own.
  *
- * C1c and C1e measured that whether a player uses ▼ is worth 223 seconds against
- * 56 to reach level 4 (L29) — a bigger lever on the opening than the drop clock,
- * the spawn table and every speed-curve change put together. A tutorial that
- * *mentions* the control teaches a fact. A tutorial the player cannot finish
- * without it teaches a habit, and the habit is what the number is about.
+ * C1c measured that whether a player uses the drop control is worth 223 seconds
+ * against 33 to reach level 4 (L29) — a bigger lever on the opening than the drop
+ * clock, the spawn table and every speed-curve change put together. A tutorial
+ * that *mentions* the control teaches a fact. A tutorial the player cannot
+ * finish without it teaches a habit, and the habit is what the number is about.
  *
- * That is also why the ▼ beats sit at drops 1-3 rather than at SPEC 13's
- * "drops 2-4 introduce the Next preview and hard drop": both of those are cut
- * (D11), and the slot they leave is the most valuable one in the script.
+ * **Decision D21 made the mechanism cheaper rather than weaker.** ▼ is a hard
+ * drop now, so a scripted drop is one press instead of four or five. That cost
+ * the script a beat: drop 1 used to ask for a first press and then for several
+ * more, and "press it again" is not a thing that can be asked of a control that
+ * finishes the drop on the first press. The two beats are one, and the six drops
+ * still cannot be reached the end of without using it.
  */
 object Tutorial {
 
@@ -146,11 +152,10 @@ object Tutorial {
 
     val Script: List<TutorialLesson> = listOf(
         TutorialLesson(TutorialStep.Steer, drop = 1, await = TutorialAwait.Steered, focus = TutorialFocus.Board),
-        TutorialLesson(TutorialStep.FirstNudge, 1, TutorialAwait.Nudged, TutorialFocus.Nudge),
-        TutorialLesson(TutorialStep.KeepNudging, 1, TutorialAwait.Dropped, TutorialFocus.Nudge),
+        TutorialLesson(TutorialStep.FirstDrop, 1, TutorialAwait.Dropped, TutorialFocus.Drop),
         TutorialLesson(TutorialStep.FirstMerge, 1, TutorialAwait.Tapped),
-        TutorialLesson(TutorialStep.SecondDrop, 2, TutorialAwait.Dropped, TutorialFocus.Nudge),
-        TutorialLesson(TutorialStep.ThirdDrop, 3, TutorialAwait.Dropped, TutorialFocus.Nudge),
+        TutorialLesson(TutorialStep.SecondDrop, 2, TutorialAwait.Dropped, TutorialFocus.Drop),
+        TutorialLesson(TutorialStep.ThirdDrop, 3, TutorialAwait.Dropped, TutorialFocus.Drop),
         TutorialLesson(TutorialStep.FourthDrop, 4, TutorialAwait.Dropped, speaks = false),
         TutorialLesson(TutorialStep.WatchThis, 5, TutorialAwait.Tapped),
         TutorialLesson(TutorialStep.CascadeDrop, 5, TutorialAwait.Dropped, speaks = false),

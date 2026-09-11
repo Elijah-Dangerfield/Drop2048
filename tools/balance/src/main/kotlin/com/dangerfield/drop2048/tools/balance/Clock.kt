@@ -13,7 +13,7 @@ import kotlin.random.Random
 
 /** Who actually put the block down. */
 enum class Placement {
-    /** A drop input put it down: a run of ▼ nudges, or a hold for a soft drop. */
+    /** A drop input put it down: one press of ▼ (decision D21). */
     PLAYER,
 
     /**
@@ -31,20 +31,20 @@ enum class Placement {
 /**
  * How a clocked policy ends a drop once it has reached the column it wants.
  *
- * There is no instant option any more. Decision D11 removed hard drop, so the
- * fastest a block can reach the floor is a thumb repeating ▼, and that is
- * modelled here as a real repeat at [PlayerProfile.tapMillis] rather than as a
- * single free press. **This is the change C1e has to re-measure**; the model is
- * faithful but no number produced with it has been looked at yet.
+ * Two options, because decision D21 left the game with two. The repeated-nudge
+ * and hold-to-soft-drop models went with the controls they modelled.
+ *
+ * **This is a model change, not a measurement change.** L40 pinned the reason: a
+ * drop control decides when a block locks and never where, so switching the
+ * finish moves the wall clock and leaves every outcome column identical to the
+ * digit. C1e already published the hard-drop column, and no balance pass is
+ * re-run on the strength of this.
  */
 enum class Finish {
-    /** Repeated taps on ▼: `EngineConfig.nudgeRows` rows per tap, one tap per `tapMillis`. */
-    NUDGE,
+    /** One press of ▼: the block locks at its landing cell, immediately. */
+    HARD_DROP,
 
-    /** A hold on the same control: 40ms a row, flat at every level. */
-    SOFT_DROP,
-
-    /** Neither. Steer, then watch it fall, which is how the game plays itself if you let it. */
+    /** Steer, then watch it fall, which is how the game plays itself if you let it. */
     WAIT,
 }
 
@@ -75,18 +75,9 @@ data class PlayerProfile(
     val finish: Finish,
 ) {
     companion object {
-        val Average = PlayerProfile("average", decisionMillis = 250, tapMillis = 120, finish = Finish.NUDGE)
-        val Quick = PlayerProfile("quick", decisionMillis = 150, tapMillis = 70, finish = Finish.NUDGE)
-        val Deliberate = PlayerProfile("deliberate", decisionMillis = 400, tapMillis = 180, finish = Finish.NUDGE)
-
-        /**
-         * SPEC 6's other half of the shared drop control: hold instead of tap and
-         * the block falls at a flat 40ms a row. Kept as a profile because a
-         * harness in which soft drop is never pressed cannot say whether soft
-         * drop matters — and since decision D11 it matters more, because soft
-         * drop and the nudge are now the only two ways to hurry a block at all.
-         */
-        val Softie = PlayerProfile("softie", decisionMillis = 250, tapMillis = 120, finish = Finish.SOFT_DROP)
+        val Average = PlayerProfile("average", decisionMillis = 250, tapMillis = 120, finish = Finish.HARD_DROP)
+        val Quick = PlayerProfile("quick", decisionMillis = 150, tapMillis = 70, finish = Finish.HARD_DROP)
+        val Deliberate = PlayerProfile("deliberate", decisionMillis = 400, tapMillis = 180, finish = Finish.HARD_DROP)
 
         /**
          * The other end of the pacing bracket: never touches the drop control.
@@ -98,7 +89,7 @@ data class PlayerProfile(
          */
         val Patient = PlayerProfile("patient", decisionMillis = 250, tapMillis = 120, finish = Finish.WAIT)
 
-        val All = listOf(Average, Quick, Deliberate, Softie, Patient)
+        val All = listOf(Average, Quick, Deliberate, Patient)
 
         fun byName(name: String): PlayerProfile? = All.firstOrNull { it.name.equals(name, ignoreCase = true) }
     }
@@ -120,8 +111,8 @@ class ClockedDrop(
  * The engine has no clock (SPEC 4.1) and the `GameViewModel` is the thing that
  * gives it one, so this is a headless copy of that ViewModel's timing rules and
  * nothing else: ticks at `msPerRow(level)`, a 150ms lock delay with **one**
- * reset per drop, soft drop flat at 40ms a row, and the one-slot sideways buffer
- * C3 added. Every one of those is a rule a scripted player can be beaten by, and
+ * reset per drop, a ▼ that locks where the block would land, and the one-slot
+ * sideways buffer C3 added. Every one of those is a rule a scripted player can be beaten by, and
  * a harness that ignored them would be measuring a game nobody plays.
  *
  * Events at the same instant resolve player input first, then the drop timer,
@@ -142,10 +133,19 @@ object DropClock {
      * cannot depend on because that module is Compose. The numbers matter for
      * two things: the wall clock a run takes, and whether the resolution lasted
      * long enough for the player to have queued the buffered move.
+     *
+     * **The second one is why the hard drop bonus is worth zero here.** It is a
+     * step only a hard-dropped block produces, so giving it any hold at all would
+     * make a hard-dropped resolution longer than a timer-placed one, flip the
+     * buffered move on the block after it, and let the drop control change where
+     * the *next* block lands. L40 says it cannot, and that is not a claim to
+     * defend by accident.
      */
     fun resolutionMillis(transcript: Transcript): Long = transcript.steps.sumOf { step ->
         when (step) {
             is ResolutionStep.Burst -> BURST_MILLIS
+            is ResolutionStep.HardDropBonus -> NO_BEAT_MILLIS
+
             is ResolutionStep.Survival,
             is ResolutionStep.LevelUp,
             -> SCORE_ONLY_MILLIS
@@ -205,18 +205,9 @@ object DropClock {
                     if (block.cell.col == target) {
                         if (slack < 0) slack = restingMillis(current, fallMillis)
                         when (profile.finish) {
-                            Finish.NUDGE -> {
+                            Finish.HARD_DROP -> {
                                 placement = Placement.PLAYER
-                                current = Cascade.apply(current, Input.Nudge).state
-                                lockAt = armLock(current, lockAt, now)
-                                nextInput = now + profile.tapMillis
-                            }
-
-                            Finish.SOFT_DROP -> {
-                                placement = Placement.PLAYER
-                                interval = config.speed.softDropMsPerRow.toLong()
-                                nextTick = minOf(nextTick, now + interval)
-                                nextInput = NEVER
+                                finished = Cascade.apply(current, Input.Lock)
                             }
 
                             Finish.WAIT -> nextInput = NEVER
@@ -306,22 +297,8 @@ object DropClock {
 
     private fun stepToward(from: Int, to: Int): Input = if (to > from) Input.MoveRight else Input.MoveLeft
 
-    /**
-     * The ViewModel's half of the nudge: a ▼ that leaves the block resting starts
-     * the lock delay rather than waiting for the next drop tick to notice.
-     *
-     * Without this the harness would charge a nudging player up to a whole tick
-     * of dead time on the last press of every drop, which at level 1 is half a
-     * second and is exactly the number C1e is trying to measure.
-     */
-    private fun armLock(state: GameState, lockAt: Long, now: Long): Long {
-        if (lockAt != NEVER) return lockAt
-        val falling = state.falling ?: return lockAt
-        if (state.board.isEmpty(falling.cell + Direction.DOWN)) return lockAt
-        return now + LOCK_DELAY_MILLIS
-    }
-
     private const val CASCADE_STEP_MILLIS = 150
     private const val BURST_MILLIS = 420
     private const val SCORE_ONLY_MILLIS = 60
+    private const val NO_BEAT_MILLIS = 0
 }

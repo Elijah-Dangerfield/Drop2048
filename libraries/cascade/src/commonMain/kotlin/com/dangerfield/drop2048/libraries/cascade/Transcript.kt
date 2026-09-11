@@ -18,9 +18,9 @@ enum class MergeKind { VALUE, WILDCARD }
  * are not part of a cascade (survival, level up) carry step 0, which is also
  * what the audio pitch in SPEC 9 keys off — step 0 is "no pitch offset".
  *
- * There is no input-driven step left. `HardDropBonus` was the only one, and
- * decision D11 removed both the input and the award; see [Scoring] for why the
- * ▼ nudge did not inherit it.
+ * [HardDropBonus] is the one step that pays for something the player did rather
+ * than for something the board did. Decision D11 removed it with hard drop; D21
+ * brought both back. See [Scoring] for the argument.
  */
 @Serializable
 sealed interface ResolutionStep {
@@ -92,6 +92,24 @@ sealed interface ResolutionStep {
         val moves: List<BlockMove>,
     ) : ResolutionStep {
         override val points: Int get() = 0
+    }
+
+    /**
+     * SPEC 7's hard drop bonus, reinstated by decision D21 along with the input
+     * it pays for. [rows] is how far the block fell when the player committed,
+     * and it is carried rather than derived because the board this step describes
+     * is gone by the time anything downstream reads the transcript.
+     *
+     * Only ever emitted when [rows] is positive, so a lock that happens because
+     * the lock delay expired on a resting block scores nothing.
+     */
+    @Serializable
+    @SerialName("hardDrop")
+    data class HardDropBonus(
+        val rows: Int,
+        override val points: Int,
+    ) : ResolutionStep {
+        override val step: Int get() = 0
     }
 
     @Serializable

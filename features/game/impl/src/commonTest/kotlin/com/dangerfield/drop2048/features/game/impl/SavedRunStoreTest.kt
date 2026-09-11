@@ -100,6 +100,39 @@ class SavedRunStoreTest {
     }
 
     /**
+     * The same upgrade path one release later: someone has the nudge build
+     * installed with a run in progress and takes the D21 update.
+     *
+     * This blob is the dangerous shape rather than the obviously broken one. It
+     * is a **version 4 `SavedRun`** whose `EngineConfig` carries `nudgeRows` and
+     * `speed.softDropMsPerRow` and does not carry `scoring.hardDropPerRow`. With
+     * `ignoreUnknownKeys` it decodes perfectly: the two dead keys are dropped and
+     * the new one takes its compiled-in default, so the run would resume under a
+     * scoring table it was never played under with nothing on screen to say so.
+     * Only the version number can catch it.
+     *
+     * Positive control (L35), and it is the whole point of the test: the same
+     * bytes are loaded again with **only** the version changed from 4 to 5, and
+     * that one must resume with its score intact. Without it this would pass on
+     * any malformed field and prove only that something was wrong with the blob.
+     */
+    @Test
+    fun aBlobFromTheNudgeBuildIsRefusedRatherThanResumed() = runTest {
+        val cache = FakeAppCache(AppData(savedRun = NUDGE_ERA_BLOB))
+
+        assertNull(
+            AppCacheSavedRunStore(cache).load(GameMode.ENDLESS),
+            "a run saved under the nudge's scoring table was resumed under D21's",
+        )
+
+        val current = NUDGE_ERA_BLOB.replaceFirst("\"version\":4", "\"version\":$SAVE_FORMAT_VERSION")
+        val resumed = AppCacheSavedRunStore(FakeAppCache(AppData(savedRun = current))).load(GameMode.ENDLESS)
+
+        assertNotNull(resumed, "the blob is well-formed old data, not garbage")
+        assertEquals(3_050L, resumed.state.score, "and the version is the only thing that refused it")
+    }
+
+    /**
      * The bug the second slot exists for, stated as the sequence that produced
      * it: play the Daily, wander off, start an Endless run.
      *
@@ -196,6 +229,32 @@ class SavedRunStoreTest {
             "\"status\":\"PLAYING\",\"inDanger\":false}," +
             "\"tally\":{\"merges\":12,\"bursts\":0,\"longestCascade\":3,\"highestTier\":64," +
             "\"playedMs\":91000},\"seed\":99,\"mode\":\"ENDLESS\"}"
+
+        /**
+         * A version 4 `SavedRun` with the nudge era's `EngineConfig` in it.
+         *
+         * Trimmed to the keys that changed — a real blob spells out the whole
+         * spawn table and speed curve, and every field elided here has a default
+         * that decodes to the same value the shipping build wrote. What is *not*
+         * trimmed is the point: `nudgeRows` and `speed.softDropMsPerRow` are keys
+         * this build no longer has, and `scoring.hardDropPerRow` is one it now
+         * needs. The blob decodes cleanly regardless, which is why the version
+         * has to be the thing that stops it.
+         */
+        const val NUDGE_ERA_BLOB = "{\"version\":4,\"state\":{" +
+            "\"config\":{\"nudgeRows\":2,\"speed\":{\"softDropMsPerRow\":40}}," +
+            "\"board\":{\"cols\":5,\"rows\":8,\"cells\":[" +
+            "null,null,null,null,null,null,null,null,null,null,null,null,null,null," +
+            "null,null,null,null,null,null,null,null,null,null,null,null,null,null," +
+            "null,null,null,null,null,null,null,{\"type\":\"number\",\"value\":\"V8\"}," +
+            "{\"type\":\"number\",\"value\":\"V2\"},null,null,null]}," +
+            "\"falling\":{\"block\":{\"type\":\"number\",\"value\":\"V4\"}," +
+            "\"cell\":{\"col\":2,\"row\":2},\"lastDirection\":null}," +
+            "\"score\":3050,\"level\":5,\"blocksDropped\":88,\"drawsMade\":89," +
+            "\"rng\":{\"state\":-4477112233445566778},\"lastDrawWasSpecial\":false," +
+            "\"status\":\"PLAYING\",\"inDanger\":false}," +
+            "\"tally\":{\"merges\":41,\"bursts\":1,\"longestCascade\":4,\"highestTier\":256," +
+            "\"playedMs\":204000},\"seed\":4242,\"mode\":\"ENDLESS\"}"
     }
 
     private fun midCascadeSnapshot(): SavedRun {

@@ -10,9 +10,7 @@ import com.dangerfield.drop2048.libraries.gameconfig.BlocksPerLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BombFirstLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BombPerMille
 import com.dangerfield.drop2048.libraries.gameconfig.BoardRows
-import com.dangerfield.drop2048.libraries.gameconfig.NudgeRows
 import com.dangerfield.drop2048.libraries.gameconfig.RemoteEngineConfig
-import com.dangerfield.drop2048.libraries.gameconfig.SoftDropMsPerRow
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnCapDivisor
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnTableValue
 import com.dangerfield.drop2048.libraries.gameconfig.SpeedCurveMsPerRow
@@ -143,8 +141,6 @@ class DailyConfigPinningTest {
             "spawn.cap.divisor" to 4,
             "speed.floorMs" to 200,
             "speed.tailStepMs" to 9,
-            "speed.softDropMsPerRow" to 20,
-            "speed.nudgeRows" to 3,
             "special.wildcard.perMille" to 500,
             "special.wildcard.firstLevel" to 1,
             "special.bomb.perMille" to 200,
@@ -177,8 +173,6 @@ private fun remoteEngineConfig(map: AppConfigMap) = RemoteEngineConfig(
     speedCurve = SpeedCurveMsPerRow(map),
     speedFloorMs = SpeedFloorMs(map),
     speedTailStepMs = SpeedTailStepMs(map),
-    softDropMsPerRow = SoftDropMsPerRow(map),
-    nudgeRows = NudgeRows(map),
     wildcardPerMille = WildcardPerMille(map),
     wildcardFirstLevel = WildcardFirstLevel(map),
     bombPerMille = BombPerMille(map),

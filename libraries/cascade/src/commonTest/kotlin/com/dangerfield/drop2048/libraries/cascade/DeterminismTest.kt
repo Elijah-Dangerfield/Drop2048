@@ -49,6 +49,24 @@ import kotlin.test.assertTrue
  * roughly six skipped rows was about 300 points of hard drop bonus, and 300 is
  * most of the 270-point fall. The rest is three fewer drops, because the run
  * plays out differently once the draw moves to spawn time.
+ *
+ * Re-pinned a **third** time, 2026-09-10, for decision D21. ▼ became a hard drop
+ * and soft drop was deleted, so `Input` lost `Nudge` and SPEC 7's
+ * `2 x rowsSkipped` bonus came back with the input that pays it. Re-derived by
+ * running the engine and reading the values out, exactly as the second re-pin
+ * was, and not by copying the "actual" out of the assertion failure (L17). Still
+ * **no recorded scores and no Daily Challenge result anywhere**, which is the
+ * only reason a third re-pin is affordable — D18 freezes `EngineConfig.Default`
+ * from the first Daily score, so this is the last cheap moment.
+ *
+ * `592 / 22 drops` became `772 / 22 drops`, and this time the arithmetic is
+ * unusually tight. The drop count, the level and every board outcome are
+ * **unchanged**, because vertical position is not an input to the engine (L40)
+ * and the only script change swapped `Nudge` for `Tick` — two controls that move
+ * the block down and nothing else. So the entire 180-point difference is the
+ * reinstated bonus: 90 skipped rows at two points, or 4.1 rows a drop across 22
+ * drops, which is what a script that locks from wherever it happens to be should
+ * average on an eight-row board.
  */
 class DeterminismTest {
 
@@ -113,10 +131,12 @@ class DeterminismTest {
      * A deliberately dumb scripted player, generated from the engine's own RNG so
      * the script needs no platform randomness of its own.
      *
-     * The weights are the pre-D11 ones with the two removed inputs replaced in
-     * place: `Hold` became `Nudge` and `HardDrop` became `Lock`. Keeping the
-     * shape of the script means the new pin is a comparable run rather than a
-     * differently-shaped one that happens to be pinned too.
+     * The weights have kept the same shape through both re-pins, with removed
+     * inputs replaced in place rather than the distribution being rewritten:
+     * `Hold` became `Nudge` in D11 and `Nudge` became `Tick` in D21, while
+     * `HardDrop` has been `Lock` throughout because D21 made that literally true
+     * again. A comparable run is what makes the arithmetic below a check on the
+     * new pin rather than a restatement of it.
      */
     private fun scriptedInputs(seed: Long, count: Int): List<Input> {
         var rng = Rng(seed)
@@ -125,8 +145,7 @@ class DeterminismTest {
             when (rng.valueIn(8)) {
                 0, 1 -> Input.MoveLeft
                 2, 3 -> Input.MoveRight
-                4 -> Input.Tick
-                5 -> Input.Nudge
+                4, 5 -> Input.Tick
                 else -> Input.Lock
             }
         }
@@ -148,9 +167,9 @@ class DeterminismTest {
         const val FNV_OFFSET = -0x340d631b7bdddcdbL
         const val FNV_PRIME = 0x100000001b3L
 
-        const val PINNED_SCORE = 592L
+        const val PINNED_SCORE = 772L
         const val PINNED_BLOCKS_DROPPED = 22
         const val PINNED_LEVEL = 2
-        const val PINNED_DIGEST = -9_016_281_694_182_991_228L
+        const val PINNED_DIGEST = 931_206_270_441_098_336L
     }
 }

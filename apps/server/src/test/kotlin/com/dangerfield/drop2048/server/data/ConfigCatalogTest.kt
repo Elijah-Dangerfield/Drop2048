@@ -28,8 +28,6 @@ class ConfigCatalogTest {
             "speed.curve",
             "speed.floorMs",
             "speed.tailStepMs",
-            "speed.softDropMsPerRow",
-            "speed.nudgeRows",
             "special.wildcard.perMille",
             "special.wildcard.firstLevel",
             "special.bomb.perMille",

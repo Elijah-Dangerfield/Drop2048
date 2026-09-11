@@ -36,7 +36,6 @@ object Cascade {
             Input.Tick -> tick(state, falling)
             Input.MoveLeft -> move(state, falling, Direction.LEFT)
             Input.MoveRight -> move(state, falling, Direction.RIGHT)
-            Input.Nudge -> nudge(state, falling)
             Input.Lock -> lock(state, falling)
         }
     }
@@ -87,24 +86,6 @@ object Cascade {
     }
 
     /**
-     * The ▼ control (decision D11): [EngineConfig.nudgeRows] ticks, applied in
-     * one transition, stopping the moment the cell below is occupied.
-     *
-     * It scores nothing and locks nothing. Everything about the fall that is not
-     * one row of gravity — the lock delay, the drop timer, whether ▼ was tapped
-     * or flicked — is still the ViewModel's, exactly as it was for [Tick].
-     */
-    private fun nudge(state: GameState, falling: FallingBlock): Transition {
-        var cell = falling.cell
-        repeat(state.config.nudgeRows) {
-            val below = cell + Direction.DOWN
-            if (!state.board.isEmpty(below)) return Transition(state.copy(falling = falling.copy(cell = cell)))
-            cell = below
-        }
-        return Transition(state.copy(falling = falling.copy(cell = cell)))
-    }
-
-    /**
      * Place the block, resolve, score, advance the level, then check for stacked
      * out and spawn the next block.
      *
@@ -113,14 +94,27 @@ object Cascade {
      * a full column therefore lands in row 0, resolution runs, and the run ends
      * only if row 0 is still occupied afterwards — no special case (SPEC 6,
      * SPEC 18.12).
+     *
+     * The rows the block skipped on the way down are what SPEC 7's hard drop
+     * bonus pays for (decision D21). A lock the player did not hurry skips none
+     * of them and the step is not emitted at all, so the bonus cannot pay for the
+     * lock delay expiring — it only ever pays for ▼.
      */
     private fun lock(state: GameState, falling: FallingBlock): Transition {
         val config = state.config
-        val cell = Cell(falling.cell.col, state.board.landingRow(falling.cell.col, falling.cell.row))
+        val landingRow = state.board.landingRow(falling.cell.col, falling.cell.row)
+        val cell = Cell(falling.cell.col, landingRow)
         val placed = state.board.with(cell, falling.block)
         val resolution = Resolver.resolve(placed, listOf(Seed(cell, falling.lastDirection)), config)
 
         val steps = mutableListOf<ResolutionStep>()
+        val rowsSkipped = landingRow - falling.cell.row
+        if (rowsSkipped > 0) {
+            steps += ResolutionStep.HardDropBonus(
+                rows = rowsSkipped,
+                points = config.scoring.hardDropPerRow * rowsSkipped,
+            )
+        }
         steps += resolution.steps
 
         val boardCleared = resolution.board.isClear

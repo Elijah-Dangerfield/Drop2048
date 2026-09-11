@@ -50,15 +50,22 @@ class TutorialTest : CoroutineTest() {
         }
     }
 
+    /**
+     * Decision D21 collapsed drop 1's two ▼ beats into one, because there is no
+     * "press it again" left to ask for: the first press finishes the drop. The
+     * steer beat still hands over to the drop beat, and the drop beat is the one
+     * that lights the control.
+     */
     @Test
-    fun firstDrop_teachesSteeringThenTheNudge() = runUnitTest {
+    fun firstDrop_teachesSteeringThenTheDrop() = runUnitTest {
         playing(teach = true, pressPlay = false) {
             act(GameAction.MoveLeft)
-            assertEquals(TutorialStep.FirstNudge, state.tutorial?.step)
-            assertEquals(TutorialFocus.Nudge, state.tutorial?.focus)
+            assertEquals(TutorialStep.FirstDrop, state.tutorial?.step)
+            assertEquals(TutorialFocus.Drop, state.tutorial?.focus)
 
-            act(GameAction.Nudge)
-            assertEquals(TutorialStep.KeepNudging, state.tutorial?.step)
+            land()
+            waitOutResolution()
+            assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
         }
     }
 
@@ -185,7 +192,7 @@ class TutorialTest : CoroutineTest() {
      * once the card is answered.
      */
     @Test
-    fun nudgingUnderACard_doesNotStrandTheScript() = runUnitTest {
+    fun pressingDropUnderACard_doesNotStrandTheScript() = runUnitTest {
         playing(teach = true, pressPlay = false) {
             playDrop(TutorialStep.Steer)
             act(GameAction.TutorialAdvance)
@@ -197,8 +204,7 @@ class TutorialTest : CoroutineTest() {
             val board = state.board
             val falling = state.falling
 
-            repeat(TrampleNudges) { act(GameAction.Nudge) }
-            waitOutLockDelay()
+            repeat(TrampleDrops) { land() }
             waitOutResolution()
 
             assertEquals(TutorialStep.WatchThis, state.tutorial?.step, "the card is still asking")
@@ -329,7 +335,7 @@ class TutorialTest : CoroutineTest() {
  * [expected] is asserted before the drop rather than after, so a script that
  * reorders itself fails on the step that moved instead of three assertions later.
  */
-private const val TrampleNudges = 12
+private const val TrampleDrops = 12
 
 private fun GameScenario.playDrop(expected: TutorialStep) {
     assertEquals(expected, state.tutorial?.step, "the beat the board is waiting on")

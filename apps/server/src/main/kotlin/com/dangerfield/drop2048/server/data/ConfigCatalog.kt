@@ -84,17 +84,6 @@ object ConfigCatalog {
             default = 2,
             description = "Milliseconds shaved per level past the end of the curve, down to the floor.",
         ),
-        int(
-            path = "speed.softDropMsPerRow",
-            default = 40,
-            description = "Soft drop interval, flat at every level (SPEC 5.5).",
-        ),
-        int(
-            path = "speed.nudgeRows",
-            default = 2,
-            description = "Rows one ▼ press is worth. Measured digest-free (L40): vertical position is not an " +
-                "engine input, so this is a free live knob.",
-        ),
         int("special.wildcard.perMille", 30, "Wildcard spawn rate in per-mille. 30 = 3% (SPEC 5.2)."),
         int("special.wildcard.firstLevel", 5, "Level Wildcards start appearing at (SPEC 5.2)."),
         int("special.bomb.perMille", 30, "Bomb spawn rate in per-mille. 30 = 3% (SPEC 5.2)."),

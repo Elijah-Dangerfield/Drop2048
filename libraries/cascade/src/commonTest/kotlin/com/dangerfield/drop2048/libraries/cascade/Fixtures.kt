@@ -81,9 +81,10 @@ internal fun resolve(
  * transition.
  *
  * [Input.Lock] locks at the block's *landing* cell, so this places it at the
- * bottom of the column without a test having to tick it down eight times. It is
- * what `Input.HardDrop` used to do here, minus the bonus that decision D11
- * removed.
+ * bottom of the column without a test having to tick it down eight times. Since
+ * decision D21 it is also literally what the player's ▼ does, **including** the
+ * hard drop bonus — a drop from row 0 skips rows, so the transcripts these
+ * produce carry a `HardDropBonus` step.
  */
 internal fun drop(
     state: GameState,

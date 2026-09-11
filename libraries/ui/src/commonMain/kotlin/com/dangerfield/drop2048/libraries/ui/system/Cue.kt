@@ -32,15 +32,13 @@ data class Cue(
         val Move = Cue(Sound.Move, HapticIntensity.Light)
 
         /**
-         * ▼, or the downward flick.
+         * ▼, or the downward flick (decision D21).
          *
-         * Its own sample rather than [Move]'s, which is what SPEC 9 asks for:
-         * they are both "very short click" and they are two different things, and
-         * a player who cannot hear the difference cannot hear that the nudge
-         * registered when the block was already against a wall.
+         * Heavier than [Move] and heavier than [Lock], because it is the one
+         * input in the game the player cannot take back. It sounds at the moment
+         * of the press; the softer [Lock] still sounds under the landing it
+         * caused, so a hard drop is two beats and a lock delay expiring is one.
          */
-        val Nudge = Cue(Sound.Nudge, HapticIntensity.Light)
-
         val HardDrop = Cue(Sound.HardDrop, HapticIntensity.Medium)
 
         val Lock = Cue(Sound.Lock, HapticIntensity.Light)
@@ -106,7 +104,6 @@ data class Cue(
 enum class Sound(val key: String) {
     Spawn("spawn"),
     Move("move"),
-    Nudge("nudge"),
     HardDrop("hard_drop"),
     Lock("lock"),
     Merge("merge"),

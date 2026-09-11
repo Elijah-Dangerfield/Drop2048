@@ -155,34 +155,6 @@ class SpeedTailStepMs(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap)
     override val default = SpeedCurve.DEFAULT_TAIL_STEP
 }
 
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class SoftDropMsPerRow(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Soft drop (ms per row)"
-    override val description = "Flat at every level (SPEC 5.5)."
-    override val path = "speed.softDropMsPerRow"
-    override val default = SpeedCurve.DEFAULT_SOFT_DROP
-}
-
-/**
- * How many rows one press of ▼ is worth (D11), and a genuinely free live knob.
- *
- * L40 measured it digest-free rather than reasoning about it: `Input.Lock`
- * places at the block's *landing* cell, so the vertical position a nudge left it
- * at is not an input to anything the engine records. A drop control decides when
- * a block locks and never where.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class NudgeRows(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Nudge rows"
-    override val description = "Rows one ▼ press is worth. Digest-free (L40): swept 1-4 in C1e and left at 2."
-    override val path = "speed.nudgeRows"
-    override val default = EngineConfig.DEFAULT_NUDGE_ROWS
-}
-
 /**
  * SPEC 5.2's three specials, per type, as SPEC 10 asks.
  *

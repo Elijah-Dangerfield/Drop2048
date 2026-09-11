@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 /**
  * The input alphabet and the state around a drop: movement, ticking, the ▼
- * nudge, level advancement, and the danger state.
+ * hard drop, level advancement, and the danger state.
  *
  * NOT covered here: the drop timer, the lock delay and transcript playback.
  * Those are the ViewModel's (C3) — the engine has no idea time exists.
@@ -49,42 +49,37 @@ class GameFlowTest {
         assertTrue(atWall.events.contains(GameEvent.Rejected(RejectionReason.MOVE_BLOCKED)))
     }
 
-    /** Decision D11: two ticks in one input, and nothing else. */
+    /** Decision D21: ▼ sends the block to the floor of its column and locks it. */
     @Test
-    fun nudgeAdvancesTheFallByTwoRowsAndScoresNothing() {
+    fun aHardDropFromTheSpawnRowLandsOnTheFloorAndEndsTheDrop() {
         val start = Cascade.newGame(seed = 4)
-        val nudged = Cascade.apply(start, Input.Nudge)
+        val dropped = Cascade.apply(start, Input.Lock)
 
-        assertEquals(Cell(2, EngineConfig.DEFAULT_NUDGE_ROWS), nudged.state.falling?.cell)
-        assertEquals(0L, nudged.state.score)
-        assertTrue(nudged.transcript.isEmpty, "a nudge is not a scoring event")
-        assertEquals(start.board, nudged.state.board, "a nudge places nothing")
-        assertEquals(start.blocksDropped, nudged.state.blocksDropped)
+        assertEquals(
+            start.falling?.block,
+            dropped.state.board[Cell(2, EngineConfig.DEFAULT_ROWS - 1)],
+            "the block the player committed is on the floor",
+        )
+        assertEquals(start.blocksDropped + 1, dropped.state.blocksDropped)
+        assertEquals(Cell(2, 0), dropped.state.falling?.cell, "and the next block has spawned")
     }
 
     /**
-     * The nudge is an accelerator, so it stops against the stack rather than
-     * pushing through it or locking on contact. A player leaning on ▼ over a
-     * resting block is not doing anything the engine should refuse.
+     * A block already resting on the stack skips no rows, so the same input that
+     * pays a bonus from row 0 pays nothing here. That is what keeps the bonus
+     * attached to the *decision* rather than to the lock delay expiring.
      */
     @Test
-    fun nudgeStopsShortOfWhatIsUnderneathAndIsNeverRejected() {
-        val state = stateOf(boardOf("S S S S S"), FallingBlock(value(2), Cell(2, 5)))
+    fun lockingARestingBlockPaysNoHardDropBonus() {
+        val state = stateOf(boardOf("S S S S S"), FallingBlock(value(2), Cell(2, 6)))
 
-        val once = Cascade.apply(state, Input.Nudge)
-        assertEquals(Cell(2, 6), once.state.falling?.cell, "one row of room, one row taken")
+        val locked = Cascade.apply(state, Input.Lock)
 
-        val again = Cascade.apply(once.state, Input.Nudge)
-        assertEquals(once.state, again.state, "a nudge with nowhere to go changes nothing")
-        assertTrue(!again.isRejected, "and it is not an error")
-    }
-
-    /** The rows a nudge is worth are configurable, because C1e has to sweep them. */
-    @Test
-    fun nudgeRowsComesFromTheConfigThatTravelsWithTheRun() {
-        val brisk = Cascade.newGame(seed = 5, EngineConfig.Default.copy(nudgeRows = 4))
-
-        assertEquals(Cell(2, 4), Cascade.apply(brisk, Input.Nudge).state.falling?.cell)
+        assertEquals(
+            emptyList(),
+            locked.transcript.steps.filterIsInstance<ResolutionStep.HardDropBonus>(),
+            "a block with nowhere left to fall was paid for falling",
+        )
     }
 
     @Test
@@ -124,7 +119,7 @@ class GameFlowTest {
     fun onceTheRunIsOverEveryInputIsRefused() {
         val over = stateOf(Board.empty(5, 8)).copy(status = RunStatus.STACKED_OUT)
 
-        listOf(Input.Tick, Input.MoveLeft, Input.MoveRight, Input.Nudge, Input.Lock).forEach { input ->
+        listOf(Input.Tick, Input.MoveLeft, Input.MoveRight, Input.Lock).forEach { input ->
             val transition = Cascade.apply(over, input)
             assertEquals(over, transition.state)
             assertTrue(transition.events.contains(GameEvent.Rejected(RejectionReason.RUN_OVER)))

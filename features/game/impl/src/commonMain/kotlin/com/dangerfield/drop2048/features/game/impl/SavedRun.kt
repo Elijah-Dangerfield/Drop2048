@@ -112,6 +112,16 @@ data class SavedRun(
 )
 
 /**
+ * 5 — decision D21 changed `EngineConfig`, which travels inside `GameState`.
+ *
+ * `nudgeRows` and `speed.softDropMsPerRow` are gone and `scoring.hardDropPerRow`
+ * has arrived. A version 4 blob is not garbage — with `ignoreUnknownKeys` it
+ * would decode perfectly, drop the two retired keys and take the compiled-in
+ * default for the new one — and that is exactly the failure worth refusing: the
+ * run would come back under a scoring table it was not played under, with
+ * nothing on screen to say so. `aBlobFromTheNudgeBuildIsRefusedRatherThanResumed`
+ * carries the real bytes and its own positive control (L35).
+ *
  * 4 — C3c split the one save slot in two, one per [GameMode].
  *
  * [SavedRun] itself did not change shape, and this is bumped anyway because the
@@ -135,4 +145,4 @@ data class SavedRun(
  * `GameState`. Version 1 is the shape C4 shipped, which had no version field at
  * all and is therefore rejected by failing to decode.
  */
-const val SAVE_FORMAT_VERSION = 4
+const val SAVE_FORMAT_VERSION = 5

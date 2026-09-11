@@ -65,6 +65,7 @@ data class RunFacts(
 
                 is ResolutionStep.Detonation,
                 is ResolutionStep.Gravity,
+                is ResolutionStep.HardDropBonus,
                 is ResolutionStep.LevelUp,
                 is ResolutionStep.Survival,
                 -> Unit

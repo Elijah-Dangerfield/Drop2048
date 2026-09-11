@@ -76,12 +76,12 @@ class ClockStats(
  *
  * Both are kept because the gap between them is the measurement.
  *
- * **C1e must re-run everything here.** Decision D11 removed hard drop, and C1c
- * measured that whether hard drop was used was the single biggest lever on the
- * opening — level 4 in 34s against 289s. Every clocked number this harness has
- * produced was measured in a game where one tap ended a fall, and none of them
- * carry over. The clock-free numbers do carry over, because placement is
- * unchanged; only the wall clock moved.
+ * **Decision D21 put hard drop back and the clocked numbers return to the column
+ * C1e already published** — level 4 in ~33s for a player who uses ▼. No balance
+ * pass was re-run for it, and that is not a shortcut: L40 measured that a drop
+ * control moves the wall clock and leaves every outcome column identical to the
+ * digit, because `Input.Lock` places at the landing cell whichever control asked
+ * for it. The finish model changed; what it produces did not.
  *
  * The stale-cap counter is gone with the same ruling: the board-aware cap now
  * reads the board at spawn, so the quantity L20 measured at 0.02-0.04% is

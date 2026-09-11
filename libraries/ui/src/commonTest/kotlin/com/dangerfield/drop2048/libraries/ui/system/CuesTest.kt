@@ -129,7 +129,7 @@ class CuesTest {
         val cues = Cues(RecordingHapticEngine(), sounds, HapticsSetting.Strong, time)
 
         repeat(5) {
-            cues.play(Cue.Nudge)
+            cues.play(Cue.Move)
             time += HumanTapInterval
         }
 

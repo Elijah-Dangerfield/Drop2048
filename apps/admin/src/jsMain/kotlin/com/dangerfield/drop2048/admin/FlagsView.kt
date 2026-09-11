@@ -214,7 +214,7 @@ private fun FlagDetail(
             Text(
                 "Changing this moves the determinism digest: every Daily Challenge score and every " +
                     "seed-attached bug report recorded under the old value replays as a different run. " +
-                    "The speed curve, the nudge and the spawn table were all measured safe to change live — " +
+                    "The speed curve and the spawn table were both measured safe to change live — " +
                     "this one was measured not to be.",
             )
         }

@@ -7,7 +7,6 @@ import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
 import com.dangerfield.drop2048.libraries.cascade.Cell
-import com.dangerfield.drop2048.libraries.cascade.Direction
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -149,25 +148,24 @@ internal class GameScenario private constructor(
     fun waitOutLockDelay() = advance(LockDelayMillis + 1)
 
     /**
-     * Put the falling block down, the way a player has to since decision D11.
+     * Put the falling block down, the way a player does since decision D21: one
+     * press of ▼.
      *
-     * There is no one-press drop any more, so this taps ▼ until the block is
-     * resting and then lets the lock delay run out. It advances **no** drop
-     * ticks, which matters for the same reason L31 does: `tick()` moves a whole
-     * drop interval, and a test that reaches for it to land a block ends up
-     * asserting about the block after the one it meant.
+     * It advances **no** drop ticks and waits out no lock delay, because a hard
+     * drop needs neither. That matters for the same reason L31 does: `tick()`
+     * moves a whole drop interval, and a test that reaches for it to land a block
+     * ends up asserting about the block after the one it meant.
      *
-     * A nudge into a blocked cell is a no-op, so a block that cannot fall at all
-     * — the stacked-out cases — simply arms the lock on the first press.
+     * What it does advance is the travel: the block is published at its landing
+     * cell and held for [HardDropTravelMillis] so the tile falls rather than
+     * teleporting, and the lock is on the other side of that.
      */
     fun land() {
-        var presses = 0
-        while (presses++ <= state.board.rows) {
-            act(GameAction.Nudge)
-            val falling = viewModel.state.falling ?: break
-            if (!viewModel.state.board.isEmpty(falling.cell + Direction.DOWN)) break
-        }
-        waitOutLockDelay()
+        act(GameAction.HardDrop)
+        // Only while the block still has somewhere to fall. A block that spawns
+        // with no room locks on the press, and advancing past that would eat the
+        // first frames of the resolution the caller is about to assert on.
+        if (viewModel.state.phase == GamePhase.Playing) advance(HardDropTravelMillis)
     }
 
     /**
@@ -212,6 +210,9 @@ internal class GameScenario private constructor(
 
     companion object {
         const val LockDelayMillis = 150L
+
+        /** `Motion.HardDropMillis`, plus enough to be past it. */
+        const val HardDropTravelMillis = 91L
 
         /** Comfortably longer than any transcript a five-wide board can produce. */
         private const val ResolutionBudgetMillis = 10_000L

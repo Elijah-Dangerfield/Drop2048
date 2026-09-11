@@ -12,9 +12,7 @@ import com.dangerfield.drop2048.libraries.gameconfig.BlocksPerLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BoardRows
 import com.dangerfield.drop2048.libraries.gameconfig.BombFirstLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BombPerMille
-import com.dangerfield.drop2048.libraries.gameconfig.NudgeRows
 import com.dangerfield.drop2048.libraries.gameconfig.RemoteEngineConfig
-import com.dangerfield.drop2048.libraries.gameconfig.SoftDropMsPerRow
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnCapDivisor
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnTableValue
 import com.dangerfield.drop2048.libraries.gameconfig.SpeedCurveMsPerRow
@@ -162,8 +160,6 @@ private fun defaultEngineConfig() = RemoteEngineConfig(
     speedCurve = SpeedCurveMsPerRow(EmptyConfigMap),
     speedFloorMs = SpeedFloorMs(EmptyConfigMap),
     speedTailStepMs = SpeedTailStepMs(EmptyConfigMap),
-    softDropMsPerRow = SoftDropMsPerRow(EmptyConfigMap),
-    nudgeRows = NudgeRows(EmptyConfigMap),
     wildcardPerMille = WildcardPerMille(EmptyConfigMap),
     wildcardFirstLevel = WildcardFirstLevel(EmptyConfigMap),
     bombPerMille = BombPerMille(EmptyConfigMap),

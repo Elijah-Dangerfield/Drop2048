@@ -24,7 +24,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C1d · Cut hard drop and hold, add nudge | **DONE** | Digest re-pinned a 2nd time. See D13, L35-L37 |
 | C1e · Re-measure pacing without hard drop | **DONE** | `6bfdb2c`. No change needed. See L40-L42 |
 | C3b · Game screen to handoff fidelity | **DONE** | 11 goldens. See D16, D17, L43-L45 |
-| D21 · ▼ becomes a hard drop | **IN PROGRESS** | Owner ruling from play. Digest moves a 3rd time |
+| D21 · ▼ becomes a hard drop | **DONE** | Digest re-pinned a 3rd time. Save format 5. See L64 |
 | C3c · One product + player bugs | **DONE** | `e049f95`. Dark design system (D20). Found L56 |
 | C3a · Feel + polish | **DONE** | `1e1959a`. Cascade re-paced (L58). Haptics fired (L59) |
 | C12 · Debug menu | **DONE** | `d47bb2e`. First Room tests ever (L61). See L62-L63 |
@@ -416,7 +416,12 @@ Rejected: Nunito ExtraBold for the score (tabular in effect, but costs the most 
 the game its Fredoka character), and a `tnum`-patched Fredoka (correct, but a font build pipeline
 for one number).
 
-### D13 · The ▼ nudge pays no score
+### D13 · The ▼ nudge pays no score — **superseded by D21**
+
+D21 put hard drop back and the bonus with it. The reasoning below was right about the nudge and is
+kept because it is *why* the bonus is defensible now: it was always paying for commitment, and the
+input it pays now is one. The guard the last paragraph describes survived under a new name,
+`noTouchOfTheBoardScoresAnything`.
 
 SPEC 7's hard drop bonus is struck rather than transferred. C1d's argument, and it is a good one:
 
@@ -468,7 +473,7 @@ burst scoring, its 5x7 board, and "no backend, no accounts, no network".
 **5x8 stands.** Board dimensions are gameplay, and C3 settled it on a device with a measurement
 (L25) rather than by taste. `board.rows` remains a remote key.
 
-### D11 · Next preview, hold slot and hard drop are cut. The ▼ nudge replaces hard drop.
+### D11 · Next preview, hold slot and hard drop are cut. The ▼ nudge replaces hard drop. — **hard-drop half superseded by D21**
 
 Owner ruling. The handoff says all three "were tried and cut. Don't reintroduce them." This is an
 *interaction* change, so the handoff governs.
@@ -621,6 +626,30 @@ that *something* was wrong with the blob, not that the version check is what cau
 
 The same shape applies anywhere a test asserts a refusal: prove the refusal is caused by the thing
 you think, by changing only that thing and watching it pass.
+
+### L64 · A playback hold is an input to the balance model, so a new one can move the game
+
+D21 added `ResolutionStep.HardDropBonus` and gave it the obvious 60ms score-only hold, the same one
+survival and level-up get. `theDropControlChangesTheWallClockAndNothingElse` then failed on one seed
+in forty: 319 drops against 320, from a board that diverged on drop 312.
+
+The chain is three steps long and none of them is in the engine. The bonus step **only exists on a
+hard-dropped block**, so a hard-dropped resolution was 60ms longer than a timer-placed one;
+`DropClock.resolutionMillis` mirrors the playback holds to decide whether the resolution lasted
+long enough for the player to have queued C3's buffered sideways move; a flipped buffer gives the
+*next* block a free sideways step, which changes what the reachability model thinks is reachable,
+which changes the column it lands in. **The drop control changed where a later block landed** —
+exactly the thing L40 says it cannot do.
+
+The fix is that the bonus gets a hold of **zero**, which is also right on its own terms: the press
+was the beat, the block is already on the floor, and a pause between the drop and its consequences
+is the opposite of what the control is for.
+
+Two general things. **A playback duration is not a cosmetic number** — this project feeds it into a
+model that decides placement, so adding a step type to the transcript is a balance change until
+proven otherwise. And **the test that caught it was a property, not an assertion about the feature
+being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
+move a block three hundred drops later.
 
 ### L61 · Room prefers a migration to a drop, so "the row survived" proves nothing
 

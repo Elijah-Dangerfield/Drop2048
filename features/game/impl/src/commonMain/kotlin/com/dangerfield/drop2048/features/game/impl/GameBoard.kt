@@ -405,7 +405,14 @@ private fun FallingBlock(
         if (still) {
             y.snapTo(target)
         } else {
-            y.animateTo(target, tween(Motion.StepDownMillis, easing = LinearEasing))
+            // One row is gravity and takes the handoff's per-step time. More than
+            // one is a hard drop (decision D21), and [Motion.HardDropMillis] is
+            // fixed however far it falls, so the thud always lands on time — a
+            // per-row descent would make a drop from row 0 take seven times as
+            // long as one from row 6.
+            val far = abs(target - y.value) > pitchPx * 1.5f
+            val millis = if (far) Motion.HardDropMillis else Motion.StepDownMillis
+            y.animateTo(target, tween(millis, easing = LinearEasing))
         }
     }
 

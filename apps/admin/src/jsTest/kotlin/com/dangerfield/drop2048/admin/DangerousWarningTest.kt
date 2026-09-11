@@ -35,8 +35,6 @@ class DangerousWarningTest {
             "speed.curve" to "[500,470,440]",
             "speed.floorMs" to "90",
             "speed.tailStepMs" to "2",
-            "speed.softDropMsPerRow" to "40",
-            "speed.nudgeRows" to "3",
             "spawn.table" to "{\"bands\":[]}",
             "spawn.cap.divisor" to "16",
             "board.rows" to "7",

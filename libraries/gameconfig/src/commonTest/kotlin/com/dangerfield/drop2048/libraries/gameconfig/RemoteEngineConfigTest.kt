@@ -27,8 +27,6 @@ class RemoteEngineConfigTest {
                     "speed.curve" to listOf(600, 550, 500),
                     "speed.floorMs" to 100,
                     "speed.tailStepMs" to 3,
-                    "speed.softDropMsPerRow" to 35,
-                    "speed.nudgeRows" to 3,
                     "special.wildcard.perMille" to 40,
                     "special.wildcard.firstLevel" to 4,
                     "special.bomb.perMille" to 20,
@@ -45,8 +43,6 @@ class RemoteEngineConfigTest {
         assertEquals(listOf(600, 550, 500), config.speed.msPerRow)
         assertEquals(100, config.speed.floorMs)
         assertEquals(3, config.speed.tailStepMs)
-        assertEquals(35, config.speed.softDropMsPerRow)
-        assertEquals(3, config.nudgeRows)
         assertEquals(
             listOf(
                 SpecialRate(Special.WILDCARD, fromLevel = 4, perMille = 40),

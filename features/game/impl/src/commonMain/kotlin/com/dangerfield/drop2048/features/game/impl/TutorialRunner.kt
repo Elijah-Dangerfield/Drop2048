@@ -49,8 +49,8 @@ class TutorialRunner(private val config: EngineConfig = EngineConfig.Default) {
      *
      * The board is frozen while this is true, and that is load-bearing rather
      * than tidy. Before C3c the ▼ control stayed live under the card, so a player
-     * who kept nudging landed the *next* scripted drop before acknowledging the
-     * card that introduces it. [stateForCurrentLesson] then had nothing to
+     * who kept pressing it landed the *next* scripted drop before acknowledging
+     * the card that introduces it. [stateForCurrentLesson] then had nothing to
      * install — the drop it wanted was already the drop on the board — and
      * `GameViewModel` nulled the falling block, leaving a beat waiting for a
      * landing that could never happen. On a frozen clock that is a permanent
@@ -118,11 +118,15 @@ class TutorialRunner(private val config: EngineConfig = EngineConfig.Default) {
      * on, not just the beat that was asking for it.
      *
      * The player is under no obligation to do the lessons in order. Drop 1 asks
-     * for a steer and then a nudge, and the block spawns in a column it can
-     * legally land in, so a player who reaches straight for ▼ never satisfies the
+     * for a steer and then for ▼, and the block spawns in a column it can legally
+     * land in, so a player who reaches straight for ▼ never satisfies the
      * steering beat — and the script would sit on it forever while the board
      * moved on without it. Anything still waiting when the drop resolves has been
      * overtaken by events.
+     *
+     * Since decision D21 that is the common case rather than the awkward one: a
+     * hard drop finishes the drop the instant it is pressed, so the steer beat is
+     * overtaken by the very next input a hurried player makes.
      *
      * A beat that waits on the card's own button is not overtaken: it is the
      * celebration *after* the landing, and it is the one thing a drop finishing

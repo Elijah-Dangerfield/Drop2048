@@ -501,7 +501,11 @@ validation this has.
 
 ---
 
-## C1d · Cut hard drop and hold, add the nudge — **DONE** (2026-09-09)
+## C1d · Cut hard drop and hold, add the nudge — **DONE** (2026-09-09), half superseded
+
+**Superseded in part by D21** (2026-09-10): the nudge is gone and ▼ is a hard drop again. The
+*hold* and *preview* halves of D11 stand. Read the section below as the record of what C1d did, not
+as a description of the game — the D21 section at the end of this file is current.
 
 Decision D11 applied to the engine and to its two consumers. Four changes, shipped as one because
 the first three each move the determinism digest and moving it three times is three chances to
@@ -549,6 +553,14 @@ and `Cue.HardDrop` is now unreferenced.
 ## C1e · Pacing re-measured without hard drop — **DONE** (2026-09-09)
 
 **Unblocked by** C1d.
+
+**Still standing after D21, and that is its own result.** Section 1 below is the reason: a drop
+control moves the wall clock and leaves every outcome column identical to the digit. So when ▼
+became a hard drop, no balance pass was re-run — the game simply returns to the hard-drop column
+this chunk already published, level 4 in ~33s. The only thing that aged out is the `nudgeRows`
+sweep in section 7, because the key is gone. The open question in section 8, **how the nudge
+feels**, was answered by the owner playing it: it did not feel like a commitment, and D21 is what
+came of that.
 
 Every clocked number in this file was measured in a game where one press ended a fall. This chunk
 re-ran all of them against the ▼ nudge and swept the three dials that were left open. **Nothing was
@@ -749,6 +761,8 @@ Two things this chunk cannot see at all. **How the nudge feels** — 88% of the 
 of the decisiveness back, and only a device answers that. And **whether players press it**: the
 entire 223s-to-56s spread is a behavioural question, and the harness models both ends rather than
 predicting which one a real player sits at.
+
+**The first of those was answered by playing it, and the answer was no.** See D21.
 
 ---
 
@@ -1042,6 +1056,55 @@ wrong, and the transcript from C1 means it is a formatter, not a new system.
 
 Icons, screenshots, store listings, privacy manifests and data-safety declarations that describe
 the app that actually exists, age rating, ATT copy, review notes for a game with no account.
+
+---
+
+## D21 · ▼ becomes a hard drop, soft drop is deleted — **DONE** (2026-09-10)
+
+Owner ruling from playing it on device. Supersedes the hard-drop half of D11 and all of D13. The
+ruling itself is in `ORCHESTRATION.md`; this is what shipped.
+
+**The engine gained no code path and lost one.** `Input.Lock` has always placed at the block's
+*landing* cell, so a hard drop is a `Lock` from mid-air and nothing else — L36's observation, now
+used in the other direction. `Input.Nudge`, `EngineConfig.nudgeRows` and
+`SpeedCurve.softDropMsPerRow` are gone, along with the two remote keys that fronted them.
+
+**SPEC 7's `2 x rowsSkipped` bonus is back**, as `ResolutionStep.HardDropBonus`, emitted only when
+the block actually skipped rows. D13's argument was that the bonus paid for commitment and a nudge
+was not one; the input that *is* one now exists again. Ceiling on a 5x8 board is 14 points a drop.
+
+**The bug this deletes.** `Modifier.softDropOnHold` was a `pointerInput` keyed on `enabled = live`.
+Hold ▼ through a landing and the resolution flipped `live` false, which re-keyed the gesture and
+tore it down mid-press, so `waitForUpOrCancellation()` was cancelled, `onEnd()` never ran, and
+`softDropping` stayed true for the rest of the run. ▼ is now a plain click: no recogniser, no
+timeout, no mode. `noInputCanLatchADropSpeed` pins the property rather than the gesture.
+
+**The downward flick survived**, and is worth more than it was: with ▼ a tap rather than a hold,
+the flick is the same one-shot commitment, so the `Drag` control scheme now loses nothing at all.
+
+**The digest moved a third time**, `592 / 22 drops` to `772 / 22 drops`, re-derived by running the
+engine (L17). Drops, level and every board outcome are unchanged — the entire 180-point difference
+is the reinstated bonus, which is the arithmetic check that the re-derivation is the right number.
+No Daily scores exist, so D18's freeze has not bitten yet and this was the last cheap moment.
+
+**`SAVE_FORMAT_VERSION` 4 → 5**, because `EngineConfig` changed shape inside `GameState`. A version
+4 blob decodes *cleanly* under `ignoreUnknownKeys` and would resume under a scoring table it was
+never played under, so the version is the only thing that can refuse it;
+`aBlobFromTheNudgeBuildIsRefusedRatherThanResumed` carries the real bytes and its own positive
+control (L35).
+
+**The tutorial kept L49's mechanism and lost a beat.** The clock is still frozen, so ▼ is still the
+only way to make progress — but one press finishes a drop, so drop 1's `FirstNudge` and
+`KeepNudging` collapsed into one `FirstDrop`. Eleven lessons, not twelve.
+
+**No balance pass was re-run**, and that is L40 rather than a shortcut: pacing returns to the
+hard-drop column C1e published, level 4 in ~33s. The harness's `Finish` model lost `NUDGE` and
+`SOFT_DROP` and gained `HARD_DROP`. One thing had to be got right for that to hold — the bonus
+step is given a **zero** playback hold, because `DropClock.resolutionMillis` mirrors those numbers
+to decide whether a resolution lasted long enough for a buffered move, and a non-zero hold would
+have let the drop control change where the *next* block landed.
+`theDropControlChangesTheWallClockAndNothingElse` caught exactly that and is the reason the number
+is zero.
 
 ---
 

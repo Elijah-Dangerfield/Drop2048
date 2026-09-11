@@ -38,6 +38,7 @@ import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
 import com.dangerfield.drop2048.libraries.sharing.ShareResult
 import com.dangerfield.drop2048.libraries.ui.system.Cue
+import com.dangerfield.drop2048.libraries.ui.system.Motion
 import com.dangerfield.drop2048.libraries.ui.system.reduced
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDate
@@ -164,7 +165,6 @@ class GameViewModel(
     private var lockJob: Job? = null
     private var playbackJob: Job? = null
 
-    private var softDropping = false
     private var lockPending = false
     private var lockResetUsed = false
 
@@ -229,9 +229,7 @@ class GameViewModel(
             GameAction.MoveLeft -> action.move(Input.MoveLeft)
             GameAction.MoveRight -> action.move(Input.MoveRight)
             is GameAction.SteerTo -> action.steerTo(action.col)
-            GameAction.Nudge -> action.nudge()
-            GameAction.SoftDropStart -> action.softDrop(on = true)
-            GameAction.SoftDropEnd -> action.softDrop(on = false)
+            GameAction.HardDrop -> action.hardDrop()
             GameAction.Pause -> action.pause()
             GameAction.Resume -> action.resume()
             GameAction.Restart -> action.restart()
@@ -361,7 +359,6 @@ class GameViewModel(
         resolutionSnapshot = null
         lockPending = false
         lockResetUsed = false
-        softDropping = false
         bufferedMove = null
         playingSince = null
         logger.logEvent("tutorial.started")
@@ -532,7 +529,6 @@ class GameViewModel(
         resolutionSnapshot = null
         lockPending = false
         lockResetUsed = false
-        softDropping = false
         bufferedMove = null
         playingSince = null
     }
@@ -704,41 +700,37 @@ class GameViewModel(
     }
 
     /**
-     * The ▼ control and the downward flick (decision D11).
+     * The ▼ control and the downward flick (decision D21): send the block to the
+     * floor of its column and lock it there.
      *
-     * Two rows and no lock, so unlike the hard drop it replaced this does **not**
-     * start a resolution. What it does have to do is arm the lock delay: without
-     * that, nudging a block onto the stack leaves it sitting there until the next
-     * drop tick notices, and at level 1 that is half a second of a block visibly
-     * resting on the pile doing nothing. That is the same arming [tick] does, and
-     * for the same reason.
+     * There is no lock delay to arm and no interval to shorten. [lock] cancels
+     * the ticker and the pending lock job itself, so a hard drop leaves **no
+     * per-drop state behind at all** — which is the whole reason D21 preferred it
+     * to fixing the hold gesture. The bug it replaces was a held "on" flag with
+     * one path out of it.
      *
-     * Deliberately not buffered during a resolution. A move that arrives mid
-     * cascade is replayed on the next block because a sideways step is cheap and
-     * recoverable; two rows of fall on a board the player has not looked at yet
-     * is not.
+     * Deliberately not buffered during a resolution, for the reason the ▼ nudge
+     * was not: a sideways step arriving mid-cascade is cheap and recoverable, and
+     * committing a block to a board the player has not looked at yet is not.
      */
-    private suspend fun GameAction.nudge() {
+    private suspend fun GameAction.hardDrop() {
         if (state.phase != GamePhase.Playing) return
         if (tutorialIsAsking) return
-        val transition = Cascade.apply(engine, Input.Nudge)
-        if (transition.isRejected) return
-        engine = transition.state
-        sendEvent(GameEffect.Play(Cue.Nudge))
-        updateState { it.published() }
-        noteTutorial(TutorialAwait.Nudged)
-
         val falling = engine.falling ?: return
-        if (!engine.board.isEmpty(falling.cell + Direction.DOWN) && !lockPending) {
-            lockPending = true
-            scheduleLock()
-        }
-    }
+        val landing = engine.landingCell ?: return
+        sendEvent(GameEffect.Play(Cue.HardDrop))
 
-    private fun GameAction.softDrop(on: Boolean) {
-        if (softDropping == on) return
-        softDropping = on
-        if (state.phase == GamePhase.Playing) restartTicker()
+        // The travel, and it has to be on screen before the lock or the tile
+        // teleports seven rows. It is published **without touching [engine]**,
+        // which is not a detail: `Input.Lock` pays SPEC 7's bonus for the rows the
+        // block skipped, and moving the engine's block to the landing cell first
+        // would make that zero on every drop. The engine stays where the player
+        // pressed; only the picture falls.
+        if (landing != falling.cell) {
+            updateState { it.published().copy(falling = falling.copy(cell = landing)) }
+            delay(reduced(Motion.HardDropMillis, reduceMotion).toLong())
+        }
+        lock()
     }
 
     private suspend fun GameAction.pause() {
@@ -1275,8 +1267,14 @@ class GameViewModel(
     }
 
     /**
-     * SPEC 5.5. Soft drop is a flat 40ms at every level rather than a multiplier,
-     * which is the line that keeps it useful at level 1 and not a cheat at 20.
+     * SPEC 5.5's drop clock, and since decision D21 it has exactly one value at a
+     * given level.
+     *
+     * There is no held mode to branch on any more. Soft drop was the only thing
+     * that made this function's answer depend on a flag, and the flag was the bug
+     * (D21): a `pointerInput` keyed on `enabled = live` tore the gesture down when
+     * the block landed, so the release callback never ran and the flag stayed set
+     * for the rest of the run. Deleting the mode deletes the class of failure.
      */
     private fun intervalMillis(): Long {
         val curve = engine.config.speed
@@ -1287,7 +1285,7 @@ class GameViewModel(
         // is not an input to the engine (L40), so overriding the interval cannot
         // change where a block lands — only how long the tester waits for it.
         debug.overrides.value.tickIntervalMs?.let { return it.toLong() }
-        return if (softDropping) curve.softDropMsPerRow.toLong() else curve.msPerRow(engine.level).toLong()
+        return curve.msPerRow(engine.level).toLong()
     }
 
     /**
@@ -1567,10 +1565,14 @@ sealed interface GameAction {
      */
     data class SteerTo(val col: Int) : GameAction
 
-    /** ▼, or a downward flick. Two rows of fall (decision D11). */
-    data object Nudge : GameAction
-    data object SoftDropStart : GameAction
-    data object SoftDropEnd : GameAction
+    /**
+     * ▼, or a downward flick: send the block to the bottom and lock it there
+     * (decision D21).
+     *
+     * One action, with no start-and-end pair to lose half of. The soft drop it
+     * replaced was two actions and a flag, and the flag is what latched.
+     */
+    data object HardDrop : GameAction
     data object Pause : GameAction
     data object Resume : GameAction
     data object Restart : GameAction

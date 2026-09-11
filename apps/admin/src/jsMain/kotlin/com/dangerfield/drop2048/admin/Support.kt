@@ -100,9 +100,7 @@ internal fun randomUuid(): String = js("crypto.randomUUID()") as String
  * ### Why `level.blocksPerLevel` is on this list and the other gameplay keys are not
  *
  * The distinction is measured, not stylistic. The speed curve is a pacing dial
- * with no effect on any outcome column (L28/D9); `speed.nudgeRows` cannot change
- * where a block lands, so it does not touch the engine's recorded state at all
- * (L40); the spawn table sets the tier ceiling and moves the median level by at
+ * with no effect on any outcome column (L28/D9); the spawn table sets the tier ceiling and moves the median level by at
  * most one (L19). All three are safe to turn live.
  *
  * `level.blocksPerLevel` feeds level advancement, so it **moves the pinned
@@ -125,8 +123,8 @@ internal fun dangerousWarning(path: String, value: String): String? {
         path in DIGEST_MOVING_PATHS ->
             "This MOVES THE DETERMINISM DIGEST. Every Daily Challenge score and every seed-attached bug " +
                 "report recorded under the old value will replay as a DIFFERENT run — silently, because it " +
-                "still replays. Only the clock behaves this way; the speed curve, the nudge and the spawn " +
-                "table were all measured safe to change live. Continue?"
+                "still replays. Only the clock behaves this way; the speed curve and the spawn table were " +
+                "both measured safe to change live. Continue?"
         else -> null
     }
 }

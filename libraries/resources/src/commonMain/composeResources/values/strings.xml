@@ -2,19 +2,19 @@
     <string name="app_name">Drop 2048</string>
 
     <!--
-        The guided run (SPEC 13). Every drop of it is landed with the nudge,
-        because the drop clock is frozen and ▼ is the only thing that moves a
-        block downward. The copy says so plainly rather than hinting.
+        The guided run (SPEC 13). Every drop of it is landed with ▼, because the
+        drop clock is frozen and ▼ is the only thing that moves a block downward.
+        The copy says so plainly rather than hinting. Since D21 one press finishes
+        a drop, so it says "drop" rather than "keep tapping".
     -->
     <string name="tutorial_steer_title">Slide it over</string>
     <string name="tutorial_steer_body">Drag anywhere on the board. The block follows your finger.</string>
-    <string name="tutorial_first_nudge_title">Bring it down</string>
-    <string name="tutorial_first_nudge_body">Nothing falls on its own. Tap ▼.</string>
-    <string name="tutorial_keep_nudging_body">Keep tapping ▼ until it lands.</string>
+    <string name="tutorial_first_drop_title">Drop it</string>
+    <string name="tutorial_first_drop_body">Nothing falls on its own. Tap ▼ and it goes straight to the bottom.</string>
     <string name="tutorial_first_merge_title">Four</string>
     <string name="tutorial_first_merge_body">Two matching numbers become one that is twice as big. That is the whole game.</string>
     <string name="tutorial_second_title">Again</string>
-    <string name="tutorial_second_body">Steer it, then ▼ all the way down.</string>
+    <string name="tutorial_second_body">Steer it, then ▼ to put it down.</string>
     <string name="tutorial_third_title">You will use ▼ a lot</string>
     <string name="tutorial_third_body">It is how you set the pace instead of waiting for one.</string>
     <string name="tutorial_watch_title">Watch this one</string>
@@ -33,10 +33,10 @@
     <string name="game_move_left">Move left</string>
     <string name="game_move_right">Move right</string>
 
-    <!-- The ▼ control (decision D11). A content description, so it says what the
-         press does rather than naming the glyph: it advances the fall, it does
-         not drop the block. -->
-    <string name="game_nudge">Speed up the fall</string>
+    <!-- The ▼ control (decision D21). A content description, so it says what the
+         press does rather than naming the glyph: it commits the block to the
+         bottom of its column, and there is no taking it back. -->
+    <string name="game_hard_drop">Drop to the bottom</string>
     <string name="game_board">Game board, %1$d columns by %2$d rows</string>
     <string name="game_falling_block">%1$s falling in column %2$d, landing in row %3$d</string>
 

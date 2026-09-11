@@ -9,9 +9,7 @@ import com.dangerfield.drop2048.libraries.gameconfig.BlocksPerLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BoardRows
 import com.dangerfield.drop2048.libraries.gameconfig.BombFirstLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BombPerMille
-import com.dangerfield.drop2048.libraries.gameconfig.NudgeRows
 import com.dangerfield.drop2048.libraries.gameconfig.RemoteEngineConfig
-import com.dangerfield.drop2048.libraries.gameconfig.SoftDropMsPerRow
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnCapDivisor
 import com.dangerfield.drop2048.libraries.gameconfig.SpawnTableValue
 import com.dangerfield.drop2048.libraries.gameconfig.SpeedCurveMsPerRow
@@ -90,7 +88,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
         assertEquals(EngineConfig.DEFAULT_ROWS, viewModel.state.board.rows)
 
         config.overrides = mapOf("board.rows" to 6)
-        viewModel.takeAction(GameAction.Nudge)
+        viewModel.takeAction(GameAction.MoveLeft)
 
         assertEquals(EngineConfig.DEFAULT_ROWS, viewModel.state.board.rows)
     }
@@ -169,8 +167,6 @@ private fun remoteEngineConfig(map: AppConfigMap) = RemoteEngineConfig(
     speedCurve = SpeedCurveMsPerRow(map),
     speedFloorMs = SpeedFloorMs(map),
     speedTailStepMs = SpeedTailStepMs(map),
-    softDropMsPerRow = SoftDropMsPerRow(map),
-    nudgeRows = NudgeRows(map),
     wildcardPerMille = WildcardPerMille(map),
     wildcardFirstLevel = WildcardFirstLevel(map),
     bombPerMille = BombPerMille(map),

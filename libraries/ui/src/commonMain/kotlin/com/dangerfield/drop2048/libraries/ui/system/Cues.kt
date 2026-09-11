@@ -47,14 +47,14 @@ class Cues(
  * Whether this cue is one of the short clicks that a fast hand can issue faster
  * than an ear can separate them.
  *
- * Move and nudge, and nothing else. Both fire once per engine column step, and a
+ * [Cue.Move], and nothing else. It fires once per engine column step, and a
  * drag across the board steps a column every frame or two: on device that is a
  * click every ~40ms, which stops sounding like steering and starts sounding like
  * a fault. Every other cue in the game is caused by a resolution step, and those
  * are paced by the playback driver.
  */
 private val Cue.chatters: Boolean
-    get() = sound == Sound.Move || sound == Sound.Nudge
+    get() = sound == Sound.Move
 
 /**
  * The floor on how close together two chattering cues may land.

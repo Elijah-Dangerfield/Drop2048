@@ -135,10 +135,10 @@ class GameSurfaceScreenshotTest : ScreenshotTest() {
             Box(Modifier.width(ControlWidth)) {
                 GameControlRow(
                     onLeft = {},
-                    onNudge = {},
+                    onDrop = {},
                     onRight = {},
                     leftDescription = "Move left",
-                    nudgeDescription = "Drop faster",
+                    dropDescription = "Drop to the bottom",
                     rightDescription = "Move right",
                 )
             }

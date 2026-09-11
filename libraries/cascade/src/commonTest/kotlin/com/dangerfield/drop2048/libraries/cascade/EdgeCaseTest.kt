@@ -209,7 +209,7 @@ class EdgeCaseTest {
         val start = Cascade.newGame(seed = 99L)
 
         assertEquals(1, start.drawsMade)
-        assertFalse(Cascade.apply(start, Input.Nudge).isRejected)
+        assertFalse(Cascade.apply(start, Input.Tick).isRejected)
         assertFalse(Cascade.apply(start, Input.MoveLeft).isRejected)
 
         val locked = Cascade.apply(start, Input.Lock)
@@ -279,7 +279,7 @@ class EdgeCaseTest {
             val input = when (chooser.valueIn(6)) {
                 0 -> Input.MoveLeft
                 1 -> Input.MoveRight
-                2 -> Input.Nudge
+                2 -> Input.Tick
                 3 -> Input.Tick
                 else -> Input.Lock
             }

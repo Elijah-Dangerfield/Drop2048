@@ -6,6 +6,58 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — ▼ is a hard drop, soft drop is deleted, and the bonus comes back with it
+
+**Decision:** D21. The ▼ control and the downward flick send the falling block to
+the bottom of its column and lock it, in one press. `Input.Nudge`,
+`EngineConfig.nudgeRows`, `SpeedCurve.softDropMsPerRow`, `GameAction.Nudge`,
+`GameAction.SoftDropStart` / `SoftDropEnd`, `Modifier.softDropOnHold` and the
+`softDropping` field are gone, along with the two remote keys that fronted them.
+SPEC 7's `2 x rowsSkipped` bonus is reinstated as `ResolutionStep.HardDropBonus`.
+
+**Why delete soft drop rather than fix it.** The reported bug was that ▼
+"triggers like a fast fall mode that's permanent". `softDropOnHold` was a
+`pointerInput` keyed on `enabled = live`; holding ▼ through a landing flipped
+`live` false, re-keyed the gesture and tore it down mid-press, so
+`waitForUpOrCancellation()` was cancelled, `onEnd()` never ran, and the flag
+stayed set with no path out but a new run.
+
+That is fixable — reset the flag on the phase change as well as at the callback.
+It was not fixed, because the *shape* is the defect: a held mode reachable by a
+recogniser that something else can re-key will strand its "on" state again the
+next time anyone builds one. A plain click has no on state to strand. The
+generalisable form is recorded as part of D21 in `ORCHESTRATION.md`: **a
+`pointerInput` keyed on a value that changes during the gesture will drop the
+release callback.**
+
+**Why the bonus returns.** D13 struck it on the argument that it paid for
+commitment and a two-tick nudge was not a commitment. That argument was correct
+and it is now an argument *for* paying: a hard drop gives up the rest of the fall
+irrevocably and can be pressed once per block, so a per-row payout rewards the
+decision rather than the tap. The ceiling on a 5x8 board is seven rows, or
+fourteen points against merges worth hundreds — a nudge toward confident play,
+not a strategy. What survives from D13 is that no *other* input scores, pinned by
+`noTouchOfTheBoardScoresAnything`.
+
+**Rejected: keeping soft drop as a separate control.** It would need its own
+button or its own gesture, and the handoff's control row has three slots. A
+second acceleration also reopens the question D21 exists to close: one input, one
+meaning.
+
+**Rejected: animating the travel by moving the engine's block first.** This was
+tried, shipped to the emulator, and caught by playing it — publishing the block at
+its landing cell *in `engine`* before `Input.Lock` makes `rowsSkipped` zero on
+every drop, so the board looks perfect and the bonus silently never fires. The
+travel is now published to the UI state only; the engine stays where the player
+pressed. `hardDrop_paysTheBonusForTheRowsThePlayerSkipped` pins it.
+
+**Accepted costs.** The determinism digest moves a third time (`592` → `772`, same
+22 drops, same level, the whole difference being the bonus) and
+`SAVE_FORMAT_VERSION` goes 4 → 5. Both are free exactly once more: no Daily score
+has ever been recorded, and D18 freezes `EngineConfig.Default` from the first one.
+
+---
+
 ## 2026-09-10 — The sample bank is one folder per platform, and a missing sample is not an error
 
 **Decision:** `SoundPlayer` now has a real engine behind it on both platforms —

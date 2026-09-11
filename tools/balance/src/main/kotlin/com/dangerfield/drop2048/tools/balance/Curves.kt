@@ -46,12 +46,11 @@ object Curves {
      * Faster than what shipped, added by C1e so the re-check of L28 has a bracket
      * on both sides of [Fast500] rather than only above it.
      *
-     * C1c only ever measured curves slower than the one it adopted, which was
-     * sound while hard drop existed: the question then was how much dead time a
-     * patient player sat through. Without hard drop the fall is a larger share of
-     * every drop for every player, so "is 500 already too fast" is a question
-     * with something at stake, and it cannot be answered by three curves that are
-     * all slower.
+     * C1c only ever measured curves slower than the one it adopted, on the
+     * question of how much dead time a patient player sat through. A bracket on
+     * both sides is worth keeping either way: the curve only ever reaches a
+     * player who is *not* using ▼, and that player is the one the opening's
+     * pacing is for.
      */
     val Fast400 = Original.copy(
         msPerRow = listOf(400, 385, 370, 355, 340, 325, 312, 300) + Original.msPerRow.drop(8)

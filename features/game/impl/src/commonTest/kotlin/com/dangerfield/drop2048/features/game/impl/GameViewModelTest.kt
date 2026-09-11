@@ -99,7 +99,7 @@ class GameViewModelTest : CoroutineTest() {
             assertPhase(GamePhase.Resolving)
 
             val boardMidCascade = state.board
-            act(GameAction.MoveLeft, GameAction.MoveRight, GameAction.Nudge)
+            act(GameAction.MoveLeft, GameAction.MoveRight, GameAction.HardDrop)
 
             assertEquals(boardMidCascade, state.board, "board moved on input during resolution")
             assertNull(state.falling, "a block was accepted during resolution")
@@ -302,9 +302,6 @@ class GameViewModelTest : CoroutineTest() {
         /** Past it from any point inside the window. */
         const val PAST_LOCK_DELAY = 160L
 
-        /** Far enough to prove the fall accelerated, far short of the block landing. */
-        const val SoftDropRows = 3
-
         /** A record no single scripted merge in these fixtures can get near. */
         const val PreviousBest = 50_000L
     }
@@ -347,83 +344,52 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     /**
-     * Advances three soft-drop rows, not one drop tick.
-     *
-     * A whole tick is twelve soft-drop rows at level 1, which is the block
-     * landing, locking, resolving and the *next* one falling — the assertion then
-     * passes for a reason that has nothing to do with soft drop, and breaks the
-     * moment the level-1 interval moves. It did, in C1c.
-     */
-    @Test
-    fun softDrop_shortensTheInterval() = runUnitTest {
-        playing(fallingAt = Cell(2, 0)) {
-            val softDropMillis = EngineConfig.Default.speed.softDropMsPerRow.toLong()
-            act(GameAction.SoftDropStart)
-            advance(softDropMillis * SoftDropRows + 1)
-
-            assertTrue(
-                state.falling!!.cell.row >= SoftDropRows,
-                "soft drop did not accelerate the fall",
-            )
-        }
-    }
-
-    /**
-     * Decision D11's ▼: two rows, no lock, no resolution.
+     * Decision D21's ▼: straight to the bottom and locked, in one press.
      *
      * Deliberately asserted **without** advancing a drop tick. L31 is the warning:
-     * `tick()` moves a whole drop interval, and at level 1 that is enough for a
-     * nudged block to land, lock, resolve and be replaced — so a nudge test built
-     * on `tick()` would be asserting about the next block, and would pass or fail
-     * on the level-1 interval rather than on the nudge.
+     * `tick()` moves a whole drop interval, so a test that reaches for it is
+     * asserting about the block after the one it meant, and passes or fails on
+     * the level-1 interval rather than on the control.
      */
     @Test
-    fun nudge_advancesTwoRowsWithoutLocking() = runUnitTest {
+    fun hardDrop_landsTheBlockAndStartsTheResolution() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
-            act(GameAction.Nudge)
+            act(GameAction.HardDrop)
+            assertFallingAt(col = 2, row = EngineConfig.DEFAULT_ROWS - 1)
 
-            assertFallingAt(col = 2, row = EngineConfig.DEFAULT_NUDGE_ROWS)
-            assertPhase(GamePhase.Playing)
-
-            act(GameAction.Nudge)
-            assertFallingAt(col = 2, row = EngineConfig.DEFAULT_NUDGE_ROWS * 2)
-            assertPhase(GamePhase.Playing)
-        }
-    }
-
-    /**
-     * The nudge is not a hard drop, and the assertion that says so is the *floor*:
-     * a block two rows above the stack takes one press, not a press and a landing.
-     */
-    @Test
-    fun nudge_intoTheStack_stopsShortAndThenLocksOnTheDelay() = runUnitTest {
-        playing(
-            picture = """
-                .  .  8  .  .
-            """,
-            fallingAt = Cell(2, 4),
-        ) {
-            act(GameAction.Nudge)
-
-            assertFallingAt(col = 2, row = 6)
-            assertPhase(GamePhase.Playing)
-
-            act(GameAction.Nudge)
-            assertFallingAt(col = 2, row = 6)
-            assertPhase(GamePhase.Playing)
-
-            waitOutLockDelay()
+            advance(GameScenario.HardDropTravelMillis)
             assertPhase(GamePhase.Resolving)
+            assertTrue(landedIn(EngineConfig.DEFAULT_ROWS - 1), "the block did not reach the floor")
         }
     }
 
     /**
-     * SPEC 6's buffer covers sideways moves only. A ▼ replayed onto the block
-     * that spawns after a cascade would drop it two rows into a board the player
-     * has not seen settle.
+     * The travel animation must not eat the bonus, which is a mistake that was
+     * made and caught by playing it rather than by a test.
+     *
+     * The tile has to be drawn falling before the lock or it teleports seven rows,
+     * and the obvious way to do that — move the engine's block to the landing cell
+     * first — makes `rowsSkipped` zero on every drop. The board looks perfect and
+     * SPEC 7's hard drop row silently never fires.
+     *
+     * Seven rows on an empty 5x8 board: 7 skipped, 14 points, plus 10 survival.
      */
     @Test
-    fun nudgeDuringResolution_isNotBuffered() = runUnitTest {
+    fun hardDrop_paysTheBonusForTheRowsThePlayerSkipped() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            land()
+            waitOutResolution()
+
+            assertEquals(24L, state.score, "the hard drop bonus did not reach the score")
+        }
+    }
+
+    /**
+     * One press, one block. The second press lands on a board that is mid-cascade
+     * and has no falling block to commit, so it does nothing.
+     */
+    @Test
+    fun hardDrop_duringItsOwnResolution_isIgnored() = runUnitTest {
         playing(
             picture = """
                 .  .  .  .  .
@@ -434,10 +400,47 @@ class GameViewModelTest : CoroutineTest() {
             land()
             assertPhase(GamePhase.Resolving)
 
-            act(GameAction.Nudge)
+            act(GameAction.HardDrop)
             waitOutResolution()
 
             assertFallingAt(col = 2, row = 0)
+        }
+    }
+
+    /**
+     * The bug decision D21 exists to delete, asserted as a property rather than
+     * as the gesture that used to cause it.
+     *
+     * `softDropOnHold` was a `pointerInput` keyed on `enabled = live`. Holding ▼
+     * through a landing flipped `live` false, which re-keyed the gesture and tore
+     * it down mid-press, so `waitForUpOrCancellation()` was cancelled, `onEnd()`
+     * never ran, and `softDropping` stayed true for the rest of the run.
+     *
+     * What has to stay true is not "the gesture releases correctly" — it is that
+     * **no input can leave the drop clock in a different mode than it found it**.
+     * So this hammers the control across a landing, a whole resolution and the
+     * block after it, and then measures the fall against the level-1 interval.
+     * If any action ever latches a speed again, this fails whatever the gesture
+     * that set it looked like.
+     */
+    @Test
+    fun noInputCanLatchADropSpeed() = runUnitTest {
+        playing(fallingAt = Cell(2, 0)) {
+            repeat(3) {
+                land()
+                waitOutResolution()
+            }
+            assertPhase(GamePhase.Playing)
+
+            val interval = EngineConfig.Default.speed.msPerRow(state.level).toLong()
+            val before = state.falling!!.cell.row
+            advance(interval + 1)
+
+            assertEquals(
+                before + 1,
+                state.falling!!.cell.row,
+                "one drop interval moved the block more than one row, so a speed mode latched",
+            )
         }
     }
 
@@ -530,18 +533,21 @@ class GameViewModelTest : CoroutineTest() {
     }
 
     /**
-     * The downward flick is the ▼ control by another gesture, so it has to be
-     * the same action — the screen maps it to [GameAction.Nudge] rather than to
-     * anything of its own. Asserting that here rather than in a gesture test is
-     * deliberate: the recogniser's thresholds are the handoff's and are pinned in
-     * `GameBoard`, but "a flick advances two rows and does not lock" is a rule.
+     * The downward flick is the ▼ control by another gesture, so it has to be the
+     * same action — the screen maps it to [GameAction.HardDrop] rather than to
+     * anything of its own. It survived decision D21 for that reason: with ▼ a tap
+     * rather than a hold, the flick is the same one-shot commitment and the `Drag`
+     * control scheme keeps a way to make it.
+     *
+     * Asserting it here rather than in a gesture test is deliberate: the
+     * recogniser's thresholds are the handoff's and are pinned in `GameBoard`,
+     * but "a flick puts the block down" is a rule.
      */
     @Test
-    fun flick_advancesTwoRowsLikeTheNudgeControl() = runUnitTest {
+    fun flick_dropsTheBlockLikeTheDropControl() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
-            act(GameAction.Nudge)
-            assertFallingAt(col = 2, row = 2)
-            assertPhase(GamePhase.Playing)
+            land()
+            assertPhase(GamePhase.Resolving)
         }
     }
 

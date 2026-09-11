@@ -354,6 +354,9 @@ three other things, and all three moved with it: the spawn draw now happens at s
 the HUD has no chips (8.1), and the engine's `Input` alphabet lost `Hold` and gained `Nudge` (6).
 Section 18.11's "hold on the first drop" edge case went with it.
 
+**D21 took `Nudge` back out again.** The preview and the hold stay cut; what returned is hard
+drop, which is the same `Input.Lock` the engine has always had. See 6.
+
 ### 5.5 Level and speed
 
 Level increases every **20 blocks dropped**. No cap. Blocks dropped is the clock, not score:
@@ -369,7 +372,7 @@ score scales superlinearly with skill and would punish good players with runaway
 | 17-20 | 140, 133, 127, 122 |
 | 21+ | 118, minus 2 per level, floor 90 |
 
-Soft drop is a flat 40ms per row at every level. **The floor is load-bearing.** Past roughly
+**The floor is load-bearing.** Past roughly
 level 20 speed stops being the pressure and the rising spawn floor carries the difficulty.
 Without the floor this stops being a puzzle and becomes a reflex test, which is a different and
 worse game.
@@ -398,24 +401,20 @@ advancement, so it moves the pinned determinism digest and every score with it.
 and the burst becomes the only way to survive). Time is not one of them: on five columns with a
 centre spawn, a block is at most two columns from anywhere, which the measured player covers in
 370ms against a budget that never falls below about 780ms even at the speed floor. That is why
-6's soft drop and nudge, not the curve, set how fast a run actually goes.
+6's drop control, not the curve, sets how fast a run actually goes.
 
-**Re-measured without hard drop in C1e, and the curve was kept at 500ms.** The nudge turned out to
-be a much better substitute than expected: a level-1 drop takes **0.96s** for a player who taps ▼,
-against 4.15s for one who never does and 0.54s under the hard drop that used to exist, and time to
-level 4 is **56s / 223s / 33s** on the same three. The nudge recovers 88% of the wall-clock gap.
+**The curve was kept at 500ms through C1e and through D21, and the pacing column is hard drop's.**
+A level-1 drop takes **0.54s** for a player who uses ▼ against **4.15s** for one who never does,
+and time to level 4 is **33s** against **223s**. C1e measured the intermediate nudge at 0.96s and
+88% of the gap; D21 returns the game to the fast end of that bracket, and no balance pass was
+re-run for it because a drop control moves the wall clock and nothing else (L40).
 
-Two things followed. The curve matters *less* now, not more: 300ms off the level-1 interval is
-worth 62ms a drop to a nudging player, because ▼ rather than gravity is carrying the block. And a
-faster opening was measured (`400, 385, 370, 355, 340, 325, 312, 300`) and rejected — it changes no
-outcome column, buys the nudging player 27ms a drop, and flattens the first band's acceleration from
-40% to 25%. What is left of the opening's dead time belongs to a player who never presses ▼, which
-is a tutorial problem (13), not a curve problem.
-
-`nudgeRows` was swept over 1-4 in the same chunk and left at 2. Returns collapse after 2 — the
-binding cost stops being rows and becomes the decision, the tap cadence and the lock delay — and
-unlike `blocksPerLevel` it does **not** move the determinism digest, because a nudge cannot change
-where a block lands. Full tables in `BUILD-PLAN.md` C1e.
+Two things follow. The curve matters *less*, not more, because ▼ rather than gravity carries the
+block for anyone who uses it. And a faster opening was measured
+(`400, 385, 370, 355, 340, 325, 312, 300`) and rejected — it changes no outcome column and flattens
+the first band's acceleration from 40% to 25%. What is left of the opening's dead time belongs to a
+player who never presses ▼, which is a tutorial problem (13), not a curve problem. Full tables in
+`BUILD-PLAN.md` C1e.
 
 ### 5.6 Undo
 
@@ -435,24 +434,27 @@ from an automated test, which matters while the loop is still being tuned.
 **Drag** lands in the same phase once the loop is proven, and becomes the default at that point
 if it feels better on device. Touch anywhere on the board, slide horizontally, the falling block
 tracks your finger's column. The handoff makes it absolute from the grab point rather than
-incremental. A downward flick is the nudge.
+incremental. A downward flick is the hard drop.
 
 **Tap Column** is v2 unless it is cheap once Drag exists.
 
 Universal, all schemes:
 
 - **Ghost outline** showing the exact landing cell. On by default, toggleable.
-- **Nudge (▼, or a downward flick)** advances the fall by **two ticks**. It is an accelerator,
-  not an instant drop, and it pays nothing (see 7). It replaced hard drop in D11.
-- **Soft drop** accelerates to 40ms per row without placing.
+- **Hard drop (▼, or a downward flick)** sends the block to the bottom of its column and locks it
+  there, in one press. It pays `2 x rowsSkipped` (see 7). **D21**, from playing it: the expectation
+  at that control is "send this tile down", D11's two-tick nudge was not that, and the hold that
+  produced soft drop was where the bug was.
+- **There is no soft drop.** It was a hold of ▼, and holding is a mode. D21 deleted it along with
+  `EngineConfig.nudgeRows` and `speed.softDropMsPerRow`. One input, one meaning.
 - **Lock delay** of 150ms at the resting cell before locking, allowing a last-instant column
   change. **One reset per drop**, so it cannot stall.
 - **Input during resolution is ignored.** Cascades play out uninterrupted. **Amended in C3:** no
   input reaches the engine mid-cascade, but the *last sideways move* is held and applied to the
   block that spawns afterwards. Discarding it turned out to be a different rule and a bad one —
   on device, every move tapped in the beat after a block landed vanished and the new block went
-  straight down the middle. The nudge is deliberately not buffered: replaying it would drop a
-  block two rows into a board the player has not looked at yet.
+  straight down the middle. The drop is deliberately not buffered: replaying it would commit a
+  block to a board the player has not looked at yet.
 
 A block locking in a full column lands in row 0, resolution runs, and if row 0 is still occupied
 the run ends. No special case.
@@ -467,6 +469,7 @@ left to the system.
 
 | Event | Points |
 |---|---|
+| Hard drop | `2 x rowsSkipped`, zero when the block was already resting |
 | Merge producing V | `V x cascadeStep`, step capped at 10 |
 | Row burst | `5000 + 250 x blocksCleared` |
 | Bomb detonation | `50 x blocksDestroyed` |
@@ -480,14 +483,19 @@ is worth 2560 for that step alone, on top of everything under it.
 The cascade multiplier **does not reset across a burst**. Merges caused by post-burst gravity keep
 counting up.
 
-**No input scores.** The hard drop bonus (`2 x rowsSkipped`) is struck with the input it paid
-for, and the ▼ nudge did **not** inherit it (D11). The bonus was paying for commitment — a hard
-drop gave up the rest of the fall and could not be taken back. A nudge gives up two rows and can
-be pressed again a moment later, so a per-row payout would reward the tap rather than the
-decision, and would oblige every player to mash a control the handoff drew as recessive. It would
-also fire on nearly every drop of nearly every run, which is a constant the score already has in
-Survival. Every remaining row of this table pays for something that happened on the board.
-(Original spec's open question 5 is resolved by removal rather than by tuning.)
+**Exactly one row pays for an input, and it is the hard drop.** D11 struck the bonus when it cut
+hard drop, and D13 declined to hand it to the ▼ nudge; **D21 reinstated both**, because the bonus
+was always paying for *commitment* and a hard drop is the commitment it was paying for. A nudge
+could be pressed again a moment later, so per-row would have rewarded the tap; a hard drop is one
+press per block, so it rewards the decision.
+
+It cannot become a strategy. On a 5x8 board the ceiling is seven skipped rows, so a drop is worth
+at most **14 points** against merges worth hundreds and a burst worth 5,000 — a whole level of
+maximal hard drops is worth less than one chained merge. And a lock the player did not hurry skips
+no rows and emits no step at all, so the bonus can never pay for the lock delay expiring.
+
+Every other row of this table pays for something that happened on the board, and
+`noTouchOfTheBoardScoresAnything` pins it. (Original spec's open question 5 is resolved.)
 
 **Survival on a drop that levels up pays the level the block was dropped at**, before advancement.
 The drop was survived under the old level's speed, so that is the level it earned. The level-up
@@ -545,7 +553,8 @@ says **"Drop again"**. Continue and any ad offer sit below it, never above.
 the game. A six-step cascade should be an ascending musical run that is a reward on its own. It
 is one of the two things section 22 says to keep if everything else is cut.
 
-Effects: spawn (subtle), move per column (very short click), nudge (very short click), lock
+Effects: spawn (subtle), move per column (very short click), hard drop (the press, heavier than a
+move), lock
 (soft), merge
 (pitched by step), merge into 256+ (heavier, distinct), row burst (the longest sample in the
 game), bomb, danger enter/exit, stacked out, level up, UI tap and back.
@@ -658,19 +667,23 @@ alive. Everything else here is negotiable. That is not.
 First launch drops straight into a scripted run. No menus, no video, no wall of text. The timer
 is frozen throughout.
 
-**The frozen timer is what teaches the nudge, and that is the whole design.** With gravity
-switched off, ▼ is the only thing that moves a block downward, so the player cannot reach the end
-of six drops without pressing it and never once watches a block come down on its own. C1c and C1e
-measured whether a player reaches for the drop control at 223 seconds against 56 to reach level 4
-(L29) — a bigger lever on the opening than the drop clock, the spawn table and every speed-curve
-change combined. A tutorial that *mentions* ▼ teaches a fact; one that cannot be finished without
-it teaches a habit, and the habit is what the number is about. Built in C5.
+**The frozen timer is what teaches ▼, and that is the whole design.** With gravity switched off, ▼
+is the only thing that moves a block downward, so the player cannot reach the end of six drops
+without pressing it and never once watches a block come down on its own. C1c measured whether a
+player reaches for the drop control at 223 seconds against 33 to reach level 4 (L29) — a bigger
+lever on the opening than the drop clock, the spawn table and every speed-curve change combined. A
+tutorial that *mentions* ▼ teaches a fact; one that cannot be finished without it teaches a habit,
+and the habit is what the number is about. Built in C5.
+
+**Amended by D21: one tap per drop, not several.** ▼ is a hard drop, so drop 1's two ▼ beats
+collapsed into one — "press it again" is not something you can ask of a control that finishes the
+drop on the first press. The mechanism is untouched and the script is a beat shorter.
 
 1. One 2 spawns, one 2 is already placed. "Slide it over." They merge it — and the same drop
    introduces ▼, because it is the only way to land it.
-2. Drops 2-4 are the nudge again, until it is a habit. They build to 16. **Amended in C5**: this
-   step used to introduce "the Next preview and hard drop", and D11 cut both. The nudge takes the
-   slot, and it is the most valuable slot in the script.
+2. Drops 2-4 are ▼ again, until it is a habit. They build to 16. **Amended in C5**: this step used
+   to introduce "the Next preview and hard drop", and D11 cut both. D21 put hard drop back, so the
+   slot now teaches exactly what SPEC 13 originally wanted it to.
 3. Drop 5 is pre-seeded so a single placement triggers a 3-step cascade. Zero explanation. Let
    them watch it.
 4. Drop 6 is pre-seeded with a 1024 next to two 512s. They trigger a 2048 burst on their sixth
@@ -854,8 +867,9 @@ The original spec's section 21, answered.
 3. **Terminal value on Wide.** Moot: Wide is cut. Revisit with the variant.
 4. **Stones removable by adjacent merges.** No. If late game proves unwinnable, lower
    `special.rates.stone` remotely first. Changing the rule is the last resort, not the first.
-5. **Hard drop bonus.** Resolved by removal, not by tuning: D11 cut hard drop and the ▼ nudge did
-   not inherit the bonus. See 7.
+5. **Hard drop bonus.** Resolved: it stands at `2 x rowsSkipped`. D11 removed it with hard drop and
+   D13 declined to give it to the nudge; D21 brought back the input and the bonus together, on the
+   argument the bonus was always making — it pays for commitment. See 7.
 
 ## 20. Non-goals for v1
 

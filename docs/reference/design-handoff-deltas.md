@@ -32,13 +32,14 @@ Take these exactly, not approximately. The numbers in its README are final.
   `cubic-bezier(.2,1.5,.4,1)`.
 - Layout: the header, the flex spacer that pushes controls into thumb reach, the control row.
 - The overlays: start, paused, game over.
-- **The control scheme** (D11): drag-anywhere as primary, arrows secondary, the ▼ nudge, no hard
-  drop, no preview, no hold.
+- **The control scheme** (D11), *except* for what ▼ does: drag-anywhere as primary, arrows
+  secondary, no preview, no hold.
 
 ## Where the handoff is stale, and what wins instead
 
 | Handoff says | We do | Why |
 |---|---|---|
+| Hard drop "was tried and cut. Don't reintroduce it." ▼ is a two-tick accelerator | **▼ is a hard drop** (SPEC 6, D21) | Owner ruling from playing it on device, 2026-09-10. The expectation at that control is "send this tile to the bottom". The handoff governs interaction and it is overridden here anyway, which is worth stating plainly rather than leaving the packet to keep telling the next reader otherwise. Soft drop went with it: it was a *hold* of ▼, and the hold is what stranded a speed mode for the rest of a run. |
 | N-way merges: 4 neighbours at once, `value × 2^N`, "three-way touch goes straight to ×4" | **Priority-order, first match only** (SPEC 4.3) | Owner ruling. The original design doc explicitly wanted "one 8 and one 4, no three-way merge". Changing it would redo C1, C1b and the whole balance pass. |
 | No special blocks | **Wildcard, Bomb and Stone** (SPEC 5.2) | In v1 scope. The desktop file's bombs were cut from the prototype, not from the game. |
 | `level = floor(merges / 10) + 1` | **Level advances every 20 blocks dropped** (SPEC 5.5) | Blocks dropped is a clock that skill does not accelerate. A merge-driven clock punishes good players with runaway speed. |

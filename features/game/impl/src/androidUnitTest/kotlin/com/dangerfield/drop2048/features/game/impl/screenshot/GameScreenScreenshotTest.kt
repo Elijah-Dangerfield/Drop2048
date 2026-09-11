@@ -227,7 +227,7 @@ class GameScreenScreenshotTest {
      */
     @Test
     fun tutorialCoachMark() = compose.captureScreen("tutorial-coach") {
-        tutorialState(TutorialStep.FirstNudge, TutorialFocus.Nudge, awaitsTap = false)
+        tutorialState(TutorialStep.FirstDrop, TutorialFocus.Drop, awaitsTap = false)
     }
 
     @Test

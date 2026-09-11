@@ -179,69 +179,55 @@ class HarnessTest {
      * broken by accident later.
      *
      * A drop control decides *when* a block locks, never *where*: `Input.Lock`
-     * places at the landing cell, so nudging to the floor and letting the timer
-     * do it produce the same board. Measured over 10,000 runs the two profiles
-     * agree to the digit on every outcome column, which is what makes the whole
-     * pacing argument separable from the difficulty one.
+     * places at the landing cell, so hard-dropping to the floor and letting the
+     * timer do it produce the same board. Measured over 10,000 runs the two
+     * profiles agree to the digit on every outcome column, which is what makes
+     * the whole pacing argument separable from the difficulty one.
      *
-     * If this ever fails, the ▼ control has started changing outcomes, and every
-     * "pure pacing dial" claim in `BUILD-PLAN.md`'s C1e section is void.
+     * **The score is the one column that is now allowed to differ**, because
+     * decision D21 reinstated SPEC 7's hard drop bonus and that is the point of
+     * it: the same board, played decisively, is worth a little more. It is
+     * asserted as an inequality rather than dropped, so a bonus that ever went
+     * *negative* would still be caught.
+     *
+     * If the rest of this ever fails, the ▼ control has started changing
+     * outcomes, and every "pure pacing dial" claim in `BUILD-PLAN.md`'s C1e
+     * section is void.
      */
     @Test
     fun theDropControlChangesTheWallClockAndNothingElse() {
         (1L..40L).forEach { seed ->
-            val nudging = Harness.play(seed, Policy.Greedy, config, PlayerProfile.Average)
+            val dropping = Harness.play(seed, Policy.Greedy, config, PlayerProfile.Average)
             val patient = Harness.play(seed, Policy.Greedy, config, PlayerProfile.Patient)
 
-            assertEquals(patient.level, nudging.level, "seed $seed level")
-            assertEquals(patient.blocksDropped, nudging.blocksDropped, "seed $seed drops")
-            assertEquals(patient.score, nudging.score, "seed $seed score")
-            assertEquals(patient.highestTier, nudging.highestTier, "seed $seed highest tier")
+            assertEquals(patient.level, dropping.level, "seed $seed level")
+            assertEquals(patient.blocksDropped, dropping.blocksDropped, "seed $seed drops")
+            assertEquals(patient.highestTier, dropping.highestTier, "seed $seed highest tier")
             assertTrue(
-                nudging.clock!!.elapsedMillis < patient.clock!!.elapsedMillis,
-                "seed $seed: nudging took no less wall clock than never touching the control",
+                dropping.clock!!.elapsedMillis < patient.clock!!.elapsedMillis,
+                "seed $seed: hard-dropping took no less wall clock than never touching the control",
+            )
+            assertTrue(
+                dropping.score >= patient.score,
+                "seed $seed: the same board scored less with the bonus than without it",
             )
         }
     }
 
     /**
-     * More rows per press is less time per drop, and the same game.
+     * A level-1 drop costs a decision and a press, and nothing else.
      *
-     * The second half is the point: `nudgeRows` is the one dial C1e swept that
-     * lives in `EngineConfig` and therefore moves the determinism digest, so the
-     * evidence that it buys pacing without buying difficulty has to be a test
-     * rather than a remembered table.
+     * C1c measured the hard-drop column at 0.54s a drop at level 1 against 4.15s
+     * patient, and decision D21 returns the game to it. The bound is loose on
+     * purpose: it is guarding the *order of magnitude*, which is what would move
+     * if the finish model quietly started charging for gravity again.
      */
     @Test
-    fun moreRowsPerNudgeIsFasterAndPlaysTheSameGame() {
-        val timings = listOf(1, 2, 3).map { rows ->
-            val outcomes = (1L..30L).map {
-                Harness.play(it, Policy.Greedy, config.copy(nudgeRows = rows), PlayerProfile.Average)
-            }
-            outcomes.sumOf { it.clock!!.elapsedMillis } to outcomes.map { it.level }
-        }
-
-        assertTrue(timings[0].first > timings[1].first, "3 rows a press was not slower than 2")
-        assertTrue(timings[1].first > timings[2].first, "2 rows a press was not slower than 3")
-        assertEquals(timings[0].second, timings[1].second, "nudgeRows changed the levels reached")
-        assertEquals(timings[1].second, timings[2].second, "nudgeRows changed the levels reached")
-    }
-
-    /**
-     * The nudge is most of the way back to what hard drop was worth.
-     *
-     * C1d predicted a level-1 drop somewhere around 1.5-2.5s once hard drop was
-     * gone. Measured, it is under a second, because three taps and a lock delay
-     * cost less than the four rows of gravity they replace. The bound here is
-     * loose on purpose — it is guarding the order of magnitude, which is the
-     * thing the prediction got wrong.
-     */
-    @Test
-    fun aNudgingPlayerSpendsUnderASecondOnALevelOneDrop() {
+    fun aHardDroppingPlayerSpendsUnderASecondOnALevelOneDrop() {
         val clocks = (1L..30L).mapNotNull { Harness.play(it, Policy.Greedy, config, PlayerProfile.Average).clock }
         val perDrop = clocks.sumOf { it.earlyElapsedMillis[1] } / clocks.sumOf { it.earlyDrops[1] }
 
-        assertTrue(perDrop < MAX_LEVEL_ONE_NUDGED_MILLIS, "a level-1 drop took ${perDrop}ms while nudging")
+        assertTrue(perDrop < MAX_LEVEL_ONE_DROPPED_MILLIS, "a level-1 drop took ${perDrop}ms while hard-dropping")
     }
 
     private fun levelOneSlack(curve: SpeedCurve): Long {
@@ -264,6 +250,6 @@ class HarnessTest {
         const val MIN_DROP_MILLIS = 200L
         const val MAX_DROP_MILLIS = 5_000L
         const val MIN_LEVEL_ONE_SLACK_MILLIS = 1_000L
-        const val MAX_LEVEL_ONE_NUDGED_MILLIS = 1_200L
+        const val MAX_LEVEL_ONE_DROPPED_MILLIS = 1_200L
     }
 }

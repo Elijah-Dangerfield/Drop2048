@@ -15,7 +15,6 @@ import kotlin.system.measureTimeMillis
  * ./gradlew :tools:balance:run --args="--policy greedy --table lowfloor --seed 99"
  * ./gradlew :tools:balance:run --args="--clock average --curve fast500"
  * ./gradlew :tools:balance:run --args="--clock average --blocks-per-level 12"
- * ./gradlew :tools:balance:run --args="--clock average --nudge-rows 3"
  * ./gradlew :tools:balance:run --args="--clock average --decision-millis 350"
  * ```
  *
@@ -23,12 +22,13 @@ import kotlin.system.measureTimeMillis
  * value is a [PlayerProfile] and puts SPEC 5.5's drop timer and SPEC 6's
  * controls in the loop.
  *
- * `--nudge-rows`, `--decision-millis` and `--tap-millis` are the three dials
- * C1e had to sweep. The first is an engine config value and therefore travels
- * inside `GameState` and moves the determinism digest; the other two are the
- * player model and touch nothing the engine can see. They are flags rather than
- * edits because a swept number that has to be typed into a source file gets
- * swept once and then left wrong.
+ * `--decision-millis` and `--tap-millis` are the two dials of the player model.
+ * Neither touches anything the engine can see, so neither can move the
+ * determinism digest. They are flags rather than edits because a swept number
+ * that has to be typed into a source file gets swept once and then left wrong.
+ *
+ * `--nudge-rows` retired with the nudge (decision D21). There is no dial on the
+ * drop control any more: ▼ goes to the bottom and that is the whole of it.
  *
  * Runs are independent and are farmed out across cores, which is the only reason
  * 30,000 of them finish inside a minute. Each run seeds both the engine and the
@@ -44,7 +44,6 @@ fun main(args: Array<String>) {
     val curveName = args.value("--curve") ?: "default"
     val blocksPerLevel = args.value("--blocks-per-level")?.toIntOrNull()
         ?: EngineConfig.DEFAULT_BLOCKS_PER_LEVEL
-    val nudgeRows = args.value("--nudge-rows")?.toIntOrNull() ?: EngineConfig.DEFAULT_NUDGE_ROWS
     val decisionMillis = args.value("--decision-millis")?.toIntOrNull()
     val tapMillis = args.value("--tap-millis")?.toIntOrNull()
 
@@ -74,7 +73,6 @@ fun main(args: Array<String>) {
         spawnTable = table,
         speed = curve,
         blocksPerLevel = blocksPerLevel,
-        nudgeRows = nudgeRows,
     )
 
     policies.forEach { policy ->
@@ -85,7 +83,7 @@ fun main(args: Array<String>) {
                 .collect(Collectors.toList())
         }
         val label = buildString {
-            append("$curveName/$blocksPerLevel/nudge$nudgeRows@${profile?.name ?: "off"}")
+            append("$curveName/$blocksPerLevel@${profile?.name ?: "off"}")
             if (profile != null) append("(${profile.decisionMillis}/${profile.tapMillis})")
         }
         print(Report.render(policy, tableName, label, outcomes, millis))

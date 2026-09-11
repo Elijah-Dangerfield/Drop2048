@@ -121,6 +121,7 @@ private fun Board.after(step: ResolutionStep): Board = when (step) {
 
     is ResolutionStep.Gravity -> settled(step)
 
+    is ResolutionStep.HardDropBonus,
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     is ResolutionStep.BoardCleared,
@@ -164,7 +165,12 @@ private fun Board.settled(step: ResolutionStep.Gravity): Board {
  * - **gravity** gets the handoff's [Motion.GravitySettleMillis], slightly under a
  *   merge, because it is the consequence of the merge rather than an event;
  * - **survival and level up** move nothing and only exist so the score rolls
- *   rather than jumping once at the end.
+ *   rather than jumping once at the end;
+ * - the **hard drop bonus** gets no beat at all. The press was the beat, and the
+ *   block slamming to the floor is already on screen by the time this frame is
+ *   drawn — holding for it would put a pause between the drop and its
+ *   consequences. Its frame still exists, so the score is correct before the
+ *   first merge lands.
  *
  * Reduce motion scales all of them together and never to zero (SPEC 16), so a
  * player who asked for less motion still sees the order things happened in.
@@ -179,6 +185,8 @@ private fun ResolutionStep.holdMillis(): Int = when (this) {
     is ResolutionStep.Burst -> Motion.RowBurstMillis
     is ResolutionStep.Gravity -> Motion.GravitySettleMillis
 
+    is ResolutionStep.HardDropBonus -> NoBeatMillis
+
     is ResolutionStep.Survival,
     is ResolutionStep.LevelUp,
     -> ScoreOnlyMillis
@@ -189,10 +197,11 @@ private fun ResolutionStep.holdMillis(): Int = when (this) {
 }
 
 /**
- * Gravity and survival are the two steps with nothing to say. Gravity is the
- * consequence of the merge that has already sounded, and survival is a payout
- * that happens on every drop of every run — a sound on either would be a sound
- * the player stops hearing.
+ * Gravity, survival and the hard drop bonus are the steps with nothing to say.
+ * Gravity is the consequence of the merge that has already sounded, survival is a
+ * payout that happens on every drop of every run, and the hard drop has already
+ * sounded as `Cue.HardDrop` at the moment of the press — a second sound under it
+ * would be the same event twice.
  *
  * Everything else does. `Sound.BoardCleared` was the one gap C3 left, on the
  * argument that a wrong sound is harder to notice than a missing one; C3a
@@ -207,6 +216,7 @@ private fun ResolutionStep.cue(): Cue? = when (this) {
     is ResolutionStep.BoardCleared -> Cue.BoardCleared
     is ResolutionStep.Gravity,
     is ResolutionStep.Survival,
+    is ResolutionStep.HardDropBonus,
     -> null
 }
 
@@ -236,6 +246,7 @@ private fun ResolutionStep.callout(): GameCallout? = when (this) {
     is ResolutionStep.LevelUp -> GameCallout.LevelUp(level)
     is ResolutionStep.Gravity,
     is ResolutionStep.Survival,
+    is ResolutionStep.HardDropBonus,
     -> null
 }
 
@@ -253,3 +264,16 @@ private const val TerminalTier = 2048
  * up does not feel like the board stopped. These frames move nothing.
  */
 private const val ScoreOnlyMillis = 60
+
+/**
+ * The hard drop bonus is scored, drawn and gone in the same frame as the landing.
+ *
+ * Zero rather than [ScoreOnlyMillis] because it is not a beat the player is
+ * waiting for — and because the balance harness's `DropClock.resolutionMillis`
+ * mirrors these numbers to decide whether a resolution lasted long enough for a
+ * buffered move. A non-zero hold here would make a hard-dropped drop's resolution
+ * measurably longer than a timer-placed one's, which would let the drop control
+ * change *placement* on the next block. That is precisely the property L40 pins,
+ * and `theDropControlChangesTheWallClockAndNothingElse` caught it.
+ */
+private const val NoBeatMillis = 0

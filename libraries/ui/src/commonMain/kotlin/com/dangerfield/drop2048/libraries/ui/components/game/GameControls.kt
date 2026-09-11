@@ -27,14 +27,14 @@ import com.dangerfield.drop2048.system.typography.FredokaFontFamily
 /**
  * The three buttons under the board, and the one visual argument they make.
  *
- * ◀ and ▶ are the game. ▼ is an accelerator, and the design paints it a step
- * quieter — a darker face, a muted glyph, a darker shadow — so the row reads as
- * "two things and a helper" rather than as three equal choices. **That
- * recessiveness is intentional and load-bearing.** C1c measured that a player who
- * reaches for the drop control reaches level 4 in 34 seconds against 289 for one
- * who does not, so a centre button that looked like the main verb would be
- * teaching the wrong game, and one that looks like a footnote is the design
- * saying "steer first".
+ * ◀ and ▶ are the game. ▼ ends the drop, and the design paints it a step quieter
+ * — a darker face, a muted glyph, a darker shadow — so the row reads as "two
+ * things and a helper" rather than as three equal choices. **That recessiveness
+ * is intentional and load-bearing.** C1c measured that a player who reaches for
+ * the drop control reaches level 4 in 33 seconds against 289 for one who does
+ * not, so a centre button that looked like the main verb would be teaching the
+ * wrong game, and one that looks like a footnote is the design saying "steer
+ * first".
  *
  * The strings are glyphs rather than copy, so they stay here rather than in
  * `:libraries:resources`. The content descriptions are not, which is why they are
@@ -43,23 +43,24 @@ import com.dangerfield.drop2048.system.typography.FredokaFontFamily
  * @param mirrored swaps ◀ and ▶ for the left-handed setting. A reversal rather
  *   than a second layout, so the two arrangements cannot drift apart and a fourth
  *   control would only have to be added once.
- * @param nudgeModifier hangs on the centre button alone, which is the only one
- *   with a gesture of its own: SPEC 6 puts soft drop on a *hold* of ▼, and the
- *   press-and-hold recogniser has to live at the call site because it needs the
- *   feature's two actions and its own timeout.
+ * @param dropModifier hangs on the centre button alone, so the tutorial can
+ *   spotlight it. It carries no gesture: since decision D21 ▼ is a plain click
+ *   with no hold, no timeout and no mode, which is exactly what deleted the
+ *   latched-soft-drop bug — there is no recogniser left to be torn down mid-press
+ *   and no "on" state for it to strand.
  */
 @Composable
 fun GameControlRow(
     onLeft: () -> Unit,
-    onNudge: () -> Unit,
+    onDrop: () -> Unit,
     onRight: () -> Unit,
     leftDescription: String,
-    nudgeDescription: String,
+    dropDescription: String,
     rightDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     mirrored: Boolean = false,
-    nudgeModifier: Modifier = Modifier,
+    dropModifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth().widthIn(max = ControlRowMaxWidth),
@@ -72,18 +73,18 @@ fun GameControlRow(
 
         ControlButton(leading.first, leading.second, onLeading, enabled, ControlKind.Primary)
         ControlButton(
-            glyph = NudgeGlyph,
-            contentDescription = nudgeDescription,
-            onClick = onNudge,
+            glyph = DropGlyph,
+            contentDescription = dropDescription,
+            onClick = onDrop,
             enabled = enabled,
             kind = ControlKind.Quiet,
-            modifier = nudgeModifier,
+            modifier = dropModifier,
         )
         ControlButton(trailing.first, trailing.second, onTrailing, enabled, ControlKind.Primary)
     }
 }
 
-/** Whether a control is one of the two verbs or the accelerator between them. */
+/** Whether a control is one of the two steering verbs or the drop between them. */
 enum class ControlKind { Primary, Quiet }
 
 /**
@@ -181,7 +182,7 @@ fun PauseButton(
  */
 private const val LeftGlyph = "◀"
 private const val RightGlyph = "▶"
-private const val NudgeGlyph = "▼"
+private const val DropGlyph = "▼"
 private const val PauseGlyph = "II"
 
 private val ControlRowMaxWidth: Dp = 370.dp

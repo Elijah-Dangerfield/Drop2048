@@ -103,7 +103,7 @@ import drop2048.libraries.resources.generated.resources.game_level_label
 import drop2048.libraries.resources.generated.resources.game_move_left
 import drop2048.libraries.resources.generated.resources.game_move_right
 import drop2048.libraries.resources.generated.resources.game_new_best
-import drop2048.libraries.resources.generated.resources.game_nudge
+import drop2048.libraries.resources.generated.resources.game_hard_drop
 import drop2048.libraries.resources.generated.resources.game_pause
 import drop2048.libraries.resources.generated.resources.game_paused
 import drop2048.libraries.resources.generated.resources.game_play
@@ -120,12 +120,11 @@ import drop2048.libraries.resources.generated.resources.tutorial_burst_body
 import drop2048.libraries.resources.generated.resources.tutorial_burst_title
 import drop2048.libraries.resources.generated.resources.tutorial_first_merge_body
 import drop2048.libraries.resources.generated.resources.tutorial_first_merge_title
-import drop2048.libraries.resources.generated.resources.tutorial_first_nudge_body
-import drop2048.libraries.resources.generated.resources.tutorial_first_nudge_title
+import drop2048.libraries.resources.generated.resources.tutorial_first_drop_body
+import drop2048.libraries.resources.generated.resources.tutorial_first_drop_title
 import drop2048.libraries.resources.generated.resources.tutorial_got_it
 import drop2048.libraries.resources.generated.resources.tutorial_handoff_body
 import drop2048.libraries.resources.generated.resources.tutorial_handoff_title
-import drop2048.libraries.resources.generated.resources.tutorial_keep_nudging_body
 import drop2048.libraries.resources.generated.resources.tutorial_ok
 import drop2048.libraries.resources.generated.resources.tutorial_second_body
 import drop2048.libraries.resources.generated.resources.tutorial_second_title
@@ -175,10 +174,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * **[ControlScheme] is honoured here rather than only stored.** `Drag` hides the
  * control row, `Buttons` stops [GameBoard] accepting a drag, `Both` is what the
  * game has shipped with. Decision D11 makes drag primary and the buttons the
- * secondary path, so `Drag` is the scheme that loses least — the downward flick
- * still nudges. What it does lose is **soft drop**, which is a hold of the ▼
- * button and has no gesture equivalent; that is a known cost of picking `Drag`
- * rather than an oversight.
+ * secondary path, and since D21 `Drag` loses **nothing at all**: the downward
+ * flick is the same hard drop the ▼ button fires, and there is no held mode left
+ * that a gesture cannot express.
  */
 @Composable
 fun GameScreen(
@@ -221,20 +219,14 @@ fun GameScreen(
                     if (state.controlScheme != ControlScheme.Drag) {
                         GameControlRow(
                             onLeft = { onAction(GameAction.MoveLeft) },
-                            onNudge = { onAction(GameAction.Nudge) },
+                            onDrop = { onAction(GameAction.HardDrop) },
                             onRight = { onAction(GameAction.MoveRight) },
                             leftDescription = stringResource(Res.string.game_move_left),
-                            nudgeDescription = stringResource(Res.string.game_nudge),
+                            dropDescription = stringResource(Res.string.game_hard_drop),
                             rightDescription = stringResource(Res.string.game_move_right),
                             enabled = live,
                             mirrored = state.leftHanded,
-                            nudgeModifier = Modifier
-                                .softDropOnHold(
-                                    enabled = live,
-                                    onStart = { onAction(GameAction.SoftDropStart) },
-                                    onEnd = { onAction(GameAction.SoftDropEnd) },
-                                )
-                                .focusTarget(NudgeFocusKey),
+                            dropModifier = Modifier.focusTarget(DropFocusKey),
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                     }
@@ -385,13 +377,13 @@ private fun BoxScope.TutorialLayer(state: GameUiState, onAction: (GameAction) ->
 private fun TutorialFrame.spotlight(): Spotlight = when (focus) {
     TutorialFocus.None -> Spotlight(emptySet())
     TutorialFocus.Board -> Spotlight(setOf(BoardFocusKey), anchor = BoardFocusKey)
-    TutorialFocus.Nudge -> Spotlight(setOf(BoardFocusKey, NudgeFocusKey), anchor = NudgeFocusKey)
+    TutorialFocus.Drop -> Spotlight(setOf(BoardFocusKey, DropFocusKey), anchor = DropFocusKey)
 }
 
 @Composable
 private fun tutorialTitle(step: TutorialStep): String? = when (step) {
     TutorialStep.Steer -> stringResource(Res.string.tutorial_steer_title)
-    TutorialStep.FirstNudge -> stringResource(Res.string.tutorial_first_nudge_title)
+    TutorialStep.FirstDrop -> stringResource(Res.string.tutorial_first_drop_title)
     TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_first_merge_title)
     TutorialStep.SecondDrop -> stringResource(Res.string.tutorial_second_title)
     TutorialStep.ThirdDrop -> stringResource(Res.string.tutorial_third_title)
@@ -404,14 +396,14 @@ private fun tutorialTitle(step: TutorialStep): String? = when (step) {
 @Composable
 private fun tutorialBody(step: TutorialStep): String = when (step) {
     TutorialStep.Steer -> stringResource(Res.string.tutorial_steer_body)
-    TutorialStep.FirstNudge -> stringResource(Res.string.tutorial_first_nudge_body)
+    TutorialStep.FirstDrop -> stringResource(Res.string.tutorial_first_drop_body)
     TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_first_merge_body)
     TutorialStep.SecondDrop -> stringResource(Res.string.tutorial_second_body)
     TutorialStep.ThirdDrop -> stringResource(Res.string.tutorial_third_body)
     TutorialStep.WatchThis -> stringResource(Res.string.tutorial_watch_body)
     TutorialStep.BurstIntro -> stringResource(Res.string.tutorial_burst_body)
     TutorialStep.Handoff -> stringResource(Res.string.tutorial_handoff_body)
-    else -> stringResource(Res.string.tutorial_keep_nudging_body)
+    else -> stringResource(Res.string.tutorial_first_drop_body)
 }
 
 @Composable
@@ -425,10 +417,10 @@ private fun tutorialConfirm(step: TutorialStep): String = when (step) {
  * The two things a lesson can point at, keyed as strings.
  *
  * Minted here rather than in `:libraries:ui` on purpose: the design system knows
- * how to light a rectangle and nothing about what a board or a nudge button is.
+ * how to light a rectangle and nothing about what a board or a ▼ button is.
  */
 private val BoardFocusKey = FocusTargetKey("game-board")
-private val NudgeFocusKey = FocusTargetKey("game-nudge")
+private val DropFocusKey = FocusTargetKey("game-drop")
 
 /**
  * The board, the flex spacer under it, and whichever overlay is up.
@@ -473,7 +465,7 @@ private fun BoardArea(
                     },
                     calloutText = state.callout?.let { calloutText(it) },
                     onSteerTo = { col -> onAction(GameAction.SteerTo(col)) },
-                    onFlickDown = { onAction(GameAction.Nudge) },
+                    onFlickDown = { onAction(GameAction.HardDrop) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .thenIf(covered) { blur(OverlayBlur) },
@@ -810,37 +802,6 @@ private fun OverlayOption(text: String, onClick: () -> Unit) {
     )
 }
 
-/**
- * Tap to nudge, hold to soft drop (SPEC 6), on the one control that has both.
- *
- * The gesture only **watches**: it never consumes, so the button underneath still
- * detects its own click and still shows its own press state. That is also why
- * disarming the tap while soft-dropping is a flag rather than a consume — the
- * click has already fired by the time this sees the pointer come up.
- */
-@Composable
-private fun Modifier.softDropOnHold(
-    enabled: Boolean,
-    onStart: () -> Unit,
-    onEnd: () -> Unit,
-): Modifier {
-    val holding = remember { mutableStateOf(false) }
-    return this.pointerInput(enabled) {
-        if (!enabled) return@pointerInput
-        awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
-            val quick = withTimeoutOrNull(SoftDropAfterMillis) { waitForUpOrCancellation() }
-            if (quick == null) {
-                holding.value = true
-                onStart()
-                waitForUpOrCancellation()
-                onEnd()
-                holding.value = false
-            }
-        }
-    }
-}
-
 @Composable
 private fun calloutText(callout: GameCallout): String = when (callout) {
     is GameCallout.Chain -> stringResource(Res.string.game_chain, callout.step)
@@ -915,12 +876,6 @@ private val NewBestSize = 14.sp
 private val DropAgainSize = 18.sp
 private val DropAgainPaddingX: Dp = 30.dp
 private val DropAgainPaddingY: Dp = 13.dp
-
-/**
- * Long enough that a decisive tap is never read as a hold, short enough that a
- * player who meant to nudge does not feel the control stick.
- */
-private const val SoftDropAfterMillis = 160L
 
 /**
  * A toggle drawn as a mark rather than a switch, because the pause overlay is not
