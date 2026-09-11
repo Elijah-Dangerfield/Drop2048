@@ -33,7 +33,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
 | C8 · Telemetry | not started | |
 | C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
-| C10 · Ads + billing | not started | |
+| C10 · Ads + billing | **IN PROGRESS** | Continue-after-loss and Pro |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C13 · Store prep | not started | |
 
@@ -301,7 +301,7 @@ Generalisable: **a `pointerInput` keyed on a value that changes during the gestu
 release callback.** Any hold-to-do-X built this way leaks its "on" state. Prefer a gesture that
 cannot be re-keyed mid-press, or reset the state on the phase change as well as at the callback.
 
-**Costs, all accepted:** the determinism digest moves a third time (still free — no scores exist,
+**Landed `6917a7f`.** Score bonus reinstated at `2 x rowsSkipped`, emitted only when rows were actually skipped so a lock-delay expiry pays nothing. Digest re-pinned a third time; the whole 180-point delta is the bonus, and every board outcome was identical, which is L40 holding. **Costs, all accepted:** the digest moved (still free — no Daily score has ever been recorded,
 and D18's freeze does not bite until Daily scores are recorded); `Input.Nudge` and
 `EngineConfig.nudgeRows` retire; every balance number shifts to the hard-dropping column, which
 C1e already measured. `Motion.HardDropMillis` exists and was never used — now it has a caller.
@@ -650,6 +650,33 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L64 · Animating a move by mutating engine state silently deleted the score it was paying for
+
+D21 needed the hard-dropped tile to travel rather than teleport seven rows. The first attempt
+published the block **at its landing cell in `engine`** before calling `Input.Lock` — so
+`rowsSkipped` was zero, the bonus never fired, and **the board looked perfect.**
+
+Caught by playing: the score read 14 where it should have read 26. No test was watching, because
+every board assertion passed.
+
+The fix is the rule: **animation state is published to the UI, never written back into the engine.**
+That is what the transcript architecture was for (SPEC 4.2) and this was a quiet violation of it.
+Pinned now by `hardDrop_paysTheBonusForTheRowsThePlayerSkipped`.
+
+### L65 · Pin the property, not the gesture
+
+D21's regression test for the latched-fast-fall bug does not test `pointerInput` or timeouts. It
+hammers the control across three landings and three resolutions, then measures **one drop interval
+and asserts the block moved exactly one row.** The old failure would show twelve.
+
+Whatever replaces that control later — a different gesture, a different component — cannot latch a
+speed without failing this test. A test written against the gesture would have been deleted along
+with the gesture.
+
+The structural half is better still: ▼ is now a plain `onClick` with no `pointerInput`, no timeout
+and no remembered flag, and the tick interval has no mode to branch on. **There is nothing left to
+strand.** Deleting the state beats guarding it.
 
 ### L61 · Room prefers a migration to a drop, so "the row survived" proves nothing
 

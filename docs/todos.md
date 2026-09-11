@@ -12,6 +12,19 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
+### The ▼ button is drawn recessive and is now the decisive control
+
+The handoff painted it quiet because it was an accelerator. D21 made it the only irreversible input
+in the game, and C1c measured that using it is the biggest lever on the opening (33s vs 289s to
+level 4). Visual change only, and it is the handoff's call to override.
+
+### `hard_drop.ogg` is the sample people will miss first
+
+`Cue.HardDrop` existed with no caller for four chunks and now fires on **every drop of every run**.
+It is on the missing-samples list with the other fifteen, but it is the one whose absence is most
+audible.
+
+
 ### Unify the two `ProEntitlement` seams before C10
 
 Settings has one (`StateFlow`, in `:features:settings`) and the Daily has another (`fun interface`,
