@@ -662,6 +662,25 @@ added against this advice, its space is reserved from app launch so nothing move
 **The governing principle:** the player never sees an ad they did not choose while a run is
 alive. Everything else here is negotiable. That is not.
 
+**Built in C10.** Six rulings the section did not make, all in `decisions.md`. The load-bearing
+ones: there is now **one** `ProEntitlement` (`Entitlements` in `:libraries:billing`) because the
+two that existed could never agree and the debug grant silently failed to reach the Daily;
+interstitials are their own type with one caller rather than a third placement, so the governing
+principle has no expressible call site to violate; a **Daily run is never offered a continue**,
+because a cleared board is a larger change than any config key and D18 pins the config to keep two
+players' runs comparable; and SPEC 12's "2nd at higher friction" is implemented as *not offered* —
+the sheet carries it and the player has to reach for it.
+
+Every gate in 12.3 is a branch of one pure function (`InterstitialPolicy`), with a test per rule
+against a positive baseline that does show. The 8-second countdown is a ViewModel rule rather than
+an animation, which is also what lets the offer be screenshot-tested at all.
+
+**iOS serves no ads yet.** The Android network is real (AdMob + UMP); iOS falls through to a
+binding that answers `NotShown` and **cannot** report a reward. Sodogku shipped an iOS stub that
+paid out for free and every log read it as a watched ad; this one is honest, and the rewarded
+call sites pay the player anyway because that is a deliberate rule applied to a real outcome.
+`OWNER-TODO.md` carries what iOS needs.
+
 ## 13. Onboarding
 
 First launch drops straight into a scripted run. No menus, no video, no wall of text. The timer

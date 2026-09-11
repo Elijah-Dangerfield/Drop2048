@@ -39,6 +39,8 @@ kotlin {
             implementation(projects.features.home)
             implementation(projects.libraries.navigation)
 
+            implementation(projects.libraries.ads)
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.config)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
@@ -68,6 +70,8 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.features.settings)
+            implementation(projects.libraries.ads)
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.config)
             implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.flowroutines.testing)

@@ -119,6 +119,17 @@ data class AppData(
     val debugMenuUnlocked: Boolean = false,
 
     /**
+     * SPEC 12's one-time Pro purchase, cached so the first frame of the app does
+     * not render as a free player while the store is being asked.
+     *
+     * A fact about the player rather than machinery, which is why it is here
+     * and the ad-frequency timestamps are in their own cache. It is only ever
+     * cleared by a store that explicitly said "not owned" — see
+     * `RealEntitlements`.
+     */
+    val isProEntitled: Boolean = false,
+
+    /**
      * The legal record the launch gates measure against.
      *
      * [legalAcceptedAt] being 0 means this device has never recorded an

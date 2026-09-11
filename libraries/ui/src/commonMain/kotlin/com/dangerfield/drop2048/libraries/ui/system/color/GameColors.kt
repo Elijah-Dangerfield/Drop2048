@@ -109,6 +109,17 @@ object GameColors {
     val ScrimPaused = Color(0xFF0E0B17).copy(alpha = 0.84f)
     val ScrimGameOver = Color(0xFF0E0B17).copy(alpha = 0.90f)
 
+    /**
+     * The fourth, and the only one that sits over an **unblurred** board.
+     *
+     * SPEC 12.2's continue offer has to keep the board readable behind it,
+     * because the whole offer is "look at what you are about to lose". At 0.42
+     * the tiles still read as tiles at a glance; the copy does not rely on this
+     * for contrast at all, because it sits on its own panel — see
+     * `GameScreen.ContinueOverlay`.
+     */
+    val ScrimContinue = Color(0xFF0E0B17).copy(alpha = 0.42f)
+
     /** The hard shadow under the wordmark, which is not the accent shadow. */
     val WordmarkShadow = Color(0xFF0A0812)
 

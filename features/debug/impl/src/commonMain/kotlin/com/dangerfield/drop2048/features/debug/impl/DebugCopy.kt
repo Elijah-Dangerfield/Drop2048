@@ -69,7 +69,7 @@ object DebugCopy {
     const val RandomSeed = "Roll a new seed"
 
     const val ProGranted = "Pro granted"
-    const val ProGrantedHint = "Folded into the entitlement Settings reads"
+    const val ProGrantedHint = "Every Pro perk behaves as it will for a buyer, until you relaunch"
     const val ResetPurchases = "Reset IAP state"
     const val ClearDaily = "Clear the Daily ledger"
     const val ClearDailyHint = "Every day's result, and the streak with it"

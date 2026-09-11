@@ -48,6 +48,7 @@ class DailyRunTest : CoroutineTest() {
             act(GameAction.StartDaily)
             land()
             waitOutResolution()
+            declineContinue()
 
             assertPhase(GamePhase.StackedOut)
             assertEquals(listOf(Day to state.score), daily.banked)
@@ -64,6 +65,7 @@ class DailyRunTest : CoroutineTest() {
             act(GameAction.StartDaily)
             land()
             waitOutResolution()
+            declineContinue()
 
             val record = progress.recorded.single()
             assertEquals(GameMode.DAILY, record.mode)
@@ -90,6 +92,7 @@ class DailyRunTest : CoroutineTest() {
             act(GameAction.StartDaily)
             land()
             waitOutResolution()
+            declineContinue()
 
             assertPhase(GamePhase.StackedOut)
             assertTrue(state.score > 0, "the run really did beat the old best of zero")
@@ -99,6 +102,7 @@ class DailyRunTest : CoroutineTest() {
         playing(picture = NearlyStackedOut, fallingAt = Cell(2, 0)) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertPhase(GamePhase.StackedOut)
             assertTrue(state.newBest, "the same score in Endless does")

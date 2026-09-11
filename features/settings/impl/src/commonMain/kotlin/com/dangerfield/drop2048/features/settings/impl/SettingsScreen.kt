@@ -70,6 +70,8 @@ import drop2048.libraries.resources.generated.resources.settings_replay_tutorial
 import drop2048.libraries.resources.generated.resources.settings_replay_tutorial_hint
 import drop2048.libraries.resources.generated.resources.settings_reset_progress
 import drop2048.libraries.resources.generated.resources.settings_reset_progress_hint
+import drop2048.libraries.resources.generated.resources.settings_pro_hint
+import drop2048.libraries.resources.generated.resources.settings_pro_upgrade
 import drop2048.libraries.resources.generated.resources.settings_restore
 import drop2048.libraries.resources.generated.resources.settings_restore_nothing
 import drop2048.libraries.resources.generated.resources.settings_restore_restored
@@ -318,23 +320,42 @@ private fun GameSection(onAction: (SettingsAction) -> Unit) {
 private fun ProSection(state: SettingsState, onAction: (SettingsAction) -> Unit) {
     ListSection(
         title = stringResource(Res.string.settings_section_pro),
-        items = listOf(
-            ListSectionItem(
-                headlineText = stringResource(Res.string.settings_pro_status),
-                accessory = ListItemAccessory.Text(
-                    text = if (state.isPro) {
-                        stringResource(Res.string.settings_pro_active)
-                    } else {
-                        stringResource(Res.string.settings_pro_inactive)
-                    },
+        items = buildList {
+            add(
+                ListSectionItem(
+                    headlineText = stringResource(Res.string.settings_pro_status),
+                    accessory = ListItemAccessory.Text(
+                        text = if (state.isPro) {
+                            stringResource(Res.string.settings_pro_active)
+                        } else {
+                            stringResource(Res.string.settings_pro_inactive)
+                        },
+                    ),
                 ),
-            ),
-            ListSectionItem(
-                headlineText = stringResource(Res.string.settings_restore),
-                supportingText = state.restoreMessage?.let { restoreLabel(it) },
-                onClick = { onAction(SettingsAction.RestorePurchases) },
-            ),
-        ),
+            )
+            // SPEC 12's "small persistent entry in Settings", and it is absent
+            // for a player who already owns Pro. A shop row that sells something
+            // you have is the one upsell nobody has an excuse for.
+            if (!state.isPro) {
+                add(
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_pro_upgrade),
+                        supportingText = stringResource(Res.string.settings_pro_hint),
+                        onClick = { onAction(SettingsAction.OpenPro) },
+                    ),
+                )
+            }
+            // Restore stays visible either way. Apple requires a visible control
+            // for it, and a player whose entitlement failed to load is exactly
+            // the person who needs the button and would be shown "Not active".
+            add(
+                ListSectionItem(
+                    headlineText = stringResource(Res.string.settings_restore),
+                    supportingText = state.restoreMessage?.let { restoreLabel(it) },
+                    onClick = { onAction(SettingsAction.RestorePurchases) },
+                ),
+            )
+        },
     )
 }
 

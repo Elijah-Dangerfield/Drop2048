@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.libraries.progress.impl.daily
 
+import com.dangerfield.drop2048.libraries.billing.Entitlements
 import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.gameconfig.DailyChallengeEnabled
 import com.dangerfield.drop2048.libraries.gameconfig.RewardedDailyRetriesPerDay
@@ -9,7 +10,6 @@ import com.dangerfield.drop2048.libraries.progress.daily.DailyResult
 import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryAd
 import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryResult
 import com.dangerfield.drop2048.libraries.progress.daily.DailyStatus
-import com.dangerfield.drop2048.libraries.progress.daily.ProEntitlement
 import com.dangerfield.drop2048.libraries.progress.daily.RewardOutcome
 import com.dangerfield.drop2048.libraries.progress.daily.dailyDayOf
 import com.dangerfield.drop2048.libraries.progress.daily.dailySeedFor
@@ -54,7 +54,7 @@ import kotlin.time.ExperimentalTime
 class DailyRepositoryImpl(
     private val dao: DailyResultDao,
     private val clock: Clock,
-    private val pro: ProEntitlement,
+    private val entitlements: Entitlements,
     private val retryAd: DailyRetryAd,
     private val featureEnabled: DailyChallengeEnabled,
     private val retriesPerDay: RewardedDailyRetriesPerDay,
@@ -144,7 +144,22 @@ class DailyRepositoryImpl(
     /** SPEC 12: one attempt, two for Pro, plus one for every retry already bought. */
     private fun allowanceFor(row: DailyResult): Int = baseAllowance() + row.retriesUsed
 
-    private fun baseAllowance(): Int = if (pro.isPro()) ProAttempts else FreeAttempts
+    /**
+     * Read at the instant an attempt is requested, never observed.
+     *
+     * `Entitlements.isPro` is a `StateFlow` because a dozen screens render off
+     * it, and this is the one caller that must not collect it: an entitlement
+     * that changed mid-run would retroactively change how many attempts the day
+     * had, and the day's allowance is a fact about the moment the player asked.
+     *
+     * Until C10 this read a second `ProEntitlement` that lived in this library
+     * and answered `false` forever, while the settings screen read a different
+     * one the debug menu could grant. Two types for one fact meant granting Pro
+     * worked everywhere except here, silently. There is one type now
+     * (`:libraries:billing`), and it is the one the store and the debug menu both
+     * write to.
+     */
+    private fun baseAllowance(): Int = if (entitlements.isPro.value) ProAttempts else FreeAttempts
 
     /**
      * Emits today's UTC date, then again each time it rolls over.

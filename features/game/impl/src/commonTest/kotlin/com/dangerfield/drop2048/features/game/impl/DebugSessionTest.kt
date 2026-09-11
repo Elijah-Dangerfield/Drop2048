@@ -32,6 +32,7 @@ class DebugSessionTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(GamePhase.StackedOut, state.phase)
             assertTrue(progress.recorded.isEmpty(), "a debug run reached run_record")
@@ -47,6 +48,7 @@ class DebugSessionTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertTrue(
                 leaderboards.submissions.isEmpty(),
@@ -72,6 +74,7 @@ class DebugSessionTest : CoroutineTest() {
             act(GameAction.StartDaily)
             land()
             waitOutResolution()
+            declineContinue()
 
             assertTrue(daily.banked.isEmpty(), "a debug Daily banked ${daily.banked}")
         }
@@ -86,6 +89,7 @@ class DebugSessionTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertTrue(achievements.recorded.isEmpty(), "a debug run filed an achievement fact")
             assertTrue(state.unlocked.isEmpty(), "a debug run announced a badge")
@@ -107,6 +111,7 @@ class DebugSessionTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(GamePhase.StackedOut, state.phase)
             assertTrue(state.score > 0, "a debug run scored nothing")
@@ -128,6 +133,7 @@ class DebugSessionTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(forced, state.falling?.block, "the queue did not reach the board")
         }

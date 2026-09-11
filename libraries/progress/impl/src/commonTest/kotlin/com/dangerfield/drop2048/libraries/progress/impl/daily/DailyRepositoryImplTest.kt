@@ -4,15 +4,18 @@ import com.dangerfield.drop2048.libraries.config.AppConfigMap
 import com.dangerfield.drop2048.libraries.gameconfig.DailyChallengeEnabled
 import com.dangerfield.drop2048.libraries.gameconfig.RewardedDailyRetriesPerDay
 import com.dangerfield.drop2048.libraries.progress.daily.DailyAttempt
+import com.dangerfield.drop2048.libraries.billing.Entitlements
+import com.dangerfield.drop2048.libraries.billing.PurchaseOutcome
+import com.dangerfield.drop2048.libraries.billing.RestoreOutcome
 import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryAd
 import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryResult
-import com.dangerfield.drop2048.libraries.progress.daily.ProEntitlement
 import com.dangerfield.drop2048.libraries.progress.daily.RewardOutcome
 import com.dangerfield.drop2048.libraries.progress.daily.dailySeedFor
 import com.dangerfield.drop2048.libraries.progress.db.DailyResultDao
 import com.dangerfield.drop2048.libraries.progress.db.DailyResultEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
@@ -235,7 +238,7 @@ class DailyRepositoryImplTest {
     ) = DailyRepositoryImpl(
         dao = dao,
         clock = clock,
-        pro = ProEntitlement { pro },
+        entitlements = FixedEntitlements(pro),
         retryAd = DailyRetryAd { ad() },
         featureEnabled = DailyChallengeEnabled(configMap(enabled)),
         retriesPerDay = RewardedDailyRetriesPerDay(configMap(enabled)),
@@ -292,4 +295,16 @@ private class FakeDailyResultDao : DailyResultDao {
         val existing = rows.value[date] ?: return
         rows.value = rows.value + (date to change(existing))
     }
+}
+
+/**
+ * Pro as a fixed fact, which is what the repository actually reads: the
+ * allowance is decided at the instant an attempt is requested, so a flow that
+ * could change under the test would be testing something the production code
+ * deliberately does not do.
+ */
+private class FixedEntitlements(pro: Boolean) : Entitlements {
+    override val isPro: StateFlow<Boolean> = MutableStateFlow(pro)
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
+    override suspend fun restore(): RestoreOutcome = RestoreOutcome.Unavailable
 }

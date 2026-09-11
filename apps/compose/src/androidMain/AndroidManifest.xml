@@ -70,6 +70,21 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The AdMob app id, which the SDK reads out of the manifest before any
+          Kotlin runs — `MobileAds.initialize` throws at startup without it, and
+          the crash is on the first launch of a build nobody has tested ads on.
+
+          It is **not** in `AdUnits.kt` with the unit ids for exactly that
+          reason: this one cannot be a Kotlin constant, because it is read too
+          early. The value below is Google's published sample app id and it
+          pairs with `AdUnits.useTestUnits`; both flip together when the real
+          AdMob app exists. See `OWNER-TODO.md`.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

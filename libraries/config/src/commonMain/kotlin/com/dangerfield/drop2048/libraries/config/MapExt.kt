@@ -21,6 +21,25 @@ inline fun <reified T : Any> Map<String, *>.getValueForPath(fullPath: String) =
 
 /**
  * Recursively traverses a nested map structure and attempts to coerce the final value to [clazz].
+ *
+ * ### Booleans are parsed strictly, and that is a fix rather than a style
+ *
+ * This used to read `toString().toBoolean()`, which answers `false` for anything
+ * that is not the literal `"true"` — so a corrupted remote value did not fall
+ * back to its compiled default, it silently became `false` (L48). SPEC 10 asks
+ * for the opposite in as many words: *a malformed remote value falls back to the
+ * compiled default instead of crashing.*
+ *
+ * For `ads.enabled` the old behaviour was arguably safe: garbage turned the ads
+ * off. For `feature.dailyChallenge` and `feature.leaderboards` it removed a
+ * whole feature from the app with no error anywhere and no way for anyone to
+ * tell it from a deliberate kill switch — both default **on** precisely so an
+ * unreachable server leaves the game exactly as the binary ships it, and a
+ * one-character typo in the admin console defeated that.
+ *
+ * `toBooleanStrictOrNull` returns null for anything but `"true"` and `"false"`,
+ * the null resolves to the compiled default one layer up in `ConfiguredValue`,
+ * and the failure is now visible in the log rather than invisible in the app.
  */
 @Suppress("UNCHECKED_CAST", "ReturnCount")
 fun <T : Any> Map<String, *>.getValueRecursive(path: List<String>, clazz: KClass<*>): T? {
@@ -29,7 +48,7 @@ fun <T : Any> Map<String, *>.getValueRecursive(path: List<String>, clazz: KClass
         return Catching {
             when (clazz) {
                 String::class -> rawValue.toString() as? T
-                Boolean::class -> rawValue.toString().toBoolean() as? T
+                Boolean::class -> rawValue.toString().toBooleanStrictOrNull() as? T
                 Int::class -> rawValue.toString().toDoubleOrNull()?.toInt() as? T
                 Number::class -> rawValue.toString().toDoubleOrNull() as? T
                 Double::class -> rawValue.toString().toDoubleOrNull() as? T

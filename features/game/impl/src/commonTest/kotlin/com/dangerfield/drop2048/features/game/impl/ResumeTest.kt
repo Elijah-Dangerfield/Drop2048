@@ -45,6 +45,7 @@ class ResumeTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.Playing)
             state.score to assertNotNull(savedRun())
         }
@@ -72,6 +73,7 @@ class ResumeTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
             assertNotNull(savedRun())
         }
 
@@ -114,6 +116,7 @@ class ResumeTest : CoroutineTest() {
             assertNull(state.falling, "input during resolution is still ignored")
 
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.Playing)
             assertEquals(
                 NumberBlock(BlockValue.V8),
@@ -173,6 +176,7 @@ class ResumeTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.StackedOut)
             assertNull(savedRun(), "the save is cleared when the run ends")
             savedRuns.stored
@@ -209,6 +213,7 @@ class ResumeTest : CoroutineTest() {
             clock.advance(by = 25_000)
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(25_000, assertNotNull(savedRun()).tally.playedMs)
         }
@@ -240,6 +245,7 @@ class ResumeTest : CoroutineTest() {
 
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(40_000, recordedRuns().single().durationMs)
         }

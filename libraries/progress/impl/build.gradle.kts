@@ -14,6 +14,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.libraries.progress)
+            // SPEC 12's second Daily attempt. The one `Entitlements` every part
+            // of the app now reads, C10.
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines)
             // RunRecordDao's supertype. Needed on the classpath even though this
@@ -30,6 +33,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(projects.libraries.progress)
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.drop2048.storage)
             implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.config)

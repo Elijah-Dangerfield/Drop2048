@@ -58,6 +58,7 @@ class GameViewModelTest : CoroutineTest() {
 
             assertPhase(GamePhase.Resolving)
             waitOutResolution()
+            declineContinue()
             assertState { assertEquals(NumberBlock(BlockValue.V2), it.board[Cell(2, 7)]) }
         }
     }
@@ -121,6 +122,7 @@ class GameViewModelTest : CoroutineTest() {
             assertNull(state.falling, "a block was accepted during resolution")
 
             waitOutResolution()
+            declineContinue()
 
             assertPhase(GamePhase.Playing)
             assertFallingAt(col = 1, row = 0)
@@ -134,6 +136,7 @@ class GameViewModelTest : CoroutineTest() {
             act(GameAction.MoveLeft, GameAction.MoveLeft, GameAction.MoveRight)
 
             waitOutResolution()
+            declineContinue()
 
             assertFallingAt(col = 3, row = 0)
         }
@@ -174,6 +177,7 @@ class GameViewModelTest : CoroutineTest() {
             )
 
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.Playing)
             assertEquals(NumberBlock(BlockValue.V8), state.board[Cell(2, 7)])
             assertTrue(
@@ -203,6 +207,7 @@ class GameViewModelTest : CoroutineTest() {
             assertPhase(GamePhase.Resolving)
 
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.StackedOut)
             assertTrue(cues.contains(Cue.StackedOut), "no stacked-out cue")
             assertTrue(state.best >= state.score, "best did not absorb the final score")
@@ -232,6 +237,7 @@ class GameViewModelTest : CoroutineTest() {
 
             land()
             waitOutResolution()
+            declineContinue()
 
             assertTrue(state.score > 0, "the run scored something")
             assertTrue(state.score < PreviousBest, "and it is nowhere near the record")
@@ -263,6 +269,7 @@ class GameViewModelTest : CoroutineTest() {
 
             land()
             waitOutResolution()
+            declineContinue()
 
             assertPhase(GamePhase.StackedOut)
             assertEquals(state.score, state.best, "the record is the run that just set it")
@@ -286,6 +293,7 @@ class GameViewModelTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(GamePhase.StackedOut, state.phase)
             val recorded = recordedRuns().single()
@@ -339,6 +347,7 @@ class GameViewModelTest : CoroutineTest() {
             assertPhase(GamePhase.Resolving)
 
             waitOutResolution()
+            declineContinue()
             assertPhase(GamePhase.Playing)
         }
     }
@@ -379,6 +388,7 @@ class GameViewModelTest : CoroutineTest() {
         playing(fallingAt = Cell(2, 0)) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(24L, state.score, "the hard drop bonus did not reach the score")
         }
@@ -402,6 +412,7 @@ class GameViewModelTest : CoroutineTest() {
 
             act(GameAction.HardDrop)
             waitOutResolution()
+            declineContinue()
 
             assertFallingAt(col = 2, row = 0)
         }
@@ -429,6 +440,7 @@ class GameViewModelTest : CoroutineTest() {
             repeat(3) {
                 land()
                 waitOutResolution()
+                declineContinue()
             }
             assertPhase(GamePhase.Playing)
 
@@ -564,6 +576,7 @@ class GameViewModelTest : CoroutineTest() {
             val before = state.calloutNonce
             land()
             waitOutResolution()
+            declineContinue()
             assertEquals(GameCallout.Chain(step = 2), state.callout)
             assertTrue(state.calloutNonce > before, "expected the callout nonce to move")
         }

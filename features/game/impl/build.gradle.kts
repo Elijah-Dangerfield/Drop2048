@@ -52,10 +52,18 @@ kotlin {
             implementation(projects.libraries.navigation)
 
             implementation(projects.libraries.achievements)
+            // SPEC 12: the rewarded continue, the interstitial gate, and the
+            // Pro sheet the stacked-out card opens.
+            implementation(projects.libraries.ads)
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.leaderboards)
             implementation(projects.libraries.sharing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.gameconfig)
+            // ConfiguredValue is the supertype of `ads.rewarded.continuesPerRun`
+            // and :gameconfig keeps it internal to its own compilation, so
+            // calling one needs it here.
+            implementation(projects.libraries.config)
             implementation(projects.libraries.core)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.flowroutines)
@@ -86,6 +94,8 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(projects.libraries.ads)
+            implementation(projects.libraries.billing)
             implementation(projects.features.debug)
             implementation(projects.libraries.flowroutines.testing)
             // The screenshot harness in androidUnitTest names ControlScheme, and

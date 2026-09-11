@@ -3,7 +3,9 @@ package com.dangerfield.drop2048.features.game.impl
 import com.dangerfield.drop2048.features.debug.NoDebugController
 import com.dangerfield.drop2048.features.debug.NoDiagnostics
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
+import com.dangerfield.drop2048.libraries.ads.InMemoryRunActivity
 import com.dangerfield.drop2048.libraries.config.AppConfigMap
+import com.dangerfield.drop2048.libraries.gameconfig.RewardedContinuesPerRun
 import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.gameconfig.BlocksPerLevel
 import com.dangerfield.drop2048.libraries.gameconfig.BoardRows
@@ -129,6 +131,11 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         appLifecycle = FakeAppLifecycle(),
         debug = NoDebugController,
         diagnostics = NoDiagnostics,
+        adGate = FakeAdGate(),
+        interstitials = FakeInterstitialGate(),
+        runActivity = InMemoryRunActivity(),
+        paywall = FakePaywallCoordinator(),
+        continuesPerRun = RewardedContinuesPerRun(config),
     )
     if (viewModel.state.phase == GamePhase.Ready) viewModel.takeAction(GameAction.Start)
     return viewModel

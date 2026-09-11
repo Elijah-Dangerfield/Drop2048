@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.debug.impl
 
+import com.dangerfield.drop2048.libraries.billing.InMemoryProGrant
 import com.dangerfield.drop2048.features.debug.DebugMenuGate
 import com.dangerfield.drop2048.features.debug.PresetBoard
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
@@ -165,7 +166,7 @@ class DebugViewModelTest : CoroutineTest() {
                 controller = controller,
                 diagnostics = InMemoryDiagnostics(),
                 gate = gate,
-                entitlements = InMemoryDebugEntitlements(),
+                proGrant = InMemoryProGrant(),
                 daily = StubDailyRepository(),
                 appCache = cache,
                 clearableDaos = setOf(dao),

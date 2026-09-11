@@ -184,6 +184,50 @@ class GameScreenScreenshotTest {
     }
 
     /**
+     * SPEC 12.2's continue offer, and the golden that exists to prove one thing:
+     * **the board is still legible behind it.**
+     *
+     * The whole offer is an argument about what the player is saving, so a scrim
+     * that got one step darker, or a `blur` that crept back onto this phase,
+     * would take the argument away and nothing else would notice. It is also the
+     * frame that proves the countdown ring draws at all — the ring is deliberately
+     * un-animated so that capture cannot hang on it (see `CountdownRing`), which
+     * is a claim only a golden can settle.
+     */
+    @Test
+    fun continueOffer() = compose.captureScreen("game-continue-offer") {
+        playingState().copy(
+            phase = GamePhase.ContinueOffer,
+            board = dangerBoard(),
+            falling = null,
+            ghost = null,
+            biggestTier = 512,
+            continueSecondsLeft = 5,
+        )
+    }
+
+    /**
+     * SPEC 12's non-modal Pro card, below Drop again where SPEC 8.4 puts every
+     * offer, with the second continue above it.
+     *
+     * Its own frame rather than a variant of `game-stacked-out`, because the
+     * thing worth pinning is the *order and the weight*: the card must not read
+     * louder than the primary button, and it must not push it up the screen.
+     */
+    @Test
+    fun stackedOutWithUpsell() = compose.captureScreen("game-stacked-out-upsell") {
+        playingState().copy(
+            phase = GamePhase.StackedOut,
+            board = dangerBoard(),
+            falling = null,
+            ghost = null,
+            biggestTier = 512,
+            continueAvailable = true,
+            showUpsell = true,
+        )
+    }
+
+    /**
      * The four landing previews, one per test because
      * `ComposeContentTestRule.setContent` may only be called once per rule.
      *

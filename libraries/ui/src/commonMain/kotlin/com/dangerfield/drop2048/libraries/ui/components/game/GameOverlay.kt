@@ -38,11 +38,28 @@ import com.dangerfield.drop2048.libraries.ui.system.deepFace
 import com.dangerfield.drop2048.system.Radius
 import com.dangerfield.drop2048.system.typography.FredokaFontFamily
 
-/** Which of the three overlays is showing. They differ only in how dark the scrim is. */
+/**
+ * Which overlay is showing. They differ only in how dark the scrim is — and
+ * [Continue] differs in how *light* it is, which is the only interesting entry.
+ */
 enum class OverlayKind(internal val scrim: Color) {
     Start(GameColors.ScrimStart),
     Paused(GameColors.ScrimPaused),
     GameOver(GameColors.ScrimGameOver),
+
+    /**
+     * SPEC 8.4 and 12.2's rewarded continue offer, and the reason its scrim is
+     * the lightest in the app.
+     *
+     * **The player must be able to see exactly what they are saving.** This is
+     * the one overlay drawn over a board that still matters: a run they built
+     * over ten minutes, one row from the top, with the merge that killed them
+     * still on it. A scrim at the game-over weight would dim the thing the offer
+     * is about, and the caller deliberately does not blur underneath it either
+     * (which is also why `behind` is left null here — see L43: `Modifier.blur`
+     * clips to bounds at any radius, so "blur by zero" is not a no-op).
+     */
+    Continue(GameColors.ScrimContinue),
 }
 
 /**

@@ -6,6 +6,237 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-10 — There is one `ProEntitlement`, it lives in `:libraries:billing`, and the debug grant folds in above the store
+
+**Decision:** both `ProEntitlement` types are deleted. `Entitlements` in the new
+leaf library `:libraries:billing` is the single answer to "does this device own
+Pro", read by `SettingsViewModel`, by `DailyRepositoryImpl`, by
+`RealInterstitialGate` and by the paywall. QA's "grant Pro" is `ProGrant` in the
+same library, and `RealEntitlements` ORs it over the store's answer, so every
+consumer present and future gets it without knowing it exists.
+
+**The bug this closes was silent and shipped.** C11 put a `StateFlow`-shaped
+`ProEntitlement` in `:features:settings` and folded the debug grant into its
+binding. C6 had already put a synchronous `fun interface` of the same name in
+`:libraries:progress`, which is what decides SPEC 12's second Daily attempt. A
+library impl may not read a feature's api, so the two could never be the same
+object: granting Pro from the debug menu worked on the settings row, worked on
+everything the settings row gated, and silently did nothing for the Daily — the
+one perk a tester is least likely to check, because checking it costs a day.
+C12 wrote the gap down in `DebugEntitlements`' KDoc rather than fixing it, and
+`todos.md` carried it as a C10 prerequisite.
+
+**Alternatives.** Keeping two types and binding them from one source was
+rejected: two types for one fact means the question "is this player Pro" has two
+answers that agree by convention, and conventions are what the first version
+already was. Putting the shared type in `:libraries:progress` was rejected
+because the Daily's library has no business owning the store. Moving
+`DebugEntitlements` into `:libraries:billing` wholesale was rejected in favour of
+moving only the *flag*: the debug menu's screen state stays in the feature, and
+what crosses the boundary is one boolean.
+
+**The synchronous read survives.** C6's `fun interface` was deliberately not a
+`Flow`, because the day's allowance is a fact about the moment the attempt was
+requested and an entitlement that changed mid-run must not retroactively change
+it. `DailyRepositoryImpl` now reads `entitlements.isPro.value` at exactly that
+instant, which is the same answer; what the flow buys is a settings row that
+updates without polling.
+
+**The debug grant is never persisted.** It lives in `ProGrant`'s memory and dies
+with the process. A granted entitlement that survived a relaunch is
+indistinguishable from a billing bug, and the person most likely to hit it is the
+tester who granted it and forgot.
+
+---
+
+## 2026-09-10 — The interstitial is its own type with one caller, and the rules are a pure function
+
+**Decision:** interstitials are `InterstitialGate`, not a third `AdPlacement` on
+`AdGate`. It has one method that can show anything, one caller, and that caller
+is the code that has just watched the player dismiss a results sheet. Every rule
+in SPEC 12.3 is evaluated in `InterstitialPolicy.decide`, a pure function over an
+`InterstitialConditions` value with no clock, config, storage or DI in it.
+
+**Why the type split.** SPEC 12's governing principle — *the player never sees an
+ad they did not choose while a run is alive* — is the only rule the spec refuses
+to negotiate, and the defence that survives a year of edits is one where the
+unchosen format has no expressible call site inside a live run. Sodogku is the
+control: it shipped a `LevelComplete` interstitial as one entry in its rewarded
+placement enum, gave it three remote keys and a triple gate, and never called it.
+The one ad nobody asked for was a single call site away from shipping by
+accident, and deleting it was free precisely because nothing had ever used it.
+
+**Why a pure function.** Eight rules that all have to hold is eight ways to be
+wrong, and every wrong version is silent: nobody notices an interstitial that is
+ten percent too frequent, and nobody notices a gate that stopped being evaluated.
+`AdPolicyTest` holds one rule at a time against a positive baseline that *does*
+show — without the baseline a policy that refused everything would pass all eight
+negative cases — and asserts *which* block fired rather than that one did, so a
+deleted cooldown cannot be covered for by the install suppression happening to be
+true of the same player.
+
+**"Either direction" of the 45-second rule needed a second mechanism.** Backwards
+is arithmetic against a stored timestamp. Forwards is not, because the future is
+not a number you can subtract: the only moment the app knows a rewarded ad is
+about to happen is while one is on screen. So `RewardedClock` is held across the
+whole rewarded show and the policy refuses while it is raised. Without it the
+8-second continue countdown and the results dismissal are one mistimed tap away
+from racing each other.
+
+**`RunActivity` is asked, not passed.** The alternative was a `runAlive` argument
+on `showIfReady`, which is one type smaller and makes the governing principle the
+*caller's* rule — true as long as every present and future call site passes the
+right value, and silently false the first time one does not. Asked of the app, it
+is the ad layer's rule, and a call site that gets the moment wrong is refused
+rather than obeyed.
+
+---
+
+## 2026-09-10 — A Daily run is never offered a continue
+
+**Decision:** SPEC 12's rewarded continue is refused in `GameMode.DAILY`. The
+offer is not made, the sheet carries no continue option, and `GameViewModel`
+refuses the action as well as hiding the control.
+
+**Why.** This is the one place SPEC 12 and SPEC 14 have to be reconciled rather
+than both applied. The Daily's whole claim is that everybody played the same
+board — D18 goes as far as pinning `EngineConfig.Default` against remote config,
+and accepts that `EngineConfig.Default` can never move again, in order to keep
+two players' runs comparable. A continue clears the top three rows and drops a
+level, which is a larger change to the board than any config key could make and
+one that only some players would have. Watching an advert is not allowed to buy a
+better score on a leaderboard everyone shares.
+
+**Alternative considered:** allowing it and recording the continue count on
+`daily_result`, so a leaderboard could segregate. Rejected as a worse version of
+the same problem: two Daily leaderboards for one seed is two answers to "who won
+today", and the second one is the paid answer.
+
+**The rewarded Daily *retry* is untouched**, and the distinction is the one that
+matters: a retry is a fresh attempt at the same board from the beginning, which
+is a second sample of the same skill. A continue is a different board.
+
+---
+
+## 2026-09-10 — The second continue is reached for, not offered
+
+**Decision:** SPEC 12 asks for "1 free per run, a 2nd at higher friction, hard cap
+2". The first continue is offered automatically when the run ends, with the
+8-second auto-decline. The second is not offered at all: the stacked-out sheet
+carries a quiet option below "Drop again", and taking it goes straight to the ad
+with no countdown.
+
+**Why this is the friction.** The obvious reading of "higher friction" is a
+second offer with a longer countdown or an extra confirmation. Both are more
+friction to *sit through* and less to *accept*, which is backwards — the thing
+worth making harder is the decision, not the wait. A control the player has to go
+looking for costs nothing to ignore and requires an actual intent to use.
+
+It also solves a real case for free: a player who declined the first offer and
+changed their mind three seconds later can still take it. The eight seconds exist
+so a dead board does not sit waiting forever, not to punish someone for reading
+slowly. The cap is the cap either way.
+
+**No countdown on the second one**, because a sheet is not something that
+expires. The countdown belongs to an offer that appeared without being asked for.
+
+---
+
+## 2026-09-10 — The 8-second countdown is a ViewModel rule and the ring is not animated
+
+**Decision:** `GameViewModel` publishes `continueSecondsLeft` as an integer,
+decremented once a second by a coroutine, and declines the offer at zero.
+`CountdownRing` draws the arc straight off that integer. Nothing animates.
+
+**Why.** The countdown ends a run, so it is a rule, and a rule belongs where it
+can be tested without a frame clock. Drawing off the published integer also means
+the ring can never disagree with the thing that is actually counting — an
+animated ring on its own spec can sit at 1.2 seconds after the decline has
+already fired, leaving the player looking at a control that no longer does
+anything.
+
+It removes two hazards that meet exactly here. Reading an animated value during
+composition fails the repo's own detekt rule, and an `animateFloatAsState` left
+running under `LocalInspectionMode` **hangs** screenshot capture rather than
+failing it — so `game-continue-offer.png` would simply never finish recording.
+The golden existing at all is the proof.
+
+The cost is that the sweep steps eight times instead of gliding. On a control
+counting down to a decision, a step per second is arguably the more honest
+reading.
+
+---
+
+## 2026-09-10 — The continue offer keeps the board sharp and puts the copy on a plate
+
+**Decision:** `OverlayKind.Continue` is the lightest scrim in the app (0.42
+against the game-over sheet's 0.90), the board underneath is **not** blurred, and
+the offer's copy sits on its own translucent panel inside the overlay.
+
+**Why the panel exists.** SPEC 12.2's requirement is that the player sees exactly
+what they are saving, which pulls against the other requirement — that the offer
+itself is readable. A scrim dark enough for white text over a 1024 tile takes the
+board away; a scrim light enough to show the board puts "Keep going?" on top of a
+tile face, which the first recorded golden showed plainly. The scrim stays light
+and the text gets a plate, so the stack reads all around it.
+
+**The blur is applied conditionally, not at radius zero.** L43: `Modifier.blur`
+clips to its bounds at any radius including zero, and passing zero as a no-op was
+already caught once shaving the board well's ring off three sides. `GameScreen`
+therefore branches on the phase rather than on the radius.
+
+---
+
+## 2026-09-10 — A malformed boolean falls back to its compiled default
+
+**Decision:** `getValueRecursive` parses booleans with `toBooleanStrictOrNull`
+instead of `toBoolean`.
+
+**Why now.** L48 recorded the behaviour during C7 and noted it mattered "before
+C10 leans on these keys". `toBoolean` answers `false` for anything that is not
+the literal `"true"`, so a corrupted remote value did not fall back — it silently
+became `false`. SPEC 10 asks for the opposite in as many words: *a malformed
+remote value falls back to the compiled default instead of crashing.*
+
+For `ads.enabled` the old behaviour was arguably safe, since garbage turned
+advertising off. For `feature.dailyChallenge` and `feature.leaderboards` it
+removed a whole feature with no error anywhere and no way to tell it from a
+deliberate kill switch — and both default **on** precisely so that an unreachable
+server leaves the game exactly as the binary ships it. A one-character typo in the
+admin console defeated that.
+
+---
+
+## 2026-09-10 — A debug session sees every ad surface, and still writes nothing
+
+**Decision:** neither the continue nor the interstitial is gated on
+`StartedRun.debug`. A debug run may take a rewarded continue, counts towards "not
+before the 4th run of a session", and can be shown an interstitial. Pro can be
+granted freely. What is gated is unchanged: `endRun` still refuses `run_record`,
+`daily_result`, the leaderboard submission and the achievement fact for a debug
+session, exactly as L63 left it.
+
+**This was decided the other way first, and reversed by trying to use it.** The
+first version refused the continue on the argument that it changes a run's
+outcome and a tester with a seed switch should not be able to rewind a board.
+Installing the build to play it (L56) showed what that costs: the only practical
+way to reach a stacked-out board on purpose is the debug menu's preset boards and
+forced-block queue, so refusing the continue for a debug session made the new
+screen **unreachable by hand** — on the chunk whose whole risk is a screen nobody
+has looked at.
+
+The argument was also weaker than it read. L63's list is four *writes*, and a
+continue is not one of them; `endRun` already refuses all four for a debug run
+whether it was continued or not, so a continued debug run reaches the economy
+exactly as much as an uncontinued one, which is not at all. The second guard was
+saying the same thing as the first one and charging QA for it.
+
+**The general shape:** a debug gate that blocks a *write* is worth having, and a
+debug gate that blocks a *screen* is usually the tester paying for a rule that is
+already enforced somewhere else. Ask which of the two it is before adding one.
+
+---
+
 ## 2026-09-10 — ▼ is a hard drop, soft drop is deleted, and the bonus comes back with it
 
 **Decision:** D21. The ▼ control and the downward flick send the falling block to

@@ -3,6 +3,17 @@ package com.dangerfield.drop2048.features.game.impl
 import com.dangerfield.drop2048.features.debug.DebugController
 import com.dangerfield.drop2048.features.debug.NoDebugController
 import com.dangerfield.drop2048.features.debug.NoDiagnostics
+import com.dangerfield.drop2048.libraries.ads.AdGate
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.InMemoryRunActivity
+import com.dangerfield.drop2048.libraries.ads.InterstitialGate
+import com.dangerfield.drop2048.libraries.ads.RewardOutcome
+import com.dangerfield.drop2048.libraries.ads.RunActivity
+import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
+import com.dangerfield.drop2048.libraries.billing.PaywallRequest
+import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
+import com.dangerfield.drop2048.libraries.config.AppConfigMap
+import com.dangerfield.drop2048.libraries.gameconfig.RewardedContinuesPerRun
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
@@ -46,6 +57,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -78,6 +90,11 @@ internal class GameScenario private constructor(
     val lifecycle: FakeAppLifecycle,
     val clock: MutableClock,
     private val debug: DebugController,
+    val ads: FakeAdGate,
+    val interstitials: FakeInterstitialGate,
+    val runActivity: RunActivity,
+    val paywall: FakePaywallCoordinator,
+    private val continuesPerRun: Int,
 ) {
     val cues = mutableListOf<Cue>()
     val effects = mutableListOf<GameEffect>()
@@ -120,6 +137,17 @@ internal class GameScenario private constructor(
             appLifecycle = lifecycle,
             debug = debug,
             diagnostics = NoDiagnostics,
+            adGate = ads,
+            interstitials = interstitials,
+            runActivity = runActivity,
+            paywall = paywall,
+            continuesPerRun = RewardedContinuesPerRun(
+                object : AppConfigMap() {
+                    override val map: Map<String, *> = mapOf(
+                        "ads" to mapOf("rewarded" to mapOf("continuesPerRun" to continuesPerRun)),
+                    )
+                },
+            ),
         )
         collectorScope.launch {
             viewModel.eventFlow.collect { effect ->
@@ -182,6 +210,21 @@ internal class GameScenario private constructor(
             advance(ResolutionStepMillis)
             elapsed += ResolutionStepMillis
         }
+    }
+
+    /**
+     * Refuse SPEC 12's rewarded continue, which since C10 sits between the last
+     * cascade and the results sheet.
+     *
+     * Every test that is about a run *ending* has to go through it, and saying so
+     * in one call is better than the two alternatives: turning the offer off in
+     * the fixture, which would leave forty tests asserting about a game
+     * configuration nobody ships, or folding the decline into
+     * [waitOutResolution], which would hide the one screen this chunk added from
+     * every test that walks past it.
+     */
+    fun declineContinue() {
+        if (viewModel.state.phase == GamePhase.ContinueOffer) act(GameAction.ContinueDecline)
     }
 
     fun act(vararg actions: GameAction) {
@@ -268,6 +311,14 @@ internal class GameScenario private constructor(
              * about the game, which is all of them but one.
              */
             debug: DebugController = NoDebugController,
+            /** What the rewarded continue's ad network answers (SPEC 12). */
+            ads: FakeAdGate = FakeAdGate(),
+            /** Whether an interstitial is available when the results are dismissed. */
+            interstitials: FakeInterstitialGate = FakeInterstitialGate(),
+            /** Whether the once-per-session upsell card is still there. */
+            paywall: FakePaywallCoordinator = FakePaywallCoordinator(),
+            /** `ads.rewarded.continuesPerRun`. SPEC 12's hard cap is 2. */
+            continuesPerRun: Int = 2,
             body: GameScenario.() -> T,
         ): T {
             val board = boardOf(picture, config.cols, config.rows)
@@ -292,6 +343,11 @@ internal class GameScenario private constructor(
                 lifecycle = FakeAppLifecycle(),
                 clock = MutableClock(),
                 debug = debug,
+                ads = ads,
+                interstitials = interstitials,
+                runActivity = InMemoryRunActivity(),
+                paywall = paywall,
+                continuesPerRun = continuesPerRun,
             )
             scenario.launch(backgroundScope)
             if (pressPlay && scenario.state.phase == GamePhase.Ready) {
@@ -549,5 +605,82 @@ internal class MutableClock(private var millis: Long = 0) : Clock {
 
     fun advance(by: Long) {
         millis += by
+    }
+}
+
+/**
+ * The rewarded gate, as something a scenario can set an answer on.
+ *
+ * It records [requests] rather than only returning, because half of what SPEC 12
+ * asks for is about ads that are *not* asked for — a Daily run must never reach
+ * this, and neither must a third continue.
+ */
+internal class FakeAdGate(
+    var outcome: RewardOutcome = RewardOutcome.Rewarded,
+) : AdGate {
+    val requests = mutableListOf<AdPlacement>()
+    val preloads = mutableListOf<AdPlacement>()
+
+    override suspend fun showRewarded(placement: AdPlacement): RewardOutcome {
+        requests += placement
+        return outcome
+    }
+
+    override fun preload(placement: AdPlacement) {
+        preloads += placement
+    }
+}
+
+/**
+ * The interstitial gate, recording the three things the game says to it.
+ *
+ * [shows] is the assertion that matters: SPEC 12 allows exactly one moment for
+ * an interstitial, and every test about the governing principle is a test that
+ * this list is empty.
+ */
+internal class FakeInterstitialGate(
+    var ready: Boolean = true,
+) : InterstitialGate {
+    var runsFinished = 0
+        private set
+    var rewardedNotices = 0
+        private set
+    var shows = 0
+        private set
+
+    override fun noteRunFinished() {
+        runsFinished++
+    }
+
+    override suspend fun showIfReady(): Boolean {
+        shows++
+        return ready
+    }
+
+    override fun noteRewardedShown() {
+        rewardedNotices++
+    }
+
+    override fun preload() = Unit
+}
+
+internal class FakePaywallCoordinator(
+    var cardAvailable: Boolean = true,
+) : PaywallCoordinator {
+    val offers = mutableListOf<PaywallTrigger>()
+    var cardClaims = 0
+        private set
+
+    /** Nothing collects it here: the navigator that does lives in another module. */
+    override val requests: Flow<PaywallRequest> = emptyFlow()
+
+    override fun requestOffer(trigger: PaywallTrigger): Boolean {
+        offers += trigger
+        return true
+    }
+
+    override fun claimStackedOutCard(): Boolean {
+        cardClaims++
+        return cardAvailable
     }
 }

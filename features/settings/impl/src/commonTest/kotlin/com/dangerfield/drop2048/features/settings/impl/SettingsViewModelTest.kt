@@ -1,8 +1,12 @@
 package com.dangerfield.drop2048.features.settings.impl
 
-import com.dangerfield.drop2048.features.settings.AdConsent
-import com.dangerfield.drop2048.features.settings.ProEntitlement
-import com.dangerfield.drop2048.features.settings.RestoreOutcome
+import com.dangerfield.drop2048.libraries.ads.AdConsent
+import com.dangerfield.drop2048.libraries.billing.Entitlements
+import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
+import com.dangerfield.drop2048.libraries.billing.PaywallRequest
+import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
+import com.dangerfield.drop2048.libraries.billing.PurchaseOutcome
+import com.dangerfield.drop2048.libraries.billing.RestoreOutcome
 import com.dangerfield.drop2048.libraries.config.AppConfigMap
 import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
@@ -10,7 +14,9 @@ import com.dangerfield.drop2048.libraries.gameconfig.LegalPrivacyUrl
 import com.dangerfield.drop2048.libraries.gameconfig.LegalTermsUrl
 import com.dangerfield.drop2048.libraries.ui.system.HapticsSetting
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -161,6 +167,7 @@ class SettingsViewModelTest : CoroutineTest() {
             eraser = PlayerDataEraser(setOf(dao), cache),
             entitlement = NeverProEntitlement(),
             adConsent = NoAdConsent(),
+            paywall = RecordingPaywall(),
             termsUrl = LegalTermsUrl(EmptyConfigMap),
             privacyUrl = LegalPrivacyUrl(EmptyConfigMap),
         )
@@ -176,8 +183,9 @@ class SettingsViewModelTest : CoroutineTest() {
     )
 }
 
-private class NeverProEntitlement : ProEntitlement {
+private class NeverProEntitlement : Entitlements {
     override val isPro: StateFlow<Boolean> = MutableStateFlow(false)
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.Unavailable
 }
 
@@ -192,4 +200,21 @@ private class NoAdConsent : AdConsent {
  */
 private object EmptyConfigMap : AppConfigMap() {
     override val map: Map<String, Any> = emptyMap()
+}
+
+/**
+ * SPEC 12's Settings entry goes through the coordinator rather than to a route,
+ * so what a test can see is the trigger it asked with.
+ */
+private class RecordingPaywall : PaywallCoordinator {
+    val offers = mutableListOf<PaywallTrigger>()
+
+    override val requests: Flow<PaywallRequest> = emptyFlow()
+
+    override fun requestOffer(trigger: PaywallTrigger): Boolean {
+        offers += trigger
+        return true
+    }
+
+    override fun claimStackedOutCard(): Boolean = false
 }

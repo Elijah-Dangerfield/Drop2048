@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.game.impl
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -52,6 +54,8 @@ import com.dangerfield.drop2048.libraries.ui.components.Screen
 import com.dangerfield.drop2048.libraries.ui.components.dialog.BasicDialog
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardRadius
 import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
+import com.dangerfield.drop2048.libraries.ui.components.game.CountdownRing
+import com.dangerfield.drop2048.libraries.ui.components.game.ProUpsellCard
 import com.dangerfield.drop2048.libraries.ui.components.game.FixedWidthDigits
 import com.dangerfield.drop2048.libraries.ui.components.game.GameControlRow
 import com.dangerfield.drop2048.features.achievements.AchievementCopy
@@ -79,6 +83,12 @@ import com.dangerfield.drop2048.system.thenIf
 import com.dangerfield.drop2048.system.typography.FredokaFontFamily
 import com.dangerfield.drop2048.system.typography.NunitoFontFamily
 import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.continue_body
+import drop2048.libraries.resources.generated.resources.continue_body_second
+import drop2048.libraries.resources.generated.resources.continue_countdown_description
+import drop2048.libraries.resources.generated.resources.continue_decline
+import drop2048.libraries.resources.generated.resources.continue_title
+import drop2048.libraries.resources.generated.resources.continue_watch
 import drop2048.libraries.resources.generated.resources.game_best_score
 import drop2048.libraries.resources.generated.resources.game_biggest
 import drop2048.libraries.resources.generated.resources.game_board
@@ -114,6 +124,9 @@ import drop2048.libraries.resources.generated.resources.game_stacked_out
 import drop2048.libraries.resources.generated.resources.game_start_body
 import drop2048.libraries.resources.generated.resources.game_stats
 import drop2048.libraries.resources.generated.resources.share_run
+import drop2048.libraries.resources.generated.resources.upsell_card_action
+import drop2048.libraries.resources.generated.resources.upsell_card_body
+import drop2048.libraries.resources.generated.resources.upsell_card_title
 import drop2048.libraries.resources.generated.resources.game_tap_to_resume
 import drop2048.libraries.resources.generated.resources.tutorial_begin
 import drop2048.libraries.resources.generated.resources.tutorial_burst_body
@@ -189,6 +202,14 @@ fun GameScreen(
     val live = state.phase == GamePhase.Playing
     val covered = state.phase != GamePhase.Playing && state.phase != GamePhase.Resolving
 
+    // SPEC 12.2: the continue offer keeps the board visible behind its scrim,
+    // because the board is the entire argument for taking the offer. It is the
+    // one covered phase that is deliberately left sharp — and the modifier is
+    // applied conditionally rather than with a zero radius, because
+    // `Modifier.blur` clips to its bounds at any radius including zero (L43) and
+    // would shave the well's ring off three sides.
+    val blurred = covered && state.phase != GamePhase.ContinueOffer
+
     val registry = remember { FocusRegistry() }
 
     GameBackHandler(phase = state.phase, onAction = onAction)
@@ -211,7 +232,7 @@ fun GameScreen(
 
                     BoardArea(
                         state = state,
-                        covered = covered,
+                        blurred = blurred,
                         onAction = onAction,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
@@ -434,7 +455,7 @@ private val DropFocusKey = FocusTargetKey("game-drop")
 @Composable
 private fun BoardArea(
     state: GameUiState,
-    covered: Boolean,
+    blurred: Boolean,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -468,7 +489,7 @@ private fun BoardArea(
                     onFlickDown = { onAction(GameAction.HardDrop) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .thenIf(covered) { blur(OverlayBlur) },
+                        .thenIf(blurred) { blur(OverlayBlur) },
                 )
 
                 when (state.phase) {
@@ -480,6 +501,12 @@ private fun BoardArea(
 
                     GamePhase.Paused -> PauseOverlay(
                         daily = state.mode == GameMode.DAILY,
+                        onAction = onAction,
+                        modifier = Modifier.matchParentSize(),
+                    )
+
+                    GamePhase.ContinueOffer -> ContinueOverlay(
+                        state = state,
                         onAction = onAction,
                         modifier = Modifier.matchParentSize(),
                     )
@@ -633,6 +660,74 @@ private fun MenuOptions(
     }
 }
 
+
+/**
+ * SPEC 12.2's rewarded continue, over a board that is still legible.
+ *
+ * ### Everything about this screen is arguing one point
+ *
+ * The player is about to lose a run they have been building for ten minutes, and
+ * the offer only makes sense if they can see it. So the scrim is the lightest in
+ * the app, the board underneath is **not blurred** (the one covered phase where
+ * it is not), and the copy is two short lines so it does not take the space the
+ * argument lives in.
+ *
+ * ### The countdown is drawn, not animated
+ *
+ * [CountdownRing] renders the integer the ViewModel publishes. That keeps the
+ * ring honest — it can never sit at 1.2 seconds after the rule has already
+ * fired — and it keeps this composable clear of the two hazards that meet
+ * exactly here: reading an animated value during composition fails the repo's
+ * detekt rule, and an animation left running under `LocalInspectionMode` hangs
+ * screenshot capture rather than failing it, so the golden would never finish.
+ *
+ * ### No tap-to-dismiss
+ *
+ * Unlike the pause overlay. A stray tap anywhere on the board must not decline
+ * an offer that ends the run — "No thanks" is a target the player has to mean to
+ * hit, and the eight seconds are there for the case where they mean nothing at
+ * all.
+ */
+@Composable
+private fun ContinueOverlay(
+    state: GameUiState,
+    onAction: (GameAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GameOverlay(kind = OverlayKind.Continue, modifier = modifier) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(OfferGap),
+            modifier = Modifier
+                .background(GameColors.BackdropMid.copy(alpha = OfferPanelAlpha), OfferPanelShape)
+                .padding(horizontal = OfferPanelPaddingX, vertical = OfferPanelPaddingY),
+        ) {
+            CountdownRing(
+                secondsLeft = state.continueSecondsLeft,
+                totalSeconds = ContinueCountdownSeconds,
+                contentDescription = stringResource(
+                    Res.string.continue_countdown_description,
+                    state.continueSecondsLeft,
+                ),
+            )
+            OverlayHeadline(stringResource(Res.string.continue_title))
+            OverlayBody(
+                stringResource(
+                    if (state.continueAvailable) Res.string.continue_body_second
+                    else Res.string.continue_body,
+                ),
+            )
+            GamePrimaryButton(
+                label = stringResource(Res.string.continue_watch),
+                onClick = { onAction(GameAction.ContinueAccept) },
+            )
+            OverlayOption(stringResource(Res.string.continue_decline)) {
+                onAction(GameAction.ContinueDecline)
+            }
+        }
+    }
+}
+
 /**
  * SPEC 8.4, drawn as the handoff draws it plus the three options the prototype
  * has nowhere to put.
@@ -719,9 +814,54 @@ private fun StackedOutOverlay(
             horizontalPadding = DropAgainPaddingX,
             verticalPadding = DropAgainPaddingY,
         )
+        // SPEC 8.4: continue and any ad offer sit below the primary button,
+        // never above. Both of these are that, and the order is the order of how
+        // much they are worth to a player who has just lost a board.
+        if (state.continueAvailable && !daily) {
+            OverlayOption(stringResource(Res.string.continue_watch)) {
+                onAction(GameAction.ContinueAgain)
+            }
+        }
         MenuOptions(daily = !daily, onAction = onAction, share = true)
+        if (state.showUpsell) {
+            ProUpsellCard(
+                title = stringResource(Res.string.upsell_card_title),
+                body = stringResource(Res.string.upsell_card_body),
+                action = stringResource(Res.string.upsell_card_action),
+                onClick = { onAction(GameAction.OpenPro) },
+            )
+        }
     }
 }
+
+/**
+ * SPEC 8.4's eight seconds, as the ring needs them.
+ *
+ * Duplicated from `GameViewModel` rather than published on the state, because it
+ * is the *denominator* of a fraction the screen draws and never a fact about the
+ * run. Putting it on `GameUiState` would mean every test that builds a state has
+ * an opinion about it, and every golden pins it.
+ */
+private const val ContinueCountdownSeconds = 8
+
+/**
+ * The copy sits on its own plate rather than straight on the board.
+ *
+ * The offer has two requirements that pull against each other: the board must
+ * stay readable (SPEC 12.2 — it is the whole argument) and the offer must be
+ * readable too. A scrim dark enough for white text over 1024s takes the board
+ * away; a scrim light enough to show the board puts "Keep going?" on top of a
+ * tile face. So the scrim stays light and the *text* gets a panel, which leaves
+ * the stack visible all around it and behind the well's own margins.
+ *
+ * It is a plain translucent surface rather than a `DeepSurface`: nothing here is
+ * pressable, and the chunky treatment belongs to things the player touches.
+ */
+private val OfferPanelShape = RoundedCornerShape(20.dp)
+private const val OfferPanelAlpha = 0.93f
+private val OfferPanelPaddingX: Dp = 20.dp
+private val OfferPanelPaddingY: Dp = 18.dp
+private val OfferGap: Dp = 12.dp
 
 @Composable
 private fun finalStatStyle() = TextStyle(

@@ -1010,6 +1010,30 @@ publishes what it unlocked; `GameFeatureEntryPoint` assembles the share string a
 governing principle holds: no unchosen ad while a run is alive. Sodogku shipped an iOS ad stub
 that paid out rewards for free; check the iOS network is real before this chunk closes.
 
+**Outcome.** Four modules, ported and stripped. `:libraries:ads` is the two rewarded placements
+plus a **separate** `InterstitialGate` — a separate type rather than a third placement, because
+SPEC 12's governing principle only survives a year of edits if the unchosen format has no
+expressible call site inside a live run. Sodogku is the control: it shipped an interstitial
+placement in its rewarded enum, gave it three remote keys, and never called it.
+
+Every gate in SPEC 12.3 is a branch of `InterstitialPolicy.decide`, a pure function with no clock,
+config, storage or DI in it. `AdPolicyTest` holds one rule at a time against a positive baseline
+that **does** show, and asserts which block fired rather than that one did.
+
+**The two `ProEntitlement` seams are one type**, `Entitlements` in the new `:libraries:billing`.
+They could never have agreed — one lived in a feature the other could not read — so the debug
+menu's Pro grant worked everywhere except the Daily's second attempt, silently. The grant is now
+`ProGrant` in the same library and `RealEntitlements` folds it in above the store.
+
+**iOS serves no ads and sells nothing.** Android is real on both (AdMob + UMP, Play Billing 8).
+iOS falls through to bindings that answer `NotShown` and `Unknown`, and the ad one **cannot**
+report a reward — which is the whole lesson from Sodogku's stub. Both are owner-blocked on an
+AdMob app, an App Store Connect product and Swift implementations handed in through
+`IosAppComponent`.
+
+L48's malformed boolean is fixed here rather than left: `feature.dailyChallenge` and
+`feature.leaderboards` were one typo in the admin console away from silently disappearing.
+
 ---
 
 ## C11 · Settings, legal, gates, accessibility

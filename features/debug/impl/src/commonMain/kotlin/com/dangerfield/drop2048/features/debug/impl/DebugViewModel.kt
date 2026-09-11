@@ -2,7 +2,7 @@ package com.dangerfield.drop2048.features.debug.impl
 
 import androidx.lifecycle.viewModelScope
 import com.dangerfield.drop2048.features.debug.DebugController
-import com.dangerfield.drop2048.features.debug.DebugEntitlements
+import com.dangerfield.drop2048.libraries.billing.ProGrant
 import com.dangerfield.drop2048.features.debug.DebugMenuGate
 import com.dangerfield.drop2048.features.debug.DebugOverrides
 import com.dangerfield.drop2048.features.debug.Diagnostics
@@ -60,7 +60,7 @@ class DebugViewModel(
     private val controller: DebugController,
     private val diagnostics: Diagnostics,
     private val gate: DebugMenuGate,
-    private val entitlements: DebugEntitlements,
+    private val proGrant: ProGrant,
     private val daily: DailyRepository,
     private val appCache: AppCache,
     private val clearableDaos: Set<ClearableDao>,
@@ -88,7 +88,7 @@ class DebugViewModel(
             .map { it.describe() }
             .collectIn(viewModelScope) { takeAction(DebugAction.TranscriptChanged(it)) }
         gate.isUnlocked.collectIn(viewModelScope) { takeAction(DebugAction.UnlockChanged(it)) }
-        entitlements.proGranted.collectIn(viewModelScope) { takeAction(DebugAction.ProChanged(it)) }
+        proGrant.granted.collectIn(viewModelScope) { takeAction(DebugAction.ProChanged(it)) }
     }
 
     @Suppress("CyclomaticComplexMethod")
@@ -142,8 +142,8 @@ class DebugViewModel(
             DebugAction.ToggleMergeArrows -> diagnose { it.copy(showMergeArrows = !it.showMergeArrows) }
             DebugAction.ToggleTranscript -> diagnose { it.copy(showTranscript = !it.showTranscript) }
 
-            is DebugAction.SetProGranted -> entitlements.setProGranted(action.granted)
-            DebugAction.ResetPurchases -> entitlements.resetPurchases()
+            is DebugAction.SetProGranted -> proGrant.setGranted(action.granted)
+            DebugAction.ResetPurchases -> proGrant.setGranted(false)
             DebugAction.ClearDailyToday -> action.clearDaily()
 
             DebugAction.ResetTutorial -> action.resetTutorial()

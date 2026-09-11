@@ -83,6 +83,11 @@ if (!serverOnly) {
     include(":features:debug:impl")
     include(":features:game")
     include(":features:game:impl")
+    // SPEC 12's Pro sheet, and the only screen in the app that sells anything.
+    // A feature rather than a dialog inside Settings because the ad layer and the
+    // stacked-out sheet both open it, and neither of those should know a route.
+    include(":features:paywall")
+    include(":features:paywall:impl")
     // Force update, maintenance and legal re-accept. Rendered *instead of* the
     // nav host rather than navigated to, so a blocking gate has no back stack
     // entry to pop and no destination a deep link can land behind.
@@ -96,6 +101,17 @@ if (!serverOnly) {
     include(":features:stats:impl")
 
     // Libraries
+    // SPEC 12's advertising: the two rewarded placements, the interstitial and
+    // every gate in 12.3. No banners, ever — the reasoning is in the spec and in
+    // `AdFormat`.
+    include(":libraries:ads")
+    include(":libraries:ads:impl")
+    // The one-time Pro purchase, and the single `Entitlements` every part of the
+    // app reads. It is a leaf library because two features *and* two library
+    // impls ask the same question, and before C10 there were two types answering
+    // it differently.
+    include(":libraries:billing")
+    include(":libraries:billing:impl")
     // SPEC 15's twenty-four badges: the catalog, the fold over the fact log, and
     // the `achievement_fact` / `achievement_unlock` tables. They unlock and post
     // and pay nothing — SPEC 2 cut the currency they used to pay in.

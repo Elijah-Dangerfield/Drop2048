@@ -181,6 +181,8 @@
     <string name="settings_pro_status">Pro</string>
     <string name="settings_pro_active">Active</string>
     <string name="settings_pro_inactive">Not active</string>
+    <string name="settings_pro_upgrade">Go Pro</string>
+    <string name="settings_pro_hint">No ads, every palette, two Daily attempts, two continues.</string>
     <string name="settings_restore">Restore purchases</string>
     <string name="settings_restore_working">Asking the store…</string>
     <string name="settings_restore_restored">Pro restored. Thank you.</string>
@@ -358,4 +360,36 @@
 
     <string name="settings_achievements">Achievements</string>
     <string name="settings_achievements_hint">Twenty-four badges, and how far you are into each.</string>
+    <!-- SPEC 12: the Pro sheet, the two rewarded placements, and the upsell card. -->
+    <string name="paywall_title">Drop 2048 Pro</string>
+    <string name="paywall_subtitle">One purchase. Yours forever.</string>
+    <string name="paywall_perk_ads">No interstitial ads, ever</string>
+    <string name="paywall_perk_ads_detail">Rewarded videos stay, if you want them. Nothing interrupts a run.</string>
+    <string name="paywall_perk_palettes">Every block palette</string>
+    <string name="paywall_perk_palettes_detail">All five, including the three built for colour vision.</string>
+    <string name="paywall_perk_daily">Two Daily attempts</string>
+    <string name="paywall_perk_daily_detail">Instead of one. Same seed, same board, one more go.</string>
+    <string name="paywall_perk_continues">Two continues a run</string>
+    <string name="paywall_perk_continues_detail">Instead of one, after you stack out.</string>
+    <string name="paywall_buy">Go Pro</string>
+    <string name="paywall_buy_priced">Go Pro · %1$s</string>
+    <string name="paywall_restore">Restore purchase</string>
+    <string name="paywall_owned">You have Pro. Thank you.</string>
+    <string name="paywall_close">Close</string>
+    <string name="paywall_nothing_to_restore">Nothing to restore on this device.</string>
+    <string name="paywall_unavailable">Could not reach the store. Try again in a moment.</string>
+    <string name="paywall_failed">That did not go through. You have not been charged.</string>
+
+    <string name="upsell_card_title">Tired of the ads?</string>
+    <string name="upsell_card_body">Pro removes them, unlocks every palette, and doubles your continues.</string>
+    <string name="upsell_card_action">See Pro</string>
+
+    <string name="continue_title">Keep going?</string>
+    <string name="continue_body">Watch an ad to clear the top three rows and drop a level. Your score stays.</string>
+    <string name="continue_body_second">One more, and it is your last. Same deal: three rows cleared, a level back.</string>
+    <string name="continue_watch">Watch and continue</string>
+    <string name="continue_decline">No thanks</string>
+    <string name="continue_countdown">%1$d</string>
+    <string name="continue_countdown_description">%1$d seconds left to decide</string>
+    <string name="continue_unavailable">No ad to show right now, so this one is on us.</string>
 </resources>

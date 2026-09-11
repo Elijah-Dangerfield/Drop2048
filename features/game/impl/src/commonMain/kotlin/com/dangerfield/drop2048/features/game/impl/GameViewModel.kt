@@ -17,6 +17,13 @@ import androidx.lifecycle.viewModelScope
 import com.dangerfield.drop2048.libraries.achievements.AchievementId
 import com.dangerfield.drop2048.libraries.achievements.AchievementsRepository
 import com.dangerfield.drop2048.libraries.achievements.outcomeWith
+import com.dangerfield.drop2048.libraries.ads.AdGate
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.InterstitialGate
+import com.dangerfield.drop2048.libraries.ads.RewardOutcome
+import com.dangerfield.drop2048.libraries.ads.RunActivity
+import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
+import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
 import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.logging.KLog
@@ -29,6 +36,7 @@ import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.flowroutines.collectIn
+import com.dangerfield.drop2048.libraries.gameconfig.RewardedContinuesPerRun
 import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
@@ -110,6 +118,11 @@ class GameViewModel(
     private val appLifecycle: AppLifecycle,
     private val debug: DebugController,
     private val diagnostics: Diagnostics,
+    private val adGate: AdGate,
+    private val interstitials: InterstitialGate,
+    private val runActivity: RunActivity,
+    private val paywall: PaywallCoordinator,
+    private val continuesPerRun: RewardedContinuesPerRun,
 ) : SEAViewModel<GameUiState, GameEffect, GameAction>(initialStateArg = GameUiState()) {
 
     private val logger = KLog.withTag("Game")
@@ -164,6 +177,17 @@ class GameViewModel(
     private var tickerJob: Job? = null
     private var lockJob: Job? = null
     private var playbackJob: Job? = null
+
+    /**
+     * SPEC 12's continue counter, per run. Reset in [adopt] with everything else
+     * a fresh run has to forget — a cap that survived into the next run would
+     * make the second run of a session the one with no continues in it, which is
+     * the opposite of what a per-run cap means.
+     */
+    private var continuesUsed = 0
+
+    /** The 8-second auto-decline (SPEC 8.4). Cancelled by either answer. */
+    private var countdownJob: Job? = null
 
     private var lockPending = false
     private var lockResetUsed = false
@@ -249,6 +273,11 @@ class GameViewModel(
             is GameAction.SetReduceMotion -> reduceMotion = action.enabled
             is GameAction.ShowFrame -> action.showFrame(action.index)
             GameAction.FinishResolution -> action.finishResolution()
+            GameAction.ContinueAccept -> action.continueAccept()
+            GameAction.ContinueDecline -> action.continueDecline()
+            GameAction.ContinueAgain -> action.continueAgain()
+            is GameAction.ContinueTick -> action.continueTick(action.secondsLeft)
+            GameAction.OpenPro -> paywall.requestOffer(PaywallTrigger.StackedOut)
         }
     }
 
@@ -538,6 +567,13 @@ class GameViewModel(
         dailyDate = day
         engine = run.state
         tally = RunTally(highestTier = engine.board.highestValue()?.points ?: 0)
+        continuesUsed = 0
+        // The ad layer asks this rather than being told by an argument, so that
+        // SPEC 12's governing principle is the gate's rule rather than a
+        // convention every call site has to keep. See `RunActivity`.
+        runActivity.runStarted()
+        interstitials.preload()
+        adGate.preload(AdPlacement.ContinueRun)
         logger.logEvent("run.start", "level" to engine.level, "mode" to run.mode.name)
     }
 
@@ -784,6 +820,11 @@ class GameViewModel(
      * see and could not touch, because the scrim is a real input barrier.
      */
     private suspend fun GameAction.restart() {
+        // "Drop again" *is* the dismissal (SPEC 12), so this is one of the two
+        // call sites an interstitial can ever come from. It suspends, and the
+        // reset below happens after the ad closes — a run started behind a
+        // full-screen ad is a run the player is losing while they cannot see it.
+        dismissResults()
         if (started.mode == GameMode.DAILY) {
             sendEvent(GameEffect.Leave)
             return
@@ -905,6 +946,9 @@ class GameViewModel(
      * so there is a run behind that overlay and Play picks it back up.
      */
     private suspend fun GameAction.leaveRun() {
+        // The other dismissal. Quitting from the pause overlay is not one — the
+        // run is still alive there, and the gate refuses it anyway.
+        dismissResults()
         if (started.mode == GameMode.DAILY) {
             sendEvent(GameEffect.Leave)
             return
@@ -939,7 +983,7 @@ class GameViewModel(
         frameIndex = 0
         resolutionSnapshot = null
         if (engine.isOver) {
-            endRun()
+            if (mayOfferContinue()) offerContinue() else endRun()
             return
         }
         if (tutorial.isRunning) {
@@ -982,7 +1026,13 @@ class GameViewModel(
      */
     private suspend fun GameAction.endRun() {
         tickerJob?.cancel()
+        countdownJob?.cancel()
         stopPlaying()
+        // Before anything else, and before the sheet is drawn. Everything the
+        // ad layer is allowed to do from here reads this, and a run that is
+        // still "alive" while its results are on screen would make SPEC 12's one
+        // non-negotiable rule depend on the order of the next twenty lines.
+        runActivity.runEnded()
         sendEvent(GameEffect.Play(Cue.StackedOut))
         val score = engine.score
         val record = RunRecord(
@@ -1022,6 +1072,13 @@ class GameViewModel(
             // downstream.
             "debug_session" to started.debug,
         )
+        // Counts towards SPEC 12's "not before the 4th run of a session", and
+        // shows nothing. A debug run is still a run the player sat through, so
+        // it counts here even though it writes nothing anywhere else (L63): the
+        // frequency gates are about attention, not about the economy.
+        interstitials.noteRunFinished()
+        interstitials.preload()
+
         updateState {
             it.published(best = best).copy(
                 phase = GamePhase.StackedOut,
@@ -1029,9 +1086,230 @@ class GameViewModel(
                 ghost = null,
                 newBest = started.mode == GameMode.ENDLESS && score > 0 && score > bestBeforeRun,
                 unlocked = unlocked,
+                continueSecondsLeft = 0,
+                continueAvailable = mayOfferSecondContinue(),
+                // SPEC 12: one non-modal card, at most once per session. The
+                // coordinator owns the cap; claiming it here rather than asking
+                // the screen to is what keeps "once per session" from becoming
+                // "once per recomposition".
+                showUpsell = paywall.claimStackedOutCard(),
             )
         }
         bestBeforeRun = best
+    }
+
+    /**
+     * Whether the offer may be made *automatically*, which is only ever for the
+     * first continue of a run.
+     *
+     * Two refusals worth naming.
+     *
+     * **A Daily run is never offered a continue**, and this is the one place
+     * SPEC 12 and SPEC 14 have to be reconciled rather than both applied. The
+     * Daily's whole claim is that everybody played the same board — decision D18
+     * goes as far as pinning `EngineConfig.Default` against remote config to keep
+     * two players' runs comparable. A continue clears three rows and drops a
+     * level, which is a larger change to the board than any config key could
+     * make, and one that only some players would have. Watching an ad is not
+     * allowed to buy a better score on a leaderboard everyone shares.
+     *
+     * **The second continue is not offered here.** SPEC 12 asks for "a 2nd at
+     * higher friction", and the friction is that nothing offers it: the sheet
+     * carries a quiet option and the player has to reach for it. An automatic
+     * second offer with a longer countdown would be more friction to *sit
+     * through* and less to *accept*, which is backwards.
+     *
+     * **A debug run is not refused**, and that was decided the other way first.
+     * L63 makes the session the taint and gates the four writes that claim a
+     * player did something; a continue is none of them, and `endRun` already
+     * refuses every one of those for a debug run whether it was continued or
+     * not. Refusing here bought a second guard saying the same thing, and it
+     * cost the only way to reach this screen on a build with a seed switch —
+     * which is what SPEC 19's menu is *for*. Same reasoning as the Pro grant.
+     */
+    private fun mayOfferContinue(): Boolean =
+        started.mode == GameMode.ENDLESS && continuesUsed == 0 && continuesLeft() > 0
+
+    /**
+     * SPEC 12's hard cap, read at the point of use so `ads.rewarded.continuesPerRun`
+     * can be turned down from the console mid-session.
+     *
+     * A configured zero disables the placement, which is what an operator setting
+     * it to zero means. There is no floor of one here: "continues off" has to be
+     * expressible, and the compiled default is 2 so only a deliberate value gets
+     * there.
+     */
+    private fun continuesLeft(): Int = (continuesPerRun() - continuesUsed).coerceAtLeast(0)
+
+    /**
+     * Whether the sheet carries the quiet "continue" option, which is SPEC 12's
+     * higher-friction second one.
+     *
+     * It is also what the player sees if they declined the first offer and
+     * changed their mind three seconds later. That is deliberate: the eight
+     * seconds are there so a board does not sit waiting forever, not to punish
+     * someone for not reading fast enough. The cap is the cap either way.
+     */
+    private fun mayOfferSecondContinue(): Boolean =
+        started.mode == GameMode.ENDLESS && continuesLeft() > 0
+
+    /**
+     * The offer, over a board that is still on screen and **not blurred**.
+     *
+     * SPEC 8.4 and 12.2: the player has to see exactly what they are saving. The
+     * board is the argument, so the screen draws it plainly behind a light scrim
+     * rather than behind the 6dp blur every other overlay uses.
+     *
+     * The countdown is here rather than in the composable because it is a rule,
+     * not an animation: at zero the offer declines itself and the run ends, and
+     * that is a decision worth being able to test without a frame clock. The
+     * screen renders the integer this publishes.
+     */
+    private suspend fun GameAction.offerContinue() {
+        tickerJob?.cancel()
+        lockJob?.cancel()
+        stopPlaying()
+        sendEvent(GameEffect.Play(Cue.StackedOut))
+        logger.logEvent("ads.continue_offered", "continues_used" to continuesUsed)
+        updateState {
+            it.published().copy(
+                phase = GamePhase.ContinueOffer,
+                falling = null,
+                ghost = null,
+                continueSecondsLeft = ContinueCountdownSeconds,
+            )
+        }
+        startCountdown()
+    }
+
+    private fun startCountdown() {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            var remaining = ContinueCountdownSeconds
+            while (isActive && remaining > 0) {
+                delay(CountdownStepMillis)
+                remaining--
+                takeAction(GameAction.ContinueTick(remaining))
+            }
+        }
+    }
+
+    private suspend fun GameAction.continueTick(secondsLeft: Int) {
+        if (state.phase != GamePhase.ContinueOffer) return
+        updateState { it.copy(continueSecondsLeft = secondsLeft) }
+        if (secondsLeft <= 0) continueDecline()
+    }
+
+    /**
+     * The player asked for the ad, so from here the reward is theirs unless they
+     * close it themselves.
+     *
+     * Every outcome except [RewardOutcome.Dismissed] continues the run. No fill,
+     * no network, an SDK that threw — none of those is the player saying no, and
+     * a board ten minutes in the building is not something an ad network's bad
+     * afternoon gets to take. `AdGate` already draws that line; this is the call
+     * site that spends it.
+     */
+    private suspend fun GameAction.continueAccept() {
+        if (state.continueBusy) return
+        countdownJob?.cancel()
+        updateState { it.copy(continueBusy = true) }
+
+        val outcome = Catching { adGate.showRewarded(AdPlacement.ContinueRun) }
+            .logOnFailure { "The continue ad threw; continuing anyway" }
+            .getOrDefault(RewardOutcome.Failed("threw"))
+
+        // Both directions of SPEC 12's 45-second rule start here, and it is
+        // recorded for a dismissal too: the player still sat in front of an ad.
+        interstitials.noteRewardedShown()
+
+        updateState { it.copy(continueBusy = false) }
+        logger.logEvent(
+            "ads.continue_result",
+            "outcome" to outcome::class.simpleName.orEmpty(),
+            "continues_used" to continuesUsed,
+        )
+
+        if (outcome == RewardOutcome.Dismissed) {
+            endRun()
+            return
+        }
+        grantContinue()
+    }
+
+    /**
+     * SPEC 12's continue, applied.
+     *
+     * The board half is [Cascade.continueRun] — three rows cleared, a level back,
+     * the score kept — and it has been in the engine with its own tests since C1.
+     * The clock half is the line below it: [restartTicker] begins a fresh
+     * interval, so the player gets a whole drop's worth of time rather than
+     * whatever was left of the one that killed them. SPEC 12 asks for exactly
+     * that and it is the half that could only ever be done here, because the
+     * engine has no clock.
+     */
+    private suspend fun GameAction.grantContinue() {
+        continuesUsed++
+        val transition = Cascade.continueRun(engine)
+        engine = transition.state
+        transition.events.forEach { event ->
+            when (event) {
+                GameEvent.DangerEntered -> sendEvent(GameEffect.Play(Cue.DangerEnter))
+                GameEvent.DangerCleared -> sendEvent(GameEffect.Play(Cue.DangerExit))
+                else -> Unit
+            }
+        }
+        updateState {
+            it.published().copy(
+                phase = GamePhase.Playing,
+                continueSecondsLeft = 0,
+                continueAvailable = false,
+                callout = null,
+            )
+        }
+        saveRun()
+        beginPlaying()
+    }
+
+    private suspend fun GameAction.continueDecline() {
+        countdownJob?.cancel()
+        if (state.phase != GamePhase.ContinueOffer) return
+        logger.logEvent("ads.continue_declined", "continues_used" to continuesUsed)
+        endRun()
+    }
+
+    /**
+     * The second continue, reached only by a player who went looking for it on
+     * the stacked-out sheet.
+     *
+     * No countdown, because there is nothing to time out of: the sheet is not an
+     * offer that expires, it is a screen the player is sitting on. The refusal
+     * below is the cap, and it is checked again here rather than trusted to the
+     * screen having hidden the control — this action can also arrive from a
+     * stale composition.
+     */
+    private suspend fun GameAction.continueAgain() {
+        if (state.phase != GamePhase.StackedOut) return
+        if (continuesLeft() <= 0) return
+        if (started.mode != GameMode.ENDLESS) return
+        updateState { it.copy(phase = GamePhase.ContinueOffer, continueSecondsLeft = 0) }
+        continueAccept()
+    }
+
+    /**
+     * The player dismissed the results, which is the **only** moment SPEC 12
+     * allows an interstitial.
+     *
+     * It suspends: the ad is full screen, and the next run must not start behind
+     * it. Every gate is evaluated inside `InterstitialGate` — including whether a
+     * run is alive, which is false by now because [endRun] said so — and a gate
+     * that refuses, or a network with nothing preloaded, returns immediately with
+     * nothing shown. There is no spinner and no wait, by design (SPEC 12.3).
+     */
+    private suspend fun dismissResults() {
+        if (state.phase != GamePhase.StackedOut) return
+        Catching { interstitials.showIfReady() }
+            .logOnFailure { "The interstitial path threw; carrying on" }
     }
 
     /**
@@ -1405,6 +1683,21 @@ class GameViewModel(
         const val LockDelayMillis = 150L
 
         /**
+         * SPEC 8.4: eight seconds to decide on the continue, then the offer
+         * declines itself.
+         *
+         * Not remote. Every other ad number in section 12 is a frequency dial an
+         * operator should be able to turn, and this one is a piece of interaction
+         * design: it is how long the board stays on screen before the run is
+         * over. A console value that could be set to one second would be a way to
+         * take a continue away from a player who was looking at their board,
+         * which is the exact thing the countdown exists to give them.
+         */
+        const val ContinueCountdownSeconds = 8
+
+        const val CountdownStepMillis = 1_000L
+
+        /**
          * What `run_record.cause` reads when the engine ended a run without
          * naming a reason. SPEC 18.1 says that is a bug rather than a state, so
          * it is stored as a value that can be counted rather than as a null that
@@ -1418,7 +1711,12 @@ class GameViewModel(
  * [Ready] is the handoff's start overlay, and it exists only for a run that has
  * not begun. A resumed run skips it — see `GameViewModel.start`.
  */
-enum class GamePhase { Ready, Playing, Resolving, Paused, StackedOut }
+/**
+ * [ContinueOffer] sits between the last cascade and the results, and it is the
+ * only phase where the board is covered but **not blurred** — SPEC 12.2 makes
+ * the board the argument for taking the offer, so it has to stay readable.
+ */
+enum class GamePhase { Ready, Playing, Resolving, Paused, ContinueOffer, StackedOut }
 
 /**
  * Everything on screen, and nothing the engine would call state.
@@ -1518,6 +1816,33 @@ data class GameUiState(
      * plays identically, which is the point.
      */
     val mode: GameMode = GameMode.ENDLESS,
+
+    /**
+     * Seconds left on the continue offer's auto-decline, published by the
+     * ViewModel rather than animated by the screen.
+     *
+     * An integer because it is a rule: at zero the offer declines itself and the
+     * run ends. A ring animating on its own spec can sit at 1.2 seconds while
+     * the rule has already fired, and the player would be looking at a control
+     * that no longer does anything.
+     */
+    val continueSecondsLeft: Int = 0,
+
+    /** Set while the rewarded ad is up, so neither answer can be given twice. */
+    val continueBusy: Boolean = false,
+
+    /**
+     * Whether the stacked-out sheet carries the quiet continue option — SPEC 12's
+     * second continue, at the higher friction of having to be reached for.
+     */
+    val continueAvailable: Boolean = false,
+
+    /**
+     * SPEC 12's one non-modal Pro card, at most once per session. Decided when
+     * the run ends and never recomputed, so a rotation cannot spend a second
+     * session's worth of card on the same sheet.
+     */
+    val showUpsell: Boolean = false,
 )
 
 sealed interface GameEffect {
@@ -1647,4 +1972,23 @@ sealed interface GameAction {
     data class ShowFrame(val index: Int) : GameAction
 
     data object FinishResolution : GameAction
+
+    /** Watch the ad and keep the board (SPEC 12). */
+    data object ContinueAccept : GameAction
+
+    /** "No thanks", or the countdown reaching zero. Both end the run. */
+    data object ContinueDecline : GameAction
+
+    /**
+     * The second continue, from the stacked-out sheet rather than from an offer.
+     * Its own action because it skips the countdown: a sheet is not something
+     * that expires.
+     */
+    data object ContinueAgain : GameAction
+
+    /** One second of the auto-decline, fed back in by the countdown coroutine. */
+    data class ContinueTick(val secondsLeft: Int) : GameAction
+
+    /** The upsell card was tapped (SPEC 12). Opens the paywall; buys nothing. */
+    data object OpenPro : GameAction
 }

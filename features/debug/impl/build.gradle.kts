@@ -35,6 +35,10 @@ kotlin {
             implementation(projects.features.settings)
             implementation(projects.libraries.navigation)
 
+            // SPEC 19's "grant Pro". The flag is `ProGrant` in :libraries:billing
+            // rather than a type this feature owns, because the Daily's second
+            // attempt is decided in a library impl that cannot read a feature.
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
@@ -66,6 +70,7 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.features.debug)
+            implementation(projects.libraries.billing)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)

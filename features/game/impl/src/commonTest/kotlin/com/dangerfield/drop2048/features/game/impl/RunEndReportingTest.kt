@@ -33,6 +33,7 @@ class RunEndReportingTest : CoroutineTest() {
         playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(GamePhase.StackedOut, state.phase)
             assertEquals(
@@ -59,6 +60,7 @@ class RunEndReportingTest : CoroutineTest() {
             act(GameAction.StartDaily)
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(
                 listOf(Leaderboard.DailyScore to state.score),
@@ -73,6 +75,7 @@ class RunEndReportingTest : CoroutineTest() {
         playing(fallingAt = Cell(2, 0)) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertTrue(
                 leaderboards.submissions.isEmpty(),
@@ -91,6 +94,7 @@ class RunEndReportingTest : CoroutineTest() {
         playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
             land()
             waitOutResolution()
+            declineContinue()
 
             val record = recordedRuns().single()
             val fact = achievements.recorded.single()
@@ -112,6 +116,7 @@ class RunEndReportingTest : CoroutineTest() {
         ) {
             land()
             waitOutResolution()
+            declineContinue()
 
             assertEquals(listOf(AchievementId.FirstMerge), state.unlocked)
 

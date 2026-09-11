@@ -1,12 +1,14 @@
 package com.dangerfield.drop2048.features.settings.impl
 
 import androidx.lifecycle.viewModelScope
-import com.dangerfield.drop2048.features.settings.AdConsent
 import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.settings.PlayerSettings
 import com.dangerfield.drop2048.features.settings.PlayerSettingsStore
-import com.dangerfield.drop2048.features.settings.ProEntitlement
-import com.dangerfield.drop2048.features.settings.RestoreOutcome
+import com.dangerfield.drop2048.libraries.ads.AdConsent
+import com.dangerfield.drop2048.libraries.billing.Entitlements
+import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
+import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
+import com.dangerfield.drop2048.libraries.billing.RestoreOutcome
 import com.dangerfield.drop2048.libraries.core.BuildInfo
 import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.core.logOnFailure
@@ -36,8 +38,9 @@ import me.tatarka.inject.annotations.Inject
 class SettingsViewModel(
     private val settingsStore: PlayerSettingsStore,
     private val eraser: PlayerDataEraser,
-    private val entitlement: ProEntitlement,
+    private val entitlement: Entitlements,
     private val adConsent: AdConsent,
+    private val paywall: PaywallCoordinator,
     private val termsUrl: LegalTermsUrl,
     private val privacyUrl: LegalPrivacyUrl,
 ) : SEAViewModel<SettingsState, SettingsEvent, SettingsAction>(
@@ -101,6 +104,11 @@ class SettingsViewModel(
                 it.copy(diagnosticsOptIn = !it.diagnosticsOptIn)
             }
 
+            // SPEC 12's persistent Settings entry. It goes through the
+            // coordinator rather than straight to a route so the one refusal
+            // that matters — the player already owns Pro — lives in one place
+            // instead of being a second `if` on this screen.
+            SettingsAction.OpenPro -> paywall.requestOffer(PaywallTrigger.Direct)
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.OpenDebugMenu -> sendEvent(SettingsEvent.OpenDebugMenu)
             SettingsAction.ReplayTutorial -> sendEvent(SettingsEvent.ReplayTutorial)
@@ -205,7 +213,7 @@ private const val TapsToUnlockDebug = 7
 data class SettingsState(
     val settings: PlayerSettings = PlayerSettings(),
 
-    /** Whether this device owns Pro. Always false until C10 wires billing. */
+    /** Whether this device owns Pro (SPEC 12). */
     val isPro: Boolean = false,
 
     /** Set while a restore is in flight, and to its result afterwards. */
@@ -277,6 +285,9 @@ sealed interface SettingsAction {
     data object ToggleDiagnostics : SettingsAction
 
     /** SPEC 15's badge grid. Settings is its only entry point. */
+    /** SPEC 12's "small persistent entry in Settings". */
+    data object OpenPro : SettingsAction
+
     data object OpenAchievements : SettingsAction
 
     data object ReplayTutorial : SettingsAction

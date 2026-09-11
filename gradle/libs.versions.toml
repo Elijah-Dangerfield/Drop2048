@@ -44,6 +44,9 @@ opentelemetryInstrumentation = "2.11.0-alpha"
 opentelemetryKotlin = "0.5.0"
 okio = "3.9.1"
 jetbrainsNavigationCompose = "2.9.1"
+playServicesAds = "24.9.0"
+userMessagingPlatform = "4.0.0"
+playBilling = "8.3.0"
 kotlinInjectAnvil = "0.1.6"
 composeIcons = "1.1.1"
 room = "2.8.4"
@@ -176,6 +179,11 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 
 google-play-review = { module = "com.google.android.play:review", version = "2.0.2" }
 google-play-review-ktx = { module = "com.google.android.play:review-ktx", version = "2.0.2" }
+
+google-play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+google-ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "userMessagingPlatform" }
+android-billing = { module = "com.android.billingclient:billing", version.ref = "playBilling" }
+android-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
 
 
 androidx-datastore-core = { module = "androidx.datastore:datastore", version.ref = "datastore" }
