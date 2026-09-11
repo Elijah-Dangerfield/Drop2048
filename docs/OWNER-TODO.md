@@ -30,14 +30,13 @@ ever been rendered on iOS** — the screenshot harness is Robolectric, so all 26
 The game is playable, persisted, and now looks like the handoff. Nobody but an agent has played it.
 
 1. **The 500ms opening.** Three candidate curves produced outcomes identical to the digit, so the
-   change is measurably risk-free — and no human has felt it. Worth knowing while you play:
-   whether you use the ▼ nudge is worth more than every curve change combined (223s to level 4
-   without it, 56s with).
-2. **Does ▼ feel decisive?** It recovers 88% of the wall clock that hard drop gave. C1e's own
-   caveat: 88% of the clock is not 88% of the *decisiveness*, and no harness can measure the
-   difference.
-3. **Does drag steering read as locked to the finger?** It is absolute-from-grab-point per the
+   change is measurably risk-free — and no human has felt it. With ▼ now a hard drop (D21), level 4
+   arrives in about 33 seconds rather than 223 for a player who never touches it.
+2. **Does drag steering read as locked to the finger?** It is absolute-from-grab-point per the
    handoff. The flick thresholds (30dp, 450ms) are unvalidated guesses.
+3. **Is the re-paced cascade right?** C3a found it was far too fast to read — the chain callout
+   held for three frames and the 2048 existed for 400ms before its own burst erased it. It is now
+   paced per step kind. Measured as readable; not yet judged as *good*.
 
 ## Decide before the chunk that needs it
 
