@@ -3,6 +3,7 @@ package com.dangerfield.drop2048.features.debug.impl
 import com.dangerfield.drop2048.features.debug.DebugController
 import com.dangerfield.drop2048.features.debug.DebugOverrides
 import com.dangerfield.drop2048.libraries.cascade.Block
+import com.dangerfield.drop2048.libraries.core.DebugSessionFlag
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,4 +65,24 @@ class InMemoryDebugController : DebugController {
         }
         return taken
     }
+}
+
+/**
+ * The library-side view of [InMemoryDebugController]'s latch, so
+ * `GrafanaLogTree` can stamp `debug_session` on every exported record without
+ * `:libraries:telemetry:impl` depending on a feature (L63, SPEC 17).
+ *
+ * A separate class rather than a second interface on the controller because
+ * `DebugController.isDebugSession` is a `StateFlow` and
+ * [DebugSessionFlag.isDebugSession] is a plain read — one name, two types, and
+ * Kotlin will not let one class own both. The plain read is what the logging
+ * path wants: it runs on every event and has nothing to collect into.
+ */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+@Inject
+class DebugSessionLatch(
+    private val controller: DebugController,
+) : DebugSessionFlag {
+    override val isDebugSession: Boolean get() = controller.isDebugSession.value
 }

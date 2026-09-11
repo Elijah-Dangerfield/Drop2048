@@ -32,11 +32,18 @@ import io.opentelemetry.kotlin.logging.export.LogRecordProcessor
  * reliability events (`net.backend_unreachable`, reconnect failures) must
  * survive a backend outage. See `docs/plans/client-app-events-otel.md`.
  *
- * `session_id` / `install_id` / `is_offline` ride on every record (never as
- * resource attributes — the session rolls over mid-process on a 15-min
- * background, and connectivity flips freely). `is_offline` is captured at
- * emit time, so records that ship later from the disk buffer still say what
+ * `session_id` / `install_id` / `is_offline` / `debug_session` ride on every
+ * record (never as resource attributes — the session rolls over mid-process on
+ * a 15-min background, and connectivity flips freely). `is_offline` is captured
+ * at emit time, so records that ship later from the disk buffer still say what
  * connectivity looked like when the event happened.
+ *
+ * `debug_session` is stamped **here** rather than at the call sites, which is
+ * the whole point of it (SPEC 19, L63). Forty `logEvent` calls that each have
+ * to remember a QA flag is thirty-nine chances to forget it, and the forgotten
+ * one is invisible: QA data on a dashboard looks exactly like real data. One
+ * stamp on the one path every event takes cannot be forgotten. Every dashboard
+ * in `observability.md` filters `debug_session=false`.
  *
  * [InstallFacts] go the other way — onto the Resource, resolved once at SDK
  * init — because they cannot change for the life of the install. That is also
@@ -52,6 +59,7 @@ class GrafanaLogTree(
     private val currentSessionId: () -> String?,
     private val currentInstallId: () -> String?,
     private val isOffline: () -> Boolean,
+    private val isDebugSession: () -> Boolean,
     private val installFacts: () -> InstallFacts,
     private val processorFactory: LogExportConfigDsl.() -> LogRecordProcessor,
 ) : LogTree() {
@@ -130,6 +138,7 @@ class GrafanaLogTree(
                 sessionId?.let { setStringAttribute(SESSION_ID_KEY, it) }
                 currentInstallId()?.let { setStringAttribute(INSTALL_ID_KEY, it) }
                 setBooleanAttribute(IS_OFFLINE_KEY, isOffline())
+                setBooleanAttribute(DEBUG_SESSION_KEY, isDebugSession())
                 if (eventName == null) {
                     entry.tag?.let { setStringAttribute(TAG_KEY, it) }
                     entry.throwable?.let {
@@ -183,6 +192,7 @@ class GrafanaLogTree(
         private const val SESSION_ID_KEY = "session_id"
         private const val INSTALL_ID_KEY = "install_id"
         private const val IS_OFFLINE_KEY = "is_offline"
+        internal const val DEBUG_SESSION_KEY = "debug_session"
         private const val TAG_KEY = "tag"
         private const val EXCEPTION_TYPE_KEY = "exception_type"
         private const val EXCEPTION_MESSAGE_KEY = "exception_message"

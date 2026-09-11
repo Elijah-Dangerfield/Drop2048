@@ -18,6 +18,8 @@ import kotlin.test.assertTrue
 class AppLaunchedSessionOrderingTest {
 
     private val processor = RecordingLogRecordProcessor()
+
+    private var debugSession = false
     private var currentSession = "sentinel-uuid"
 
     @AfterTest
@@ -34,6 +36,7 @@ class AppLaunchedSessionOrderingTest {
                 currentSessionId = { currentSession },
                 currentInstallId = { "install-uuid-1" },
                 isOffline = { false },
+                isDebugSession = { debugSession },
                 installFacts = { RetailInstallFacts },
                 processorFactory = { processor },
             ),

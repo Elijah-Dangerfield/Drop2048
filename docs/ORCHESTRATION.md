@@ -31,7 +31,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C5 · Tutorial | **DONE** | `ad992b6`. `:features:onboarding` deleted. See L49 |
 | C6 · Daily Challenge | **DONE** | Config pinned (D18). See L51-L52 |
 | C7 · Remote config | **DONE** | `96f7c40`. 26 keys. Integration harness ran at last (L46) |
-| C8 · Telemetry | **IN PROGRESS** | The decision-time instrument is the point (L41) |
+| C8 · Telemetry | **DONE** | `run.sample` + the decision instruments. See L69-L70 |
 | C9 · Achievements, leaderboards, sharing | **DONE** | `5fee174`+`af43fc6`. All 24 earnable. See L53-L55 |
 | C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
@@ -262,6 +262,15 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D22 · A Daily `run.end` carries the date, never the seed
+
+A Daily run can finish and ship its telemetry **19 hours before that UTC day is over**, and SPEC
+14's seed is the whole world's board for that day. Endless carries its seed (it is private and it
+makes a bug report reproducible); Daily carries only `daily_date`.
+
+Same instinct as the share payload, which carries score and tier and no board, seed or transcript —
+"a Daily share cannot leak the seed" is a property of the type rather than a rule someone remembers.
 
 ### D19 · Streak milestones stay cosmetic, and a Daily score cannot set the all-time best
 
@@ -650,6 +659,41 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L69 · Two ways the decision-time instrument would have lied, both caught before shipping
+
+L41 made the modelled 250ms decision time the highest-value thing to measure. C8 built it, and two
+obvious implementations would each have been wrong by about 3x in **opposite** directions:
+
+- **Counting gestures instead of engine column steps.** `DropClock` charges the modelled player one
+  tap per accepted column step, so a drag across three columns is three steps. Counting gestures
+  would have read ~3x *slow* for drag steering — the control most players use — while looking
+  entirely plausible on a dashboard.
+- **Zeroing unsteered drops instead of censoring them.** The case does not exist offline (every
+  policy reaches its target) and is common live. Zeroing reads ~3x *fast*; discarding silently
+  throws out every easy board. C8 ships `drops_unsteered` beside `drops_steered` and **omits the
+  time attribute entirely** when there was no steer, so a median can never arrive without its
+  censoring rate.
+
+Also: a drop spanning a pause or a backgrounding is discarded, because one pocketed phone otherwise
+lives in the tail forever. And the histogram is fixed 50ms buckets to a 3s overflow — **240 bytes
+regardless of run length**, because an unbounded sample list plus debug invincibility is how a
+counter becomes an OOM.
+
+The general point: an instrument built to settle an assumption has to be designed against the ways
+it could quietly agree with you.
+
+### L70 · Stamp a cross-cutting attribute at the exporter, not at 40 call sites
+
+`debug_session` is applied by `GrafanaLogTree` on **every exported record**, not by the code that
+logs each event. Forty call sites is thirty-nine chances to forget one, **and the forgotten one is
+invisible** — a debug run quietly counted as real data on a dashboard nobody audits.
+
+It needed a seam (`DebugSessionFlag` in `:libraries:core`) because telemetry cannot see a feature
+module. Worth the indirection.
+
+Note the companion distinction: `run.end` keeps a *narrower* `recorded` flag, so "no row was
+written" can be told apart from "no row reached us."
 
 ### L66 · An unbuilt platform path must be incapable of the reward, not merely missing it
 

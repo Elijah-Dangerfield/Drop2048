@@ -13,6 +13,8 @@ class AppLaunchedEventTest {
 
     private val processor = RecordingLogRecordProcessor()
 
+    private var debugSession = false
+
     private fun plantTree() {
         KLog.plant(
             GrafanaLogTree(
@@ -22,6 +24,7 @@ class AppLaunchedEventTest {
                 currentSessionId = { "session-uuid-1" },
                 currentInstallId = { "install-uuid-1" },
                 isOffline = { false },
+                isDebugSession = { debugSession },
                 installFacts = { RetailInstallFacts },
                 processorFactory = { processor },
             ),

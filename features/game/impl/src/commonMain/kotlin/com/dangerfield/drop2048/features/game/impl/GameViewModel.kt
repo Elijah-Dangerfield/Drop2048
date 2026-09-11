@@ -156,6 +156,17 @@ class GameViewModel(
     private var playingSince: Long? = null
 
     /**
+     * SPEC 17's two decision-time instruments, and the reason C8 exists (L41).
+     *
+     * Per-run rather than per-session: the numbers are properties of how the
+     * player played *this board*, and a session's worth of them averaged
+     * together would hide the thing L41 actually asks about, which is whether
+     * the player is slower at level 20 than at level 2. Reset in [adopt] with
+     * everything else a fresh run has to forget.
+     */
+    private var decisions = DecisionTimer()
+
+    /**
      * The best score as it stood **before** this run, which is the only number
      * that can answer "did they beat it".
      *
@@ -277,7 +288,7 @@ class GameViewModel(
             GameAction.ContinueDecline -> action.continueDecline()
             GameAction.ContinueAgain -> action.continueAgain()
             is GameAction.ContinueTick -> action.continueTick(action.secondsLeft)
-            GameAction.OpenPro -> paywall.requestOffer(PaywallTrigger.StackedOut)
+            GameAction.OpenPro -> action.openPro()
         }
     }
 
@@ -390,7 +401,13 @@ class GameViewModel(
         lockResetUsed = false
         bufferedMove = null
         playingSince = null
+        decisions.suspend()
         logger.logEvent("tutorial.started")
+        // The first beat is reached by arriving, not by finishing a drop, so
+        // it fires here. Without it the abandonment query cannot tell a player
+        // who quit on lesson one from one who never saw the tutorial at all —
+        // and lesson one is where a tutorial is abandoned.
+        logger.logEvent("tutorial.step_reached", "drop" to tutorial.currentDrop)
     }
 
     /** The card's button: "Got it", "OK", "Play". */
@@ -479,6 +496,7 @@ class GameViewModel(
             return
         }
         engine = tutorial.stateForCurrentLesson(engine.score) ?: engine.copy(falling = null)
+        logger.logEvent("tutorial.step_reached", "drop" to tutorial.currentDrop)
         updateState { it.copy(phase = GamePhase.Playing, tutorial = tutorial.frame).published() }
     }
 
@@ -560,6 +578,7 @@ class GameViewModel(
         lockResetUsed = false
         bufferedMove = null
         playingSince = null
+        decisions.suspend()
     }
 
     private fun adopt(run: StartedRun, day: String?) {
@@ -567,6 +586,7 @@ class GameViewModel(
         dailyDate = day
         engine = run.state
         tally = RunTally(highestTier = engine.board.highestValue()?.points ?: 0)
+        decisions = DecisionTimer()
         continuesUsed = 0
         // The ad layer asks this rather than being told by an argument, so that
         // SPEC 12's governing principle is the gate's rule rather than a
@@ -579,8 +599,30 @@ class GameViewModel(
 
     /** Starts the drop timer and the stretch of play the duration is made of. */
     private fun beginPlaying() {
-        playingSince = clock.now().toEpochMilliseconds()
+        val now = clock.now().toEpochMilliseconds()
+        playingSince = now
+        beginMeasuringDrop(now)
         restartTicker()
+    }
+
+    /**
+     * Starts the decision clock on the block currently in flight.
+     *
+     * Every path that hands the board back to the player goes through here or
+     * through [beginPlaying] — a fresh run, a resume, a continue, the frame
+     * after a cascade. A path that forgot to would not break anything visible;
+     * it would quietly stop measuring, which is exactly the failure mode SPEC
+     * 17 is supposed to be immune to, so `DecisionTimerCallSiteTest` asserts
+     * the measurement rather than the call.
+     *
+     * The tutorial is excluded outright. Its clock is frozen (SPEC 13), the
+     * board is scripted and a coach mark is asking the player to read — none
+     * of which is the number `decisionMillis` models.
+     */
+    private fun beginMeasuringDrop(nowMs: Long = clock.now().toEpochMilliseconds()) {
+        if (tutorial.isRunning) return
+        if (engine.falling == null) return
+        decisions.dropBegan(nowMs)
     }
 
     /**
@@ -605,6 +647,7 @@ class GameViewModel(
      * seconds twice.
      */
     private fun stopPlaying() {
+        decisions.suspend()
         val since = playingSince ?: return
         playingSince = null
         tally = tally.copy(playedMs = tally.playedMs + (clock.now().toEpochMilliseconds() - since))
@@ -653,6 +696,7 @@ class GameViewModel(
         val transition = Cascade.apply(engine, input)
         if (transition.isRejected) return
         engine = transition.state
+        decisions.columnStep(clock.now().toEpochMilliseconds())
         sendEvent(GameEffect.Play(Cue.Move))
         updateState { it.published() }
         noteTutorial(TutorialAwait.Steered)
@@ -723,6 +767,11 @@ class GameViewModel(
             val transition = Cascade.apply(engine, input)
             if (transition.isRejected) break
             engine = transition.state
+            // Per engine step, not per gesture. A drag across three columns
+            // costs the modelled player three taps at `tapMillis`, so it has
+            // to cost three here or the live histogram is measuring a
+            // different quantity from the one it is compared against.
+            decisions.columnStep(clock.now().toEpochMilliseconds())
             moved = true
         }
         if (!moved) return
@@ -806,6 +855,7 @@ class GameViewModel(
             drivePlayback()
         } else {
             updateState { it.copy(phase = GamePhase.Playing) }
+            beginMeasuringDrop()
             restartTicker()
         }
     }
@@ -992,11 +1042,16 @@ class GameViewModel(
         }
         updateState { it.copy(phase = GamePhase.Playing).published() }
         saveRun()
+        // Before the buffered move is replayed, so a nudge the player made
+        // during the cascade is measured against the moment the block became
+        // theirs rather than against nothing.
+        beginMeasuringDrop()
         bufferedMove?.let { buffered ->
             bufferedMove = null
             val transition = Cascade.apply(engine, buffered)
             if (!transition.isRejected) {
                 engine = transition.state
+                decisions.columnStep(clock.now().toEpochMilliseconds())
                 sendEvent(GameEffect.Play(Cue.Move))
                 updateState { it.published() }
             }
@@ -1059,19 +1114,50 @@ class GameViewModel(
         val unlocked = if (recordable) recordAchievements(record, streak) else emptyList()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }
             .getOrNull() ?: maxOf(state.best, score)
+        val decided = decisions.summary()
         logger.logEvent(
             "run.end",
+            "mode" to started.mode.name,
             "score" to score,
             "level" to engine.level,
             "blocks" to engine.blocksDropped,
+            "duration_ms" to tally.playedMs,
             "highest_tier" to tally.highestTier,
             "cause" to record.cause,
-            // SPEC 17's session flag, and the seam C8 consumes. It rides on the
-            // event rather than being inferred from a missing `run_record`,
-            // because "no row was written" and "no row reached us" look the same
-            // downstream.
-            "debug_session" to started.debug,
+            "bursts" to tally.bursts,
+            "merges" to tally.merges,
+            "longest_cascade" to tally.longestCascade,
+            "cascades_1" to tally.cascadesByDepth.getOrElse(1) { 0 },
+            "cascades_2" to tally.cascadesByDepth.getOrElse(2) { 0 },
+            "cascades_3" to tally.cascadesByDepth.getOrElse(3) { 0 },
+            "cascades_4plus" to tally.cascadesByDepth.drop(DeepCascade).sum(),
+            // SPEC 17 asks for the seed and SPEC 14 says a Daily seed is the
+            // whole world's board for that day. Endless seeds are a private
+            // number that makes a reported run replayable; a Daily seed on a
+            // record that can ship the moment the attempt starts is a board
+            // leaked before its day. So Endless carries it and Daily carries
+            // the day instead — which is the only part of a Daily run that is
+            // not already public.
+            "seed" to started.seed.takeIf { started.mode == GameMode.ENDLESS },
+            "daily_date" to dailyDate,
+            // Whether the four writes that claim a player did something
+            // actually happened (L63). `debug_session` is stamped on every
+            // record by `GrafanaLogTree` and answers a wider question — did
+            // this process have a debug menu open in it. This answers the
+            // narrower one the dashboards need: "no row was written" and "no
+            // row reached us" look identical downstream otherwise.
+            "recorded" to recordable,
+            // L41's two numbers. `steer_ms_*` is `decisionMillis`;
+            // `tap_gap_ms_p50` is `tapMillis`. Omitted rather than zeroed when
+            // the run produced no steered drop at all.
+            "steer_ms_p50" to decided.steerP50,
+            "steer_ms_p90" to decided.steerP90,
+            "tap_gap_ms_p50" to decided.tapGapP50,
+            "drops_steered" to decided.steeredDrops,
+            "drops_unsteered" to decided.unsteeredDrops,
+            "steps" to decided.steps,
         )
+        noteFirstRunCompleted()
         // Counts towards SPEC 12's "not before the 4th run of a session", and
         // shows nothing. A debug run is still a run the player sat through, so
         // it counts here even though it writes nothing anywhere else (L63): the
@@ -1127,6 +1213,26 @@ class GameViewModel(
      * cost the only way to reach this screen on a build with a seed switch —
      * which is what SPEC 19's menu is *for*. Same reasoning as the Pro grant.
      */
+    /**
+     * SPEC 17's "upsell tapped", which is the half of the upsell funnel the
+     * coordinator cannot see.
+     *
+     * `iap.paywall_shown` fires inside `RealPaywallCoordinator` when a request
+     * is *accepted*, so a tap that the coordinator refuses — the player is
+     * already Pro, or `pro.upsell.enabled` is off — produces no event at all
+     * and reads downstream as a card nobody touched. The tap is the player's
+     * intent and it happened either way, so it is recorded here, at the
+     * control, with what the coordinator did about it.
+     */
+    private fun GameAction.openPro() {
+        val offered = paywall.requestOffer(PaywallTrigger.StackedOut)
+        logger.logEvent(
+            "iap.upsell_tapped",
+            "surface" to PaywallTrigger.StackedOut.id,
+            "offered" to offered,
+        )
+    }
+
     private fun mayOfferContinue(): Boolean =
         started.mode == GameMode.ENDLESS && continuesUsed == 0 && continuesLeft() > 0
 
@@ -1420,9 +1526,11 @@ class GameViewModel(
         val before = if (landing != null && block != null) engine.board.with(landing, block) else engine.board
         val scoreBefore = engine.score
 
+        decisions.dropEnded()
         val transition = Cascade.apply(engine, Input.Lock)
         engine = applyDebugToLanding(transition.state)
         tallyUp(transition)
+        sampleDrop()
         reportFaults(transition)
         // Recorded whether or not the overlay is switched on. The merge that
         // looked wrong has already happened by the time anybody reaches for the
@@ -1590,8 +1698,83 @@ class GameViewModel(
             merges = tally.merges + transcript.merges.size,
             bursts = tally.bursts + transcript.bursts.size,
             longestCascade = maxOf(tally.longestCascade, transcript.depth),
+            cascadesByDepth = tally.cascadesByDepth.incrementing(transcript.depth),
             highestTier = reached,
             facts = tally.facts.fold(transition),
+        )
+    }
+
+    /**
+     * SPEC 17's funnel: the first run this install ever played to the end.
+     *
+     * Once ever, keyed on a persisted flag rather than on a count of
+     * `run_record` rows, because a player who resets their progress in
+     * Settings (C11) has not become a new player and a funnel that said so
+     * would put a second first-run on the same install id.
+     *
+     * A debug run is deliberately allowed to claim it. The flag is stamped on
+     * the event by `GrafanaLogTree` and every funnel query filters on it, so
+     * the alternative — refusing to write the timestamp — would leave a tester
+     * permanently able to fire a fresh "first run" on every launch, which is
+     * the noisier failure.
+     */
+    private suspend fun noteFirstRunCompleted() {
+        val already = Catching { appCache.get().hasCompletedARun }
+            .logOnFailure { "Could not read the first-run marker" }
+            .getOrNull() ?: return
+        if (already) return
+        Catching { appCache.update { it.copy(hasCompletedARun = true) } }
+            .logOnFailure { "Could not persist the first-run marker" }
+        logger.logEvent(
+            "funnel.first_run_completed",
+            "score" to engine.score,
+            "level" to engine.level,
+            "mode" to started.mode.name,
+        )
+    }
+
+    /**
+     * SPEC 17's per-drop sample, every tenth drop.
+     *
+     * ### The clutter number is the engine's, not a copy of it
+     *
+     * `engine.clutter` is the same `GameState.clutter` `tools/balance` reads,
+     * on the same `isSampleDrop` cadence, and that is the entire point of the
+     * metric: SPEC 4.4 wants the offline and live figures to be directly
+     * comparable, and two implementations of "blocks with no partner" would be
+     * comparable right up until one of them was edited. `ClutterParityTest`
+     * plays the same seed through the harness and through this ViewModel and
+     * asserts the two sequences are equal.
+     *
+     * ### It carries the decision times
+     *
+     * Folding them in here rather than emitting a third event is what keeps
+     * the instrument off the firehose list: the sample already fires at the
+     * right rate, and arriving on the same record as `level` is what lets the
+     * dashboard ask whether players get slower as the board speeds up — which
+     * is the question L41's sweep could not answer from the outside.
+     *
+     * ### A tutorial drop is not a sample
+     *
+     * Its clock is frozen, its board is scripted and its blocks are chosen. It
+     * would be six records of a game nobody is playing.
+     */
+    private fun sampleDrop() {
+        if (tutorial.isRunning) return
+        if (!engine.isSampleDrop) return
+        val timing = decisions.lastDrop
+        logger.logEvent(
+            "run.sample",
+            "mode" to started.mode.name,
+            "drop" to engine.blocksDropped,
+            "level" to engine.level,
+            "tick_ms" to intervalMillis(),
+            "fill_pct" to engine.board.fillPercent,
+            "highest_tier" to tally.highestTier,
+            "clutter" to engine.clutter,
+            "steer_ms" to timing?.firstStepMillis,
+            "tap_gap_ms" to timing?.firstGapMillis,
+            "steps" to timing?.steps,
         )
     }
 
@@ -1681,6 +1864,13 @@ class GameViewModel(
 
     private companion object {
         const val LockDelayMillis = 150L
+
+        /**
+         * Where SPEC 17's cascade histogram stops resolving individual depths.
+         * Four steps and deeper is roughly one lock in a thousand; giving each
+         * its own attribute would be a column of zeroes on every record.
+         */
+        const val DeepCascade = 4
 
         /**
          * SPEC 8.4: eight seconds to decide on the continue, then the offer
@@ -1991,4 +2181,18 @@ sealed interface GameAction {
 
     /** The upsell card was tapped (SPEC 12). Opens the paywall; buys nothing. */
     data object OpenPro : GameAction
+}
+
+/**
+ * `this` with the count at [index] raised by one, grown with zeroes if it does
+ * not reach that far.
+ *
+ * A list rather than a map because the index *is* the depth and the thing is
+ * serialized into a saved run on every lock — a map would spend a key on every
+ * entry to encode the number it is already sitting at.
+ */
+private fun List<Int>.incrementing(index: Int): List<Int> {
+    val grown = if (size > index) toMutableList() else (this + List(index + 1 - size) { 0 }).toMutableList()
+    grown[index] = grown[index] + 1
+    return grown
 }

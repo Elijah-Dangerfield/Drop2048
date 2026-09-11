@@ -941,6 +941,43 @@ balance harness, and both are computed by the same function in `:libraries:casca
 and a test asserts it. An event with no call site is worse than no event, because it looks like
 coverage.
 
+### What it built
+
+**Done.** 1,261 tests, 0 failed, 0 skipped.
+
+**The chunk's real deliverable is two numbers, and they are not in SPEC 17's list.** L41 measured
+`decisionMillis` — the beat between a block appearing and the player's first sideways input — as
+worth five levels of median and a 3x swing in the 1024 rate, more than the drop clock and the
+entire spawn table together, and it has never been anything but a guess. `DecisionTimer` measures
+it, and `tapMillis` beside it, from the real game. Both count **accepted engine column steps**,
+because that is precisely what `DropClock` charges the modelled player for — count gestures and
+the live tap rate reads three times slow on the control most players use. An unsteered drop is
+**censored, not zero**: `drops_unsteered` ships beside `drops_steered` so the median arrives with
+its error bar. A drop that spanned a pause is discarded, or one pocketed phone sits in the tail of
+the histogram forever. Per-drop timings ride on the every-10th-drop sample (free, and next to
+`level`, which is what makes "do players slow down as the board speeds up" answerable);
+run-level quantiles ride on `run.end`. Two hundred drops, twenty-one records.
+
+**Clutter parity is pinned at both ends.** `GameState.clutter` and `GameState.isSampleDrop` both
+moved into `:libraries:cascade`, and `Harness.CLUTTER_SAMPLE_EVERY` is now the engine's constant
+rather than a second `10`. `ClutterParityTest` rebuilds the harness's histogram from the engine's
+own property and compares; `RunSampleTest` compares the emitted attribute against the engine state
+the emitting lock wrote to disk. Reimplementing clutter in the harness was mutated in and reds
+exactly one test.
+
+**The call sites were proved by deleting them** (L55). Removing `decisions.columnStep(...)` from
+`move` and `sampleDrop()` from `lock` reds five tests in `:features:game:impl` and leaves
+`:libraries:telemetry:impl` and `:tools:balance` green — which is the distinction the whole
+exercise is about, because a unit test of `logEvent` passes happily whether or not the game calls
+it.
+
+**`debug_session` is stamped by `GrafanaLogTree`, not by call sites.** One place to be wrong
+instead of forty, and no new event can miss it. `run.end` carries a second, narrower `recorded`
+flag for the question the dashboards actually ask.
+
+**Two dashboards are defined query-for-query** in `observability.md` — median level reached and the
+distribution of highest tier *reached* — ready to create the day the Grafana credentials land.
+
 ---
 
 ## C9 · Achievements, leaderboards, sharing

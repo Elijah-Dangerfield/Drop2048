@@ -16,6 +16,8 @@ class InstallFactsResourceTest {
 
     private val processor = RecordingLogRecordProcessor()
 
+    private var debugSession = false
+
     private fun plantTree(facts: InstallFacts) {
         KLog.plant(
             GrafanaLogTree(
@@ -25,6 +27,7 @@ class InstallFactsResourceTest {
                 currentSessionId = { "session-uuid-1" },
                 currentInstallId = { "install-uuid-1" },
                 isOffline = { false },
+                isDebugSession = { debugSession },
                 installFacts = { facts },
                 processorFactory = { processor },
             ),

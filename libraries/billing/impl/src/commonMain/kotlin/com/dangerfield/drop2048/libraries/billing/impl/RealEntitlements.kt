@@ -109,6 +109,11 @@ class RealEntitlements(
     }
 
     override suspend fun purchasePro(trigger: String?): PurchaseOutcome {
+        // SPEC 17's "purchase started". Paired with `iap.purchase_result` so a
+        // store sheet the player abandoned, and one that never opened at all,
+        // are two different shapes rather than one absence — the second is a
+        // bug in us and the first is a decision by them.
+        logger.logEvent("iap.purchase_started", "trigger" to trigger)
         val outcome = Catching { store.purchase(ProductIds.pro) }
             .logOnFailure { "Purchase threw" }
             .getOrNull()
@@ -140,6 +145,10 @@ class RealEntitlements(
     }
 
     override suspend fun restore(): RestoreOutcome {
+        // SPEC 17 asks for "restore attempted" specifically, and the result
+        // event below cannot answer it: a restore that hangs on an
+        // unreachable store never produces one.
+        logger.logEvent("iap.restore_started")
         val ownership = Catching { store.restore(ProductIds.pro) }
             .logOnFailure { "Restore threw" }
             .getOrElse { StoreOwnership.Unknown }

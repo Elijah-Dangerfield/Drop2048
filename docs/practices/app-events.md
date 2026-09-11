@@ -8,11 +8,14 @@ Query conventions are in [`observability.md`](observability.md).
 
 Dashboard queries treat this page as the source of truth for names and attributes. Names are
 dot-namespaced snake_case; every record automatically carries `session_id` + `install_id` +
-`is_offline` (per-record) plus resource attributes (`service.name="drop2048-client"`,
+`is_offline` + `debug_session` (per-record) plus resource attributes (`service.name="drop2048-client"`,
 deployment environment, version, platform). `is_offline` is `AppState.isOffline` captured **at
 emit time** — records that ship later from the disk buffer still say what connectivity looked
 like when the event happened, so reliability funnels can segment "emitted offline" without span
-archaeology.
+archaeology. `debug_session` is the QA latch (SPEC 19, L63) and is stamped by `GrafanaLogTree`
+rather than by any call site — one place to be wrong instead of forty, and the forgotten one would
+be invisible because QA data looks exactly like real data. **Every dashboard filters
+`debug_session=false`.**
 
 **Delivery is durable, effectively at-least-once.** The export chain is batch → disk buffer →
 OTLP: every batch is written to a file-backed buffer (`<files>/telemetry/…`, via
@@ -73,17 +76,81 @@ The events that motivated shipping direct-to-Grafana: what never reaches the bac
 
 ## Product funnels
 
-Seed your own here as features land — the onboarding feature already emits
-`onboarding.step_viewed` / `onboarding.auth_selected` / `onboarding.completed` /
-`onboarding.abandoned` (see `OnboardingViewModel`). Keep the pattern: one row per event, name the
-attributes and the exact fire site.
+SPEC 17's set, whole. Keep the pattern when adding to it: one row per event, name the attributes
+and the exact fire site — and **assert the fire site, not the definition**. C8's own tests drive
+`GameViewModel` and read a planted `LogTree`, so deleting a `logEvent` line reds the caller's test
+and leaves `:libraries:core`'s green (L55). An event with no production call site is worse than no
+event, because it looks like coverage on a dashboard that will never have data.
 
 | Event | Attributes | Fires |
 |---|---|---|
-| `run.end` | `score`, `level`, `blocks`, `highest_tier`, `cause` | Every completed run, in `GameViewModel.endRun` (SPEC 17). A run abandoned via Restart or Quit is not a completed run and does not fire (D12) |
-| `daily.end` | `date` (UTC, ISO), `score` | A finished Daily attempt, banked against the day it was *started* on (SPEC 14) |
+| `run.start` | `mode`, `level` | `GameViewModel.adopt` — every run that begins, including a Daily and the endless run the tutorial hands over to |
+| `run.resume` | `mode`, `level`, `score` | A run restored from disk on launch (SPEC 11) |
+| `run.sample` | `mode`, `drop`, `level`, `tick_ms`, `fill_pct`, `highest_tier`, `clutter`, `steer_ms`, `tap_gap_ms`, `steps` | **Every 10th drop**, in `GameViewModel.sampleDrop` (SPEC 17). `clutter` is `GameState.clutter` from `:libraries:cascade` on `GameState.isSampleDrop` — *the same property and cadence `tools/balance` prints*, which is the whole point (SPEC 4.4). `steer_ms` / `tap_gap_ms` are the decision-time instruments below and are **absent**, not zero, on a drop with fewer than one / two column steps. Tutorial drops are not sampled |
+| `run.end` | `mode`, `score`, `level`, `blocks`, `duration_ms`, `highest_tier`, `cause`, `bursts`, `merges`, `longest_cascade`, `cascades_1`/`_2`/`_3`/`_4plus`, `seed` (Endless only), `daily_date` (Daily only), `recorded`, `steer_ms_p50`, `steer_ms_p90`, `tap_gap_ms_p50`, `drops_steered`, `drops_unsteered`, `steps` | Every completed run, in `GameViewModel.endRun` (SPEC 17). A run abandoned via Restart or Quit is not a completed run and does not fire (D12). `highest_tier` is the tier **reached** (D7) — a 2048 bursts its own row, so "at rest" would report zero of them. `recorded` says whether the four writes that claim a player did something happened; it is narrower than the `debug_session` stamp and answers "no row was written" vs "no row reached us" |
+| `funnel.first_run_completed` | `score`, `level`, `mode` | The first run this install ever played to the end, once ever (`AppData.hasCompletedARun`) |
+| `funnel.return_day` | `day` (1/3/7), `days_since_install` | `RetentionReporter` on a foreground, once per milestone. **Reached-or-passed**: a player away for five days reports day 1 and day 3 together, because the curve asks "were they still here by day N" |
+| `tutorial.started` / `tutorial.step_reached` / `tutorial.skipped` / `tutorial.completed` | `drop` (all but `started`) | SPEC 13's guided run, in `GameViewModel`. `step_reached` also fires on arrival at lesson one — without it, a player who quit on the first beat and one who never opened the app are the same row |
+| `daily.start` / `daily.refused` / `daily.retry` / `daily.end` | `date`, `attempt` / `reason` / `result` / `date`, `score` | SPEC 14's attempt ledger. `daily.end` banks against the day the attempt was *started* on |
 | `engine.fault` | `fault` | The engine reporting a bug in itself (SPEC 18.1, 18.14). Should be zero; if it is not, that is the finding |
 | `leaderboard.submitted` | `board`, `value` | A value the platform **accepted**, in `RealLeaderboards.send`. Deliberately not fired on a refusal: signed out, restricted and offline are the normal state for most players, and an event on every one of them would drown the one that means something. Zero of these on iOS while `run.end` climbs is the shape of the bug this chunk exists to prevent |
+
+## The two decision-time instruments
+
+`decisionMillis` — the beat between a block appearing and the player's first
+sideways input — is the difficulty dial nobody has measured (L41). Swept from
+150ms to 500ms it moves the balance harness's median level by five and its 1024
+rate by a factor of three, which is more than the drop clock and the entire
+spawn table put together. Every clocked balance number in this project is
+conditional on it and on `tapMillis`, the gap between consecutive column steps.
+`DecisionTimer` in `:features:game:impl` is what turns the two guesses into
+measurements.
+
+**They measure what the harness models, not something adjacent.** `DropClock`
+issues one `Input.MoveLeft`/`MoveRight` per `tapMillis` after an initial
+`decisionMillis` wait, so the live instrument counts **accepted engine column
+steps**. A drag across three columns is three steps here exactly as it is three
+taps there. Count gestures instead and the live tap rate reads three times
+slower than the number it is compared against, on the control most players use.
+
+**A drop the player never steered is censored, not zero.** The modelled player
+always reaches its target, so "never steered" does not exist offline; live it is
+common. Zeroing it would make the population read three times faster than it is
+and dropping it would throw out every easy board, so `drops_unsteered` ships
+beside `drops_steered` and the time attribute is simply absent. Query the
+steered-only median and quote the censoring rate with it.
+
+**A drop that spanned a pause is discarded.** One backgrounded phone would
+otherwise sit in the tail of the histogram forever.
+
+**Two reporting rates, and neither is a firehose.** Per-drop timings ride on the
+every-10th-drop `run.sample` — no extra records, and arriving next to `level` is
+what lets the dashboard ask whether players slow down as the board speeds up.
+Run-level quantiles ride on `run.end`, so a four-drop run still contributes. A
+200-drop run produces twenty samples and one summary, against the two thousand a
+per-drop event would have been.
+
+| Attribute | On | Means |
+|---|---|---|
+| `steer_ms` | `run.sample` | Millis from the block becoming the player's to their first column step, this drop. Absent if they never steered |
+| `tap_gap_ms` | `run.sample` | Millis between the first and second column step, this drop. Absent below two steps |
+| `steer_ms_p50` / `_p90` | `run.end` | The run's decision time, from a 50ms-bucket histogram. Absent if no drop was steered |
+| `tap_gap_ms_p50` | `run.end` | The run's tap rate, same shape |
+| `drops_steered` / `drops_unsteered` | `run.end` | The denominator and the censoring rate |
+
+## Ads and monetization
+
+| Event | Attributes | Fires |
+|---|---|---|
+| `ads.rewarded_requested` | `placement` | `RealAdGate.rewarded`, before the network is asked |
+| `ads.rewarded_result` | `placement`, `outcome`, `latency_ms`, `error_kind` | The same call returning. `outcome` covers rewarded / dismissed / no-fill / offline / failed |
+| `ads.continue_offered` / `ads.continue_declined` / `ads.continue_result` | `continues_used`, `outcome` | SPEC 12's rewarded continue, in `GameViewModel` |
+| `ads.interstitial_blocked` | `reason` | `RealInterstitialGate`, carrying **which named gate refused** — that is why the reason is there, so a live app can be asked which rule is doing the work rather than guessed at |
+| `ads.interstitial_result` | `outcome`, `error_kind`, `runs_this_session` | An interstitial actually shown |
+| `iap.paywall_shown` | `trigger` | `RealPaywallCoordinator.requestOffer`, on an **accepted** request |
+| `iap.upsell_tapped` | `surface`, `offered` | The stacked-out card's control, in `GameViewModel`. Recorded at the control rather than in the coordinator, because a tap the coordinator refuses produces no `paywall_shown` and would read downstream as a card nobody touched |
+| `iap.purchase_started` / `iap.purchase_result` | `trigger` / `outcome`, `error_kind`, `trigger` | `RealEntitlements.purchasePro`. The pair is what separates an abandoned store sheet from one that never opened |
+| `iap.restore_started` / `iap.restore_result` | — / `outcome` | `RealEntitlements.restore`. The result event cannot answer "attempted": a restore hanging on an unreachable store never produces one |
 
 ## Warn+ log forwarding (not events)
 

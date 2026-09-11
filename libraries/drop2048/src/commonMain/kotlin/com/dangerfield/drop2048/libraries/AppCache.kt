@@ -146,6 +146,37 @@ data class AppData(
      * `upgrade.softUpdateVersionCode` asks again.
      */
     val softUpdateDismissedFor: Int = 0,
+
+    /**
+     * Epoch-ms of the first foreground this install ever had, and the milestone
+     * days already reported. Together they are SPEC 17's day 1 / 3 / 7 return
+     * funnel (`RetentionReporter` in `:libraries:telemetry:impl`).
+     *
+     * Deliberately **not** reusing [reviewInstallAt]. That belongs to the review
+     * coordinator, which is free to reset or re-stamp it for its own reasons,
+     * and a retention curve quietly rebased by an unrelated prompt policy is
+     * the kind of wrong number nobody catches.
+     *
+     * The reported set is what makes the events once-per-milestone rather than
+     * once-per-foreground. A player who opens the app nine times on day 3 is
+     * one day-3 return, and without this it would be nine.
+     */
+    val firstLaunchAt: Long = 0L,
+    val returnDaysReported: Set<Int> = emptySet(),
+
+    /**
+     * Whether the player has ever finished a run (SPEC 17's funnel). Written at
+     * `endRun`, so it counts a run *played to the end* rather than one that was
+     * started — the funnel question is whether a new player ever reaches the
+     * stacked-out sheet, and every abandoned run is one who did not.
+     *
+     * A flag rather than the "epoch-ms, 0 means never" shape used elsewhere in
+     * this class, because there is exactly one bit of information here and the
+     * sentinel is a trap: a clock reading zero is indistinguishable from "not
+     * yet", so a device with an unset clock would report a first run on every
+     * run it ever played.
+     */
+    val hasCompletedARun: Boolean = false,
 ) {
     /**
      * Get the visit count for a screen by its tracking key.

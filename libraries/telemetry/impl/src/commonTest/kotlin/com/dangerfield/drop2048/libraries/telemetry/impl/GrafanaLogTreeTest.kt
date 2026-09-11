@@ -19,6 +19,8 @@ class GrafanaLogTreeTest {
     private var installId: String? = "install-uuid-1"
     private var offline = false
 
+    private var debugSession = false
+
     private fun plantTree() {
         KLog.plant(
             GrafanaLogTree(
@@ -28,6 +30,7 @@ class GrafanaLogTreeTest {
                 currentSessionId = { sessionId },
                 currentInstallId = { installId },
                 isOffline = { offline },
+                isDebugSession = { debugSession },
                 installFacts = { RetailInstallFacts },
                 processorFactory = { processor },
             ),
@@ -53,6 +56,39 @@ class GrafanaLogTreeTest {
         assertEquals("install-uuid-1", record.attributes["install_id"])
         assertEquals("wait", record.attributes["phase"])
         assertEquals(1200L, record.attributes["wait_ms"])
+    }
+
+    /**
+     * L63, and the reason the flag is stamped here rather than at the call
+     * sites: **every** record carries it, whatever emitted it and whether or
+     * not that emitter knows a debug menu exists. A QA run that reached a
+     * dashboard unflagged would be indistinguishable from real data, and the
+     * only way to be sure is for there to be one place it can be wrong.
+     */
+    @Test
+    fun everyRecordCarriesTheDebugSessionFlag() {
+        debugSession = true
+        klogForwardingEnabled = true
+        plantTree()
+
+        KLog.logEvent("run.end", "score" to 900L)
+        KLog.logEvent("run.sample", "clutter" to 4)
+        KLog.w("a plain warn line, forwarded as an ordinary log")
+
+        assertEquals(3, processor.records.size)
+        assertTrue(
+            processor.records.all { it.attributes["debug_session"] == true },
+            "a record escaped the debug-session stamp",
+        )
+    }
+
+    @Test
+    fun aNormalSessionsRecordsSayTheyAreNotDebug() {
+        plantTree()
+
+        KLog.logEvent("run.end", "score" to 900L)
+
+        assertEquals(false, processor.records.single().attributes["debug_session"])
     }
 
     @Test

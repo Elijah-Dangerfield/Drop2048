@@ -28,6 +28,8 @@ class TelemetryBackgroundFlusherTest : CoroutineTest() {
 
     private val processor = FlushCountingProcessor()
 
+    private var debugSession = false
+
     @AfterTest
     fun tearDown() {
         KLog.clearTrees()
@@ -41,6 +43,7 @@ class TelemetryBackgroundFlusherTest : CoroutineTest() {
             currentSessionId = { "session-uuid-1" },
             currentInstallId = { "install-uuid-1" },
             isOffline = { false },
+            isDebugSession = { debugSession },
             installFacts = { RetailInstallFacts },
             processorFactory = { processor },
         )

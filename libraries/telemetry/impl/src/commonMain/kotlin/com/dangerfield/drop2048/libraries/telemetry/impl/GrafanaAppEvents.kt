@@ -5,6 +5,7 @@ import com.dangerfield.drop2048.libraries.drop2048.AppEvent
 import com.dangerfield.drop2048.libraries.drop2048.AppEventListener
 import com.dangerfield.drop2048.libraries.core.AppState
 import com.dangerfield.drop2048.libraries.core.AutoInit
+import com.dangerfield.drop2048.libraries.core.DebugSessionFlag
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.logEvent
 import com.dangerfield.drop2048.libraries.networking.InstallIdProvider
@@ -46,6 +47,7 @@ class GrafanaAppEvents(
     appEventsSampleRate: AppEventsSampleRate,
     klogForwardingEnabled: KlogForwardingEnabled,
     appState: AppState,
+    debugSessionFlag: DebugSessionFlag,
     fileManager: FileManager,
     backgroundFlusher: TelemetryBackgroundFlusher,
     installFactsProvider: InstallFactsProvider,
@@ -62,6 +64,7 @@ class GrafanaAppEvents(
                 currentSessionId = { sessionIdProvider.current() },
                 currentInstallId = { installIdProvider.current() },
                 isOffline = { appState.isOffline.value },
+                isDebugSession = { debugSessionFlag.isDebugSession },
                 installFacts = installFactsProvider::facts,
                 processorFactory = {
                     durableLogRecordProcessor(

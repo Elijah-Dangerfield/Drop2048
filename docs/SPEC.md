@@ -832,7 +832,9 @@ Minimum set to actually tune the thing.
 - **Per-drop sampling.** Every 10th drop: level, tick interval, board fill percentage, highest
   tier, and the **clutter count**. That last one is the early warning that the spawn floor is
   mistuned, and it is the same metric the balance harness prints, so offline and live numbers are
-  directly comparable.
+  directly comparable. Both read `GameState.clutter` on `GameState.isSampleDrop`, both in
+  `:libraries:cascade`; `ClutterParityTest` pins the harness end and `RunSampleTest` the client
+  end.
 - **Ads.** Offered, started, completed, dismissed, failed, per placement.
 - **Monetization.** Upsell shown, upsell tapped, purchase started, completed, restore attempted.
 - **Funnel.** Tutorial step reached, completed, skipped; first run completed; day 1 / 3 / 7
@@ -843,6 +845,33 @@ Minimum set to actually tune the thing.
 1024 means too hard. Most runs reaching 2048 means too easy.
 
 Every event goes in `docs/practices/app-events.md` in the same change that adds it.
+
+**Built in C8.** Four things the section did not say, each forced once the thing was real.
+
+**The highest-value instrument is not in the list above.** L41 found that `decisionMillis` — the
+beat between a block appearing and the player's first sideways input — moves the harness's median
+level by five and its 1024 rate by a factor of three when swept across a plausible range. That is
+more than the drop clock, the spawn table and every speed-curve change put together, and it is a
+guess. So C8 ships **two measurements**: time from spawn to first column step, and the gap between
+consecutive column steps. They are `steer_ms` / `tap_gap_ms` on the per-drop sample and
+`steer_ms_p50` / `steer_ms_p90` / `tap_gap_ms_p50` on `run.end`. They count **accepted engine
+column steps**, because that is exactly what `DropClock` charges the modelled player for; counting
+gestures would measure a different quantity from the one the number is compared against.
+
+**A drop the player never steered is censored data, not a zero.** The modelled player always
+reaches its target so the case does not exist offline; live it is common. `drops_unsteered` ships
+beside `drops_steered` and no time is recorded, so the median can be quoted with its censoring
+rate rather than silently biased by it.
+
+**The seed is Endless-only.** A Daily `run.end` ships the moment the attempt ends, which can be
+nineteen hours before the day is over, and 14's seed is the board everybody plays. Endless carries
+its seed; Daily carries the date instead, which was public already.
+
+**`debug_session` is stamped by the export tree, not by the call sites.** L63's latch reaches every
+record through `GrafanaLogTree`, so no event can be missing it. `run.end` carries a second,
+narrower flag — `recorded` — saying whether the four writes that claim a player did something
+actually happened, because "no row was written" and "no row reached us" are otherwise identical
+downstream.
 
 ## 18. Edge cases
 

@@ -17,6 +17,8 @@ class StartupReporterTest {
 
     private val processor = RecordingLogRecordProcessor()
 
+    private var debugSession = false
+
     @BeforeTest
     fun plantTree() {
         KLog.plant(
@@ -27,6 +29,7 @@ class StartupReporterTest {
                 currentSessionId = { "session-uuid-1" },
                 currentInstallId = { "install-uuid-1" },
                 isOffline = { false },
+                isDebugSession = { debugSession },
                 installFacts = { RetailInstallFacts },
                 processorFactory = { processor },
             ),

@@ -4,6 +4,7 @@ import com.dangerfield.drop2048.libraries.cascade.autoplay.Autoplay
 import com.dangerfield.drop2048.libraries.cascade.autoplay.Policy
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Cascade
+import com.dangerfield.drop2048.libraries.cascade.DROPS_PER_SAMPLE
 import com.dangerfield.drop2048.libraries.cascade.DeathCause
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
@@ -91,7 +92,14 @@ class ClockStats(
 object Harness {
 
     const val MAX_DROPS = 3_000
-    const val CLUTTER_SAMPLE_EVERY = 10
+
+    /**
+     * SPEC 4.4 and SPEC 17 sample clutter on the same cadence so the offline
+     * and live numbers are directly comparable. The period is the engine's
+     * [DROPS_PER_SAMPLE] rather than a second copy of `10` here, and the drop
+     * boundary is the engine's `GameState.isSampleDrop` — see `ClutterParityTest`.
+     */
+    const val CLUTTER_SAMPLE_EVERY = DROPS_PER_SAMPLE
 
     /** SPEC 5.5 puts four levels inside these, which is the stretch C3 played and called a cutscene. */
     const val EARLY_DROPS = 60
@@ -165,7 +173,7 @@ object Harness {
             state = transition.state
             highest = higher(highest, state.highestTier)
 
-            if (state.blocksDropped % CLUTTER_SAMPLE_EVERY == 0) clutter[state.clutter]++
+            if (state.isSampleDrop) clutter[state.clutter]++
 
             if (transition.faults.isNotEmpty()) {
                 death = Death.ENGINE_FAULT

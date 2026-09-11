@@ -1727,3 +1727,77 @@ rebuilt, and anything else (a downgrade from a rolled-back release, or a future
 bump somebody forgets to write a migration for) refuses to open and leaves every
 row where it was. Both halves are asserted, and both were proven to bite by
 mutating the production configuration and watching exactly one of them go red.
+
+### The decision-time instrument measures column steps, not gestures
+
+`DropClock` charges the modelled player `tapMillis` for every `Input.MoveLeft` /
+`MoveRight` it issues, so a target three columns away costs three taps. The live
+instrument therefore counts **accepted engine column steps**, which means a drag
+across three columns counts as three.
+
+The alternative — one count per gesture — was rejected because it measures a
+different quantity from the one the number exists to be compared against. Drag
+steering (D11) is the control most players use, and counting it as one input
+would make the live tap rate read roughly three times slower than `tapMillis`
+while looking entirely plausible. The whole value of the measurement is that it
+can be substituted straight into a harness sweep.
+
+### An unsteered drop is censored, not zero, and not dropped
+
+Live, a block that spawns in a column the player is happy with takes no input at
+all. Offline that case does not exist, because every policy reaches its target.
+
+Recording it as a 0ms decision would make the population read about three times
+faster than it is. Discarding it would throw out every easy board, which biases
+the other way and by an unknown amount. So the drop is counted in
+`drops_unsteered`, no time is recorded, and both counts ship on `run.end` — the
+analyst gets the steered-only median *and* the censoring rate that qualifies it,
+which is the only honest pair.
+
+### `debug_session` is stamped by the export tree, and `run.end` carries a second flag
+
+L63's latch could have been added to each `logEvent` call. Forty call sites is
+thirty-nine chances to forget it, and the forgotten one is invisible: QA data on
+a dashboard looks exactly like real data. So `GrafanaLogTree` stamps it on every
+record it exports — one place to be wrong, and one that no new event can miss.
+
+That flag answers a wider question than the dashboards need, though: it is true
+for the whole life of a process in which the menu was opened, including runs
+that started before it. The narrow question — did the four writes that claim a
+player did something actually happen — is `StartedRun.debug`, and it rides on
+`run.end` as `recorded`. Keeping both is what lets "no `run_record` row was
+written" be told apart from "the row was written and never reached us", which
+are otherwise the same absence.
+
+### Endless `run.end` carries its seed; a Daily one carries only its date
+
+SPEC 17 asks for the seed. SPEC 14 says the Daily seed is the board everybody in
+the world plays that day, and a `run.end` ships the moment the attempt ends —
+which for an attempt started at 00:05 UTC is nineteen hours before the day is
+over. An event stream is not a place to publish a board early.
+
+Endless seeds have no such problem and make a reported run replayable, so they
+ride. Daily runs carry `daily_date` instead, which is the only part of a Daily
+attempt that was already public.
+
+### Two reporting rates for the decision times, and neither is per drop
+
+A per-drop event would be two thousand records for a long run, which is the
+firehose `app-events.md` forbids. A run-level average alone would lose the
+distribution and, worse, the correlation with level — and "do players get slower
+as the board speeds up" is the question L41's sweep could not answer from the
+outside.
+
+So the per-drop timings ride on the every-10th-drop sample that already fires at
+the right rate, where they arrive next to `level` for free, and the run-level
+quantiles ride on `run.end` so a four-drop run still contributes a number. Two
+hundred drops produce twenty samples and one summary.
+
+### The decision histogram is fixed buckets, not a list of samples
+
+Keeping every measurement would be simplest, and the debug menu's invincibility
+can run a board for thousands of drops — an unbounded list inside a ViewModel
+that also holds the board is how a telemetry counter becomes an OOM. Sixty 50ms
+buckets is 240 bytes whatever the run does, and 50ms is well inside the
+resolution the question needs: L41 swept `decisionMillis` in 100ms steps and what
+it wants to know is whether the real number is nearer 150 or nearer 500.

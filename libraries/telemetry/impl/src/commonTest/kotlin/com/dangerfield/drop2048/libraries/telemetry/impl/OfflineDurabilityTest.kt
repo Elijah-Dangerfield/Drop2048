@@ -48,6 +48,8 @@ class OfflineDurabilityTest {
 
     private var offline = false
 
+    private var debugSession = false
+
     @AfterTest
     fun tearDown() {
         KLog.clearTrees()
@@ -61,6 +63,7 @@ class OfflineDurabilityTest {
             currentSessionId = { "session-uuid-1" },
             currentInstallId = { "install-uuid-1" },
             isOffline = { offline },
+            isDebugSession = { debugSession },
             installFacts = { RetailInstallFacts },
             processorFactory = {
                 durableLogRecordProcessor(

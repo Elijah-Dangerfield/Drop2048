@@ -87,4 +87,25 @@ data class GameState(
             val counts = values.groupingBy { it }.eachCount()
             return values.count { counts.getValue(it) == 1 }
         }
+
+    /**
+     * Whether this state sits on the every-[DROPS_PER_SAMPLE]th drop boundary
+     * SPEC 4.4 and SPEC 17 both sample on.
+     *
+     * Here rather than at either call site because the whole value of the
+     * clutter metric is that `tools/balance` and the live client report the
+     * same number on the same cadence. Two `% 10` expressions in two modules
+     * are two things that can drift apart silently, and a drifted cadence is
+     * invisible on a dashboard — the numbers still arrive, they just stop
+     * meaning the same thing.
+     */
+    val isSampleDrop: Boolean get() = blocksDropped > 0 && blocksDropped % DROPS_PER_SAMPLE == 0
 }
+
+/**
+ * The sampling period SPEC 4.4's harness and SPEC 17's per-drop telemetry both
+ * use. One drop in ten: often enough to see a spawn floor go wrong within a
+ * level, rare enough that a live run emits tens of records rather than
+ * hundreds.
+ */
+const val DROPS_PER_SAMPLE = 10

@@ -24,6 +24,18 @@ data class RunTally(
     val merges: Int = 0,
     val bursts: Int = 0,
     val longestCascade: Int = 0,
+    /**
+     * SPEC 17's cascades-by-depth, indexed by depth: `cascadesByDepth[2]` is
+     * how many locks resolved in exactly two steps. Index 0 is the locks that
+     * merged nothing, which is the denominator the rest only mean anything
+     * against.
+     *
+     * Persisted alongside [longestCascade] rather than derived from it,
+     * because a histogram is not recoverable from its maximum — and a run
+     * resumed from disk that reported only the cascades since the resume would
+     * make every long session look like a short one on the dashboard.
+     */
+    val cascadesByDepth: List<Int> = emptyList(),
     /** Points value of the highest tier reached, 0 before the first merge. */
     val highestTier: Int = 0,
     val playedMs: Long = 0,
@@ -112,6 +124,15 @@ data class SavedRun(
 )
 
 /**
+ * 6 — C8 added `RunTally.cascadesByDepth`, SPEC 17's cascade-depth histogram.
+ *
+ * A nullable-free field with a default, so a version 5 blob would decode
+ * cleanly and report an empty histogram. It is bumped anyway, for the reason
+ * version 3 was: "bump on every shape change" is a rule anyone can check, and
+ * "bump only when the change is not backwards compatible" is a judgement call
+ * made under deadline by whoever is least likely to be thinking about it. The
+ * cost is one in-flight run on the release that lands it.
+ *
  * 5 — decision D21 changed `EngineConfig`, which travels inside `GameState`.
  *
  * `nudgeRows` and `speed.softDropMsPerRow` are gone and `scoring.hardDropPerRow`
@@ -145,4 +166,4 @@ data class SavedRun(
  * `GameState`. Version 1 is the shape C4 shipped, which had no version field at
  * all and is therefore rejected by failing to decode.
  */
-const val SAVE_FORMAT_VERSION = 5
+const val SAVE_FORMAT_VERSION = 6

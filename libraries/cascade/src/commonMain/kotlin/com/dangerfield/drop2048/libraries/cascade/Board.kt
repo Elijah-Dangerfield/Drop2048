@@ -71,6 +71,18 @@ data class Board(
 
     val blockCount: Int get() = cells.count { it != null }
 
+    /**
+     * Occupied cells as a whole-number percentage, which is SPEC 17's board
+     * fill.
+     *
+     * Rounded rather than truncated, and an integer rather than a float,
+     * because the consumer is a Loki histogram and a bucket edge at 49.7%
+     * helps nobody. Unlike [GameState.clutter] this counts Stones and inert
+     * Wildcards: fill is about how much room is left, and a Stone takes up
+     * exactly as much room as a 4.
+     */
+    val fillPercent: Int get() = (blockCount * PERCENT + cells.size / 2) / cells.size
+
     val isClear: Boolean get() = cells.all { it == null }
 
     val occupiedCells: List<Cell>
@@ -109,6 +121,8 @@ data class Board(
         fun empty(cols: Int, rows: Int): Board = Board(cols, rows, List(cols * rows) { null })
 
         private val ORTHOGONAL = listOf(0 to -1, 0 to 1, -1 to 0, 1 to 0)
+
+        private const val PERCENT = 100
 
         private fun render(block: Block?): String = when (block) {
             null -> "."
