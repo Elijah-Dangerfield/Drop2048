@@ -208,7 +208,9 @@ fixed**, and it opens no PR when it fails, so the failure is quiet.
 6. Licence report regenerated (`docs/store/licenses.md`) and the in-app `licenses_body` copy
    reconciled with it. **It currently says every dependency is Apache 2.0 or MIT and the generated
    report says 17 modules are on proprietary Google SDK terms.**
-7. `data-safety.md` re-derived against the tree as it is at that moment, **after C8 lands**.
+7. `data-safety.md` re-derived against the tree as it is at that moment. C8 landed at `5244bbe`
+   and was already folded in (§2.3a); the next thing that moves it is a new SDK or a new destination
+   for anything the player types.
 8. Store screenshots produced (`screenshots.md` §2 for Play, §3 for why iOS is blocked).
 9. Tag, and let `release.yml` do the rest. It signs the AAB, renders release notes, uploads to Play
    (routing to `internal` automatically on a first release, because Play will not accept an
@@ -298,4 +300,5 @@ or a file.
     R8 is unvalidated on a build that ships with `isMinifyEnabled = true`.
 26. **Reconcile `licenses_body`** with the generated report (§6, step 6).
 27. **Delete the camera permission** (§4 row 9).
-28. **Re-derive `data-safety.md` after C8 lands.**
+28. **Re-derive `data-safety.md`** against the tree at submission time. C8 landed mid-chunk and is
+    already folded in (§2.3a), so this is about whatever lands next.

@@ -5,21 +5,23 @@ from what this tree actually does. Every row names the file and the mechanism th
 Where the honest answer is "not determined", it says so and says where to look, because a guess
 here is a policy violation rather than a typo.
 
-Derived 2026-09-10 for C13, against `75cb605`.
+Derived 2026-09-10 for C13, against `75cb605`, and re-checked against `5244bbe` when C8 landed
+mid-chunk (§2.3a).
 
 **Do not fill a store form straight out of this file.** Treat the citations as a map of where to
 look and re-open them. Sodogku's own history is the argument: it shipped a data-safety document
 that did not match its code, twice, and both times the mismatch was a fact that had quietly moved
 underneath a correct-looking row.
 
-## Re-derive this before filing. Two reasons, one of them live right now
+## Re-derive this before filing
 
-1. **C8 (telemetry) is in flight as this is written.** Its whole job is to change what is
-   collected. §2.3 lists the events present in the tree at `75cb605`, and
-   `docs/practices/app-events.md` already describes several that the registry page does not carry
-   rows for. **Every analytics row below has to be re-read against the registry once C8 lands.** No
-   row below is expected to *disappear*; the risk is a new attribute that introduces a data type
-   the form does not yet declare.
+1. **C8 (telemetry) landed at `5244bbe` while this was being written, and its diff was re-read
+   against every row below before this file was committed.** §2.3's table is the pre-C8 tree at
+   `75cb605`; §2.3a is what C8 added and what it does to the declarations. The short version:
+   **no data type on either form changes.** Everything C8 added is gameplay and funnel
+   measurement under App activity / Product Interaction, which were already declared. The one
+   structural change worth knowing about is that every OTLP record now also carries a
+   `debug_session` boolean, stamped once in `GrafanaLogTree` rather than at forty call sites.
 2. **Neither telemetry backend has credentials on this machine.** `local.properties` holds only
    `sdk.dir`, so `Drop2048BuildConfig.SENTRY_DSN`, `GRAFANA_OTLP_BASE_URL`, `GRAFANA_OTLP_INSTANCE_ID`
    and `GRAFANA_LOGS_WRITE_TOKEN` all resolve blank, and both pipes are switched off in any build
@@ -138,7 +140,7 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
   | Launch gates | `gate.raised` (`gate`, `blocking`) | `LaunchGateViewModel.kt:151` |
 
   All of it is gameplay and funnel measurement. **None of it introduces a data type beyond the ones
-  declared in §4 and §5.** That statement is the one C8 could break; re-check it.
+  declared in §4 and §5.**
 - **A second mode forwards plain Warn-and-above log lines**, not just events. Those carry the log
   body, the logger `tag`, and `exception_type` / `exception_message`. The body is whatever our own
   code passed to `KLog`.
@@ -148,6 +150,23 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
 - **Grafana Cloud is a processor on our own account, not a data recipient.** Under Play's
   definition, transfer to a service provider processing on our behalf is not "sharing". Same for
   Sentry. AdMob is different: see §4.
+
+### 2.3a What C8 added, and why no declaration moves
+
+Re-read against the diff `75cb605..5244bbe` and `docs/practices/app-events.md` as it now stands.
+
+| C8 added | Carries | Declaration effect |
+|---|---|---|
+| `run.sample`, every 10th drop | `mode`, `drop`, `level`, `tick_ms`, `fill_pct`, `highest_tier`, `clutter`, `steer_ms`, `tap_gap_ms`, `steps` | None. More volume, same type. SPEC 17 asked for exactly this and `clutter` is deliberately the same property `tools/balance` prints |
+| **The decision-time instruments** `steer_ms`, `tap_gap_ms`, and the `run.end` percentiles `steer_ms_p50` / `_p90`, `tap_gap_ms_p50`, `drops_steered`, `drops_unsteered` | Millisecond timings of the player's own taps | None. This is the one worth pausing on, because "how fast does this person react" sounds like biometric or sensitive data and is not: it is interaction timing inside one game screen, it is bucketed into 50ms histograms before it leaves, and it is **App activity → App interactions** on Play and **Usage Data → Product Interaction** on Apple. Neither store has a narrower box for it |
+| `run.end` grown to carry `duration_ms`, `bursts`, `merges`, `longest_cascade`, `cascades_1`…`_4plus`, `seed`, `daily_date`, `recorded` | Gameplay outcomes | None |
+| `funnel.first_run_completed`, `funnel.return_day` | `score`, `level`, `mode`; `day`, `days_since_install` | None. Retention is App activity. `days_since_install` is derived from `AppData.firstLaunchAt`, a local timestamp, not from anything about the person |
+| `tutorial.step_reached`, `iap.upsell_tapped`, `iap.purchase_started`, `ads.interstitial_result`, `ads.rewarded_result` latency | Funnel positions | None |
+| **`debug_session` on every OTLP record** | A boolean | None, and it is an improvement: stamped once in `GrafanaLogTree` from `DebugSessionFlag` rather than at forty call sites, and every dashboard filters it false |
+| Three new `AppData` fields: `firstLaunchAt`, `returnDaysReported`, `hasCompletedARun` | Local only | None. §2.7, device-local, and cleared by "Delete local data" like everything else in `AppData` |
+
+**So the answer is the same on both forms.** What changed is that §4's App-activity row and §5's
+Product Interaction row now cover a good deal more, which is what those rows are for.
 
 ### 2.4 Crash and diagnostics (Sentry)
 
