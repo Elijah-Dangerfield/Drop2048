@@ -38,7 +38,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
 | C14 · Stats + paywall to handoff fidelity | **DONE** | `acc948f`. Paywall is a bottom sheet. See L77 |
 | C15 · Visible fake ads in debug | **DONE** | `81207c6`. House ads + QA overrides. See L78-L79 |
-| C16 · Owner directives, debug FAB, QA menu | **IN PROGRESS** | Ported from Sodogku at owner request |
+| C16 · Owner directives, debug FAB, QA menu | **DONE** | Build-seam FAB, own QA screen. See D23, L80-L81 |
 | C13a · Make the claims true + validate R8 | **DONE** | `f893a04`. **R8 passed, zero keep rules.** See L74-L76 |
 
 ---
@@ -266,6 +266,34 @@ Wildcard symmetry was confirmed in the same ruling: a value block landing beside
 Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcard, and without
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
+
+### D23 · The QA screen is its own destination, not a section of the debug menu
+
+The FAB's show/hide switch cannot live in the debug menu, because C12 gave that menu two properties
+on purpose:
+
+- **`DebugViewModel.init` calls `markDebugSession()`** — merely *opening* it silences run history,
+  Daily results and leaderboard submissions for the rest of the process (L63).
+- Navigating there **clears the back stack**.
+
+Hiding a floating button is two seconds of housekeeping. Charging it a tainted process plus the
+screen the button was covering makes the switch cost more than the button does.
+
+`QaToolsViewModel` holds no reference to `DebugController` **at all**, rather than holding one and
+remembering not to call it. The property that survives from Sodogku is the one that matters: the
+switch is reachable *without* the button — a Settings row on any tester build, no seven taps, no
+passphrase. Everything destructive stays behind both.
+
+**The FAB itself is a build seam, not a runtime flag**, following C15's shape (L78):
+`:libraries:devfeedback:tester` is a `debugImplementation` with a `verifyNoDevFeedbackInRelease`
+Gradle check, proven by flipping the scope to `implementation` and watching it fail. The *persisted
+position* stays in the always-present api module, because the QA switch has to write it on a build
+the tester module is not linked into.
+
+**The gap, and it is load-bearing here in a way it was not for the fake ads:** on iOS the tester
+module is in `iosMain` and linked into every binary, held back only by `isTesterBuild`. **TestFlight
+is a release binary**, so that is the intended audience rather than an accident — but it means iOS
+has no structural guarantee, only a flag.
 
 ### D22 · A Daily `run.end` carries the date, never the seed
 
@@ -663,6 +691,26 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L80 · `@Serializable` without the plugin is an annotation and nothing else
+
+`drop2048.compose.multiplatform` does **not** apply the kotlinx-serialization plugin, while
+`drop2048.kotlin.multiplatform` and `drop2048.feature` both do. So a `@Serializable` class in a
+compose-only module compiles fine, `assembleDebug` is green, and the app **dies on the main thread
+at first launch** with "Serializer for class ... is not found", before a single frame.
+
+Found by installing it (L56 again). A test that merely constructs the class passes; the one that
+catches it calls `serializer<T>()` directly.
+
+### L81 · A value-class return mangles the JVM method name
+
+`Catching` is an inline class over `Result`, so `submitFeedback` is `submitFeedback-hUnOzRk` in
+bytecode — and **the suffix changes with the signature.** Any reflection test over these seams has
+to match by prefix, or it breaks the next time an unrelated parameter moves.
+
+Relevant because this project now has three reflection-based guard tests (`NoIdentitySeamsTest`,
+`PlayerFeedbackSeamTest`, and the house-ad release check), all deliberately reflective because a
+compile-time shape does not catch a re-added parameter *with a default value*.
 
 ### L78 · A stand-in that *can* grant has to be kept out by the build, not by the type
 
