@@ -36,6 +36,8 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
+| C14 · Stats + paywall to handoff fidelity | **IN PROGRESS** | Owner: they read as a settings list |
+| C15 · Visible fake ads in debug | **IN PROGRESS** | Owner: no way to see an ad work |
 | C13a · Make the claims true + validate R8 | **DONE** | `f893a04`. **R8 passed, zero keep rules.** See L74-L76 |
 
 ---

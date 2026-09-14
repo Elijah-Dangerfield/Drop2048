@@ -12,16 +12,6 @@ Human-only items go in `OWNER-TODO.md` instead.
 
 ## Now
 
-### No in-app QA config overrides, and it is now blocking verification
-
-`ConfigOverrideRepository` exists and **nothing in the debug menu writes to it.** That is why the
-interstitial has never been seen: the three-day install suppression makes it unreachable on a fresh
-install, and an emulator refuses `date` on a non-userdebug build.
-
-A QA config screen would also unblock the launch gates and every kill switch. This is the cheapest
-remaining unlock for on-device verification.
-
-
 ### The ▼ button is drawn recessive and is now the decisive control
 
 The handoff painted it quiet because it was an accelerator. D21 made it the only irreversible input
