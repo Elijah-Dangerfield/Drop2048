@@ -61,6 +61,18 @@ reason to undo C13a's fix. `BuildInfo.isTesterBuild` needs checking; Sodogku's i
 `isDebug || isTestFlight`.
 
 
+### The Settings row on the Home and pause overlays swallows taps
+
+Found repeatedly by C15 while navigating (~25 minutes lost). The overlay's own click — "tap to
+resume" — wins over the `Settings` text row. Reproduces on a stock debug build and predates the ads
+work.
+
+### `:libraries:ads:fake` is linked into iOS release binaries
+
+Kotlin/Native has no build-type source sets, so the house ad network ships in every iOS binary and
+is held out only by a runtime `Platform.isDebugBinary` check (L78, layer 3). If iOS ever gains a real
+ad SDK, this wants a Gradle-level exclusion or an `expect`/`actual` no-op so iOS gets layer 1 too.
+
 ### `GameQuietButton` has no button semantics and no minimum touch target
 
 A raw `pointerInput` with no `Role.Button` and no 48dp floor. Inherited from `GameScreen`'s private

@@ -37,7 +37,8 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
 | C14 · Stats + paywall to handoff fidelity | **DONE** | `acc948f`. Paywall is a bottom sheet. See L77 |
-| C15 · Visible fake ads in debug | **IN PROGRESS** | Owner: no way to see an ad work |
+| C15 · Visible fake ads in debug | **DONE** | `81207c6`. House ads + QA overrides. See L78-L79 |
+| C16 · Owner directives, debug FAB, QA menu | **IN PROGRESS** | Ported from Sodogku at owner request |
 | C13a · Make the claims true + validate R8 | **DONE** | `f893a04`. **R8 passed, zero keep rules.** See L74-L76 |
 
 ---
@@ -662,6 +663,41 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L78 · A stand-in that *can* grant has to be kept out by the build, not by the type
+
+L66's rule — make an unbuilt path's type unable to express the grant — has no version for a fake ad
+network whose entire value is that it **does** grant. So the safety moved into the build, in three
+independent layers:
+
+1. `debugImplementation` on a separate `:libraries:ads:fake` module. Verified against the
+   **generated DI graph**, not by assertion: the `androidDebug` component provides
+   `HouseAdNetwork`, the `androidRelease` one provides `NoHouseAds` with a null network. The class,
+   the binding and the drawing code are not in a release compilation at all.
+2. **A Gradle check wired into `check`** that resolves `releaseRuntimeClasspath` and fails if the
+   module is on it. Layer 1 is structural only until somebody edits one word, which is why this is
+   part of the design rather than belt and braces.
+3. A `BuildInfo.isDebug` guard at the selection point.
+
+**iOS only gets layer 3.** Kotlin/Native has no build-type source sets, so the module is in
+`iosMain` and linked into every iOS binary; the guard is `Platform.isDebugBinary`, an Xcode
+configuration fact. That is the weakest point in the chunk and it is written down as such.
+
+Also worth copying: `HouseAds.Surface()` is a `@Composable` **on the interface**, so `App` draws it
+without naming the module. An overlay keyed on a state flow would have put the drawing code back
+into the release source set.
+
+### L79 · The emulator refusing `date` was not an inconvenience, it was the reason the feature was unreachable
+
+`date: cannot set date: Operation not permitted` on a non-userdebug build is why SPEC 12's
+three-day install suppression made the interstitial impossible to reach, for two whole chunks,
+including for the agent that built it.
+
+The fix was never a longer wait or a cleverer emulator flag — it was the QA config override screen,
+which had been sitting in the queue as a nice-to-have. **When a gate depends on wall-clock or
+install age, the override is not tooling, it is the only way the feature is testable at all.**
+
+Measured after: six taps and two text edits from the debug menu to a visible interstitial.
 
 ### L77 · The hard offset shadow was the whole difference, not the colour
 
