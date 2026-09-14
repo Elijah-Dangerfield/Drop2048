@@ -86,7 +86,9 @@
     <string name="stats_runs_played">Runs played</string>
     <string name="stats_average">Average score</string>
     <string name="stats_recent">Recent runs</string>
+    <string name="stats_bests">Bests</string>
     <string name="stats_lifetime">Lifetime</string>
+    <string name="stats_none_yet">None yet</string>
     <string name="stats_highest_tier">Highest tier</string>
     <string name="stats_total_merges">Total merges</string>
     <string name="stats_blocks_placed">Blocks placed</string>

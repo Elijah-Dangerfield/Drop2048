@@ -1,7 +1,7 @@
 package com.dangerfield.drop2048.features.paywall.impl.screenshot
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -12,7 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.features.paywall.impl.PaywallMessage
-import com.dangerfield.drop2048.features.paywall.impl.PaywallScreen
+import com.dangerfield.drop2048.features.paywall.impl.PaywallSheetContent
 import com.dangerfield.drop2048.features.paywall.impl.PaywallState
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -26,6 +26,11 @@ import java.io.File
 
 /**
  * The Pro sheet in the three states it actually ships in.
+ *
+ * The captured composable is [PaywallSheetContent] rather than the sheet itself:
+ * Material's modal sheet draws into its own window, which a harness capturing a
+ * tagged node in this composition cannot see. What the goldens pin is every pixel
+ * of the sheet except the scrim and the drag handle.
  *
  * The set is chosen so each image is the only one that would move for its own
  * concern. The priced frame catches the layout and the four perks; the unpriced
@@ -72,10 +77,10 @@ private fun ComposeContentTestRule.captureScreen(
                 Box(
                     modifier = Modifier
                         .width(ShortPhoneWidth)
-                        .height(ShortPhoneHeight)
+                        .wrapContentHeight()
                         .testTag(CaptureTag),
                 ) {
-                    PaywallScreen(state = state(), onAction = {})
+                    PaywallSheetContent(state = state(), onAction = {})
                 }
             }
         }
@@ -92,9 +97,14 @@ private const val GoldenDirectory = "screenshots"
 
 private const val CaptureTag = "capture"
 
-/** The same small phone every other module captures on (L45). */
+/**
+ * The same small phone every other module captures on (L45).
+ *
+ * Only the width is pinned. The sheet is as tall as its content, and forcing it
+ * to a full 640 would pad every golden with a screen's worth of empty background
+ * and hide the one thing the frame is about — how much of the screen it takes.
+ */
 private val ShortPhoneWidth = 360.dp
-private val ShortPhoneHeight = 640.dp
 
 /**
  * The SDK Robolectric renders against, pinned rather than tracking `compileSdk`.

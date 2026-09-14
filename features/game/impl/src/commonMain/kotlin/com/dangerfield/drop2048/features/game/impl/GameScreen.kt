@@ -55,6 +55,7 @@ import com.dangerfield.drop2048.libraries.ui.components.dialog.BasicDialog
 import com.dangerfield.drop2048.libraries.ui.components.game.BoardRadius
 import com.dangerfield.drop2048.libraries.ui.components.game.CoachMark
 import com.dangerfield.drop2048.libraries.ui.components.game.CountdownRing
+import com.dangerfield.drop2048.libraries.ui.components.game.GameQuietButton
 import com.dangerfield.drop2048.libraries.ui.components.game.ProUpsellCard
 import com.dangerfield.drop2048.libraries.ui.components.game.FixedWidthDigits
 import com.dangerfield.drop2048.libraries.ui.components.game.GameControlRow
@@ -923,23 +924,7 @@ private fun OverlayHint(text: String) {
  */
 @Composable
 private fun OverlayOption(text: String, onClick: () -> Unit) {
-    BasicText(
-        text = text,
-        style = TextStyle(
-            fontFamily = NunitoFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = OptionSize,
-            color = GameColors.InkMuted,
-        ),
-        modifier = Modifier
-            .pointerInput(onClick) {
-                awaitEachGesture {
-                    awaitFirstDown().consume()
-                    if (waitForUpOrCancellation() != null) onClick()
-                }
-            }
-            .padding(OptionPadding),
-    )
+    GameQuietButton(text = text, onClick = onClick)
 }
 
 @Composable
@@ -1006,8 +991,6 @@ private val HeadlineSize = 34.sp
 private val BodySize = 14.sp
 private val BodyLineHeight = 22.sp
 private val HintSize = 13.sp
-private val OptionSize = 13.sp
-private val OptionPadding: Dp = 4.dp
 private val OptionGap: Dp = 14.dp
 private val StatGap: Dp = 26.dp
 private val FinalLabelSize = 11.sp

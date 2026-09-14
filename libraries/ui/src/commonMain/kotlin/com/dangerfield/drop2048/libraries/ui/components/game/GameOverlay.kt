@@ -5,6 +5,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +41,7 @@ import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
 import com.dangerfield.drop2048.libraries.ui.system.deepFace
 import com.dangerfield.drop2048.system.Radius
 import com.dangerfield.drop2048.system.typography.FredokaFontFamily
+import com.dangerfield.drop2048.system.typography.NunitoFontFamily
 
 /**
  * Which overlay is showing. They differ only in how dark the scrim is — and
@@ -111,12 +116,19 @@ fun GameOverlay(
  * the whole job. It presses 4dp rather than the controls' 3dp — the design gives
  * the biggest button the biggest travel, and it is the difference between a
  * button that feels expensive and one that feels like a link.
+ *
+ * @param enabled false holds the face up and swallows the click, for the moment
+ *   a purchase is in flight and the store dialog owns the screen. It is
+ *   deliberately not dimmed: the button is unusable for the length of one modal
+ *   and greying the only saturated thing on the sheet for that long reads as a
+ *   broken button rather than as a busy one.
  */
 @Composable
 fun GamePrimaryButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     fontSize: TextUnit = PrimaryFontSize,
     horizontalPadding: Dp = PrimaryPaddingX,
     verticalPadding: Dp = PrimaryPaddingY,
@@ -126,6 +138,7 @@ fun GamePrimaryButton(
         shadow = GameColors.AccentYellowShadow,
         highlight = GameColors.AccentHighlight,
         shape = Radius(CornerSize(PillPercent)),
+        enabled = enabled,
         depth = PrimaryDepth,
         pressedDepth = PrimaryPressedDepth,
         onClick = onClick,
@@ -208,6 +221,46 @@ fun Wordmark(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The quiet second answer under a [GamePrimaryButton]: `Watch an ad and keep
+ * going`, `Restore purchase`, `Main menu`.
+ *
+ * Nunito rather than Fredoka, muted rather than inked, and no surface at all.
+ * That is what makes it read as the *other* option rather than as a second
+ * button — a chunky secondary under a chunky primary gives the player two things
+ * of equal weight to choose between, which is exactly what an overlay with one
+ * obvious action should not do.
+ *
+ * The gesture is a raw pointer handler rather than `clickable` so it takes no
+ * ripple, no minimum touch-target inflation and no indication. The design has
+ * none of those, and Material's defaults would give the text a 48dp box that
+ * overlaps whatever sits above it.
+ */
+@Composable
+fun GameQuietButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BasicText(
+        text = text,
+        style = TextStyle(
+            fontFamily = NunitoFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = QuietFontSize,
+            color = GameColors.InkMuted,
+        ),
+        modifier = modifier
+            .pointerInput(onClick) {
+                awaitEachGesture {
+                    awaitFirstDown().consume()
+                    if (waitForUpOrCancellation() != null) onClick()
+                }
+            }
+            .padding(QuietPadding),
+    )
+}
+
 private fun Modifier.tapToDismiss(onTap: () -> Unit): Modifier = clickable(
     interactionSource = null,
     indication = null,
@@ -227,6 +280,9 @@ private val PrimaryPressedDepth: Dp = 1.dp
 private val PrimaryFontSize = 20.sp
 private val PrimaryPaddingX: Dp = 34.dp
 private val PrimaryPaddingY: Dp = 14.dp
+
+private val QuietFontSize = 13.sp
+private val QuietPadding: Dp = 4.dp
 
 private const val WordmarkText = "DROP"
 private const val ChipText = "2048"

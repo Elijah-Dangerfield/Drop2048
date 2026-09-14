@@ -50,6 +50,22 @@ object Radii {
     val Banner get() = R400
     val Header get() = None
     val Card get() = R400
+
+    /**
+     * The handoff's panel radius, between its 18 and 24. Every chunky plate that
+     * is not on the board: stat panels, the perk block, the sheet's groups.
+     */
+    val Panel = Radius(CornerSize(20.dp))
+
+    /**
+     * The tile's `border-radius: 22%`, proportional rather than a fixed dp.
+     *
+     * The one detail that makes a tile read as a sweet rather than as a cell in a
+     * table, which is why anything that wants to *look* like a block — a perk
+     * chip, a swatch — takes this rather than a dp that happens to match at one
+     * size.
+     */
+    val Tile = Radius(CornerSize(percent = 22))
 }
 
 

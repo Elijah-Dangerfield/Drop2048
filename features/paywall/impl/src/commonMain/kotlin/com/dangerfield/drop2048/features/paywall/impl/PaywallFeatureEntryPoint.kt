@@ -12,7 +12,7 @@ import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.NavigationOptions
 import com.dangerfield.drop2048.libraries.navigation.Router
-import com.dangerfield.drop2048.libraries.navigation.screen
+import com.dangerfield.drop2048.libraries.navigation.bottomSheet
 import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -26,18 +26,36 @@ class PaywallFeatureEntryPoint(
     private val paywallViewModelFactory: () -> PaywallViewModel,
 ) : FeatureEntryPoint {
 
+    /**
+     * A `bottomSheet<>` rather than a `screen<>` (C14). The paywall is a
+     * transient overlay over somewhere the player expects to come straight back
+     * to, which is exactly what `AGENTS.md` reserves the sheet builder for: the
+     * backstack stays one entry deep and the screen underneath stays visible
+     * under the scrim.
+     *
+     * The two halves of leaving are deliberately separate. The view model's
+     * `Leave` event asks the *sheet* to close — it is emitted when the player
+     * taps away or the purchase lands — and `onDismissRequest` fires once it has
+     * finished sliding out, which is the only safe moment to pop the entry. Doing
+     * both in one place cuts the exit animation in half.
+     */
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<PaywallRoute> {
+        bottomSheet<PaywallRoute> { _, sheetState ->
             val viewModel: PaywallViewModel = viewModel { paywallViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
             viewModel.ObserveEvents { event ->
                 when (event) {
-                    PaywallEvent.Leave -> router.goBack()
+                    PaywallEvent.Leave -> sheetState.dismiss()
                 }
             }
 
-            PaywallScreen(state = state, onAction = viewModel::takeAction)
+            PaywallSheet(
+                state = state,
+                onAction = viewModel::takeAction,
+                onDismissRequest = { router.goBack() },
+                sheetState = sheetState,
+            )
         }
     }
 }

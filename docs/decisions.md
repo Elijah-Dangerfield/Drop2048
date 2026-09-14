@@ -1980,3 +1980,74 @@ that also holds the board is how a telemetry counter becomes an OOM. Sixty 50ms
 buckets is 240 bytes whatever the run does, and 50ms is well inside the
 resolution the question needs: L41 swept `decisionMillis` in 100ms steps and what
 it wants to know is whether the real number is nearer 150 or nearer 500.
+
+### The meta screens get the game's vocabulary, not just its palette
+
+C3c re-pointed the design system's role ramp at the dark palette, which fixed the
+colour clash between the board and the stats page and did nothing about the
+*form*. Both screens stayed list rows and flat cards while the game is chunky
+pressable surfaces, Fredoka numerals and hard offset shadows, so the owner still
+read them as a different product.
+
+The handoff does not draw either screen — its own "not designed yet" list covers
+settings and anything leaderboard-shaped — so these are derived from what it does
+specify rather than copied. Three primitives now live in `:libraries:ui`:
+`GamePanel` (the hard-shadow plate at the handoff's 20dp panel radius),
+`StatPanel` (the HUD's quiet uppercase label over a Fredoka numeral in
+`FixedWidthDigits` slots) and `StatReadout` (the same pairing as a row). They are
+in the design system rather than in the feature because the next meta screen —
+achievements, a leaderboard — needs exactly these and would otherwise grow its
+own.
+
+`SectionCard` and `SummaryRow` are untouched and still correct for a form. The
+difference is that one states a preference and the other states a score.
+
+### Highest tier is drawn as a tile
+
+It is the one number on the stats page that names an object the player has held
+on the board. Printed as `1024` it is a digit string; drawn as a `Tile` from the
+live `BlockPalette` it is the block they remember making, in their own palette if
+they have changed it. It is the cheapest single thing on the page that ties it to
+the game, and it costs a `CompositionLocalProvider` for a smaller `BoardScale`.
+
+### The recent-runs chart loses its axis and its guides
+
+A tick ladder and a grid are what a chart wears when the reader has to take a
+value off it. Nothing on this page asks that — the exact best and the exact
+average are printed above it in a larger face — so what is left is the shape of
+the last five runs, and that reads better as five chunky blocks than as a plotted
+series. The best of the five takes the accent violet so the tallest bar is also
+the coloured one.
+
+### The paywall is a bottom sheet
+
+Owner instruction, and the backstack makes the reason concrete: both things that
+open it (the Settings row, the card on the stacked-out sheet) are places the
+player expects to come straight back to. A sheet stays one entry deep, leaves the
+screen underneath visible under the scrim, and dismisses on a drag, a back press
+or a tap outside without any of those being a navigation to reason about. It also
+deletes the last thing on that surface that read as a settings page: a title bar
+with a back chevron pointing at nothing.
+
+The two halves of leaving are separate on purpose. `PaywallEvent.Leave` asks the
+sheet to close; `onDismissRequest` pops the entry once it has finished sliding
+out. Doing both in one place cuts the exit animation in half.
+
+`PaywallRoute` lost its `SlideUp`/`SlideDown` overrides with the move. A
+floating-window destination is animated by the sheet, not by the nav host, so
+those args were a promise the transition no longer keeps.
+
+### The paywall's buy button is the game's primary button
+
+`GamePrimaryButton` — accent yellow on its hard shadow, Fredoka, pressing four
+pixels down. Buying Pro is the same *act* as `Drop again`, and drawing the one
+paid action in the template's flat button was the loudest thing on the old screen
+saying "different app". It gained an `enabled` flag for the moment a purchase is
+in flight; it is deliberately not dimmed, because greying the only saturated
+thing on the sheet for the length of one store modal reads as broken rather than
+as busy.
+
+The perk marks are geometry rather than a check glyph, for the reason
+`SpecialTile` gives: a check character is a bet that every font on every target
+carries that codepoint, and losing it puts a tofu box down the side of the one
+screen that takes money.
