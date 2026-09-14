@@ -9,6 +9,26 @@ Ordered by when it starts blocking. Last pruned 2026-09-09 after C7.
 
 ## Blocking now
 
+### The Sentry DSN is now the single blocker on the directive channel
+
+The whole thing is built, tested and verified on a device: the button drags and stays put across a
+force-stop, the panel captures the frame underneath, a typed directive reaches
+`captureUserFeedback` with `feedback_kind=owner_directive`. Then the log says
+`Sentry disabled, feedback dropped` and nothing leaves the phone.
+
+One DSN turns it on. After that, `/feedback-triage` reads your directives out of Sentry and files
+them into `docs/todos.md`, with `docs/feedback-log.md` as the ledger that keeps it idempotent.
+
+**Expect the first triage run to need you beside it.** Sodogku's found the feedback twin was not
+reachable from the Sentry MCP and had to fall back to the carrier's extra and attachment — the
+skill is written against that, and it should be corrected from whatever is actually true here.
+
+### `.gitignore` changed, and it is the first time `.claude/` is committed
+
+`.claude/` became `.claude/*` plus `!.claude/skills/`, so the triage skill is source and agent
+worktrees and settings stay ignored. Worth a look since it changes what the repo carries.
+
+
 ### Xcode: create the `xcode_select_link`
 
 `xcode-select -p` already returns the right path, **but `/var/db/xcode_select_link` does not
