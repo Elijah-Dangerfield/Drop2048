@@ -89,12 +89,28 @@ interface Telemetry {
      *
      * Defaulting to `false` is the point: a caller that forgets the parameter
      * sends less, not more.
+     *
+     * ### The owner's own channel is the one exception, and it is decided by kind
+     *
+     * [FeedbackKind.OwnerDirective] attaches the session log and keeps its
+     * breadcrumbs whatever [attachSessionLog] says. That is not a hole in the
+     * two rules above — it is the recognition that they are promises made to a
+     * *player*, and a directive is the owner writing about their own install
+     * from a build no player can run. Deciding it by [kind] rather than by a
+     * second flag beside it means there is no combination of arguments that
+     * sends a player's board to Sentry: a caller cannot ask for the owner's
+     * treatment, only to be the owner. See [FeedbackKind.isOwnerChannel].
+     *
+     * [screenshots] are frames the reporter attached deliberately. Only the
+     * directive panel supplies any; the player-facing screens pass none, and the
+     * capture code that would produce one is not in a release binary at all.
      */
     fun captureUserFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
         attachSessionLog: Boolean = false,
+        screenshots: List<ByteArray> = emptyList(),
     )
 }

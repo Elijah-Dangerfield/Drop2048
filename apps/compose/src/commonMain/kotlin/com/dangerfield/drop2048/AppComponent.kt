@@ -11,6 +11,7 @@ import com.dangerfield.drop2048.libraries.telemetry.impl.JankMonitor
 import com.dangerfield.drop2048.libraries.telemetry.impl.StartupReporter
 import com.dangerfield.drop2048.libraries.drop2048.Telemetry
 import com.dangerfield.drop2048.libraries.ads.HouseAds
+import com.dangerfield.drop2048.libraries.devfeedback.DevFeedback
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -53,6 +54,16 @@ interface AppComponent {
      * composable.
      */
     val houseAds: HouseAds
+
+    /**
+     * The owner's directive channel, wrapped around the entire app.
+     *
+     * Here for the same reason `houseAds` is: it draws above every feature, and
+     * the binding that answers it is `NoDevFeedback` — one composable that calls
+     * its content — in any build without `:libraries:devfeedback:tester`, which
+     * is every Android release build. See `DevFeedback`.
+     */
+    val devFeedback: DevFeedback
 
     val shakeHandler: ShakeHandler
     val deepLinkBridge: DeepLinkBridge

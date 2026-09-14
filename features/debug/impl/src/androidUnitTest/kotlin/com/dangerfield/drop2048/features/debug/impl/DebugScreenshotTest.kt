@@ -148,6 +148,27 @@ class DebugScreenshotTest {
         )
     }
 
+    /**
+     * The QA screen, in both switch positions.
+     *
+     * A one-switch screen is not much of a picture, and it is here for one
+     * reason: the switch's *off* state is the only thing on any screen that
+     * explains why the floating button is not there. A row that lost its
+     * accessory would leave that unanswerable from inside the app.
+     */
+    @Test
+    fun qaTools() = compose.capture("qa-tools") {
+        QaToolsScreen(state = QaToolsState(loaded = true), onAction = {})
+    }
+
+    @Test
+    fun qaToolsWithTheButtonHidden() = compose.capture("qa-tools-hidden") {
+        QaToolsScreen(
+            state = QaToolsState(loaded = true, feedbackFabShown = false),
+            onAction = {},
+        )
+    }
+
     @Test
     fun overlay() = compose.capture("debug-overlay", height = OverlayHeight) {
         DiagnosticsOverlay(

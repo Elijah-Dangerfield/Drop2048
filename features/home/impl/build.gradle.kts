@@ -26,6 +26,15 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
         }
 
+        // One test, and it needs JVM reflection: `PlayerFeedbackSeamTest` pins
+        // the shape of `FeedbackRepository` against a parameter being re-added
+        // *with a default value*, which breaks no caller and is how the dead
+        // `screenshots` parameter came back. Same reasoning as
+        // `NoIdentitySeamsTest`, which is why it is not in commonTest.
+        androidUnitTest.dependencies {
+            implementation(libs.junit)
+        }
+
         commonTest.dependencies {
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.core)

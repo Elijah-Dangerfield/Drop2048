@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.debug.ConfigOverridesRoute
 import com.dangerfield.drop2048.features.debug.DebugRoute
+import com.dangerfield.drop2048.features.debug.QaToolsRoute
 import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
@@ -46,6 +47,7 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 class DebugFeatureEntryPoint(
     private val debugViewModelFactory: () -> DebugViewModel,
     private val configOverridesViewModelFactory: () -> ConfigOverridesViewModel,
+    private val qaToolsViewModelFactory: () -> QaToolsViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
@@ -84,6 +86,23 @@ class DebugFeatureEntryPoint(
             }
 
             ConfigOverridesScreen(state = state, onAction = viewModel::takeAction)
+        }
+
+        // Pushed normally and reached from its own Settings row rather than
+        // from the debug menu, because a tester opening this must not pay the
+        // debug session's price or lose the screen they were on. See
+        // `QaToolsRoute`.
+        screen<QaToolsRoute> {
+            val viewModel: QaToolsViewModel = viewModel { qaToolsViewModelFactory() }
+            val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
+
+            viewModel.ObserveEvents { event ->
+                when (event) {
+                    QaToolsEvent.Back -> router.goBack()
+                }
+            }
+
+            QaToolsScreen(state = state, onAction = viewModel::takeAction)
         }
     }
 

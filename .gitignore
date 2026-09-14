@@ -48,4 +48,14 @@ apps/admin/admin-tokens.local.properties
 # Worktrees here are whole second checkouts of this repo — left untracked they
 # show up in every recursive grep and status, which is how a stray nested
 # project has confused this repo's own smoke test before.
-.claude/
+#
+# `.claude/*` rather than `.claude/` so that one thing can be let back in: git
+# does not descend into an excluded directory, so a negation under `.claude/`
+# would never be reached.
+.claude/*
+
+# Skills are the exception, and they are source. `feedback-triage` is a routine
+# the repo depends on — `FeedbackTriageQueryContractTest` reads its markdown off
+# disk and holds its Sentry queries against `FeedbackKind`, so an ignored skill
+# is a test that passes on the machine that wrote it and fails in CI.
+!.claude/skills/

@@ -9,6 +9,7 @@ import com.dangerfield.drop2048.libraries.core.versionString
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.LogLevel
 import com.dangerfield.drop2048.libraries.core.logging.Logger
+import com.dangerfield.drop2048.libraries.drop2048.FeedbackKind
 import com.dangerfield.drop2048.libraries.drop2048.Telemetry
 import com.dangerfield.drop2048.libraries.drop2048.impl.logging.DevConsoleWriter
 import com.dangerfield.drop2048.libraries.drop2048.impl.logging.KermitLogTree
@@ -17,6 +18,7 @@ import co.touchlab.kermit.Logger as KermitLogger
 import co.touchlab.kermit.Severity as KermitSeverity
 import io.sentry.kotlin.multiplatform.Attachment
 import io.sentry.kotlin.multiplatform.Sentry
+import io.sentry.kotlin.multiplatform.SentryLevel
 import io.sentry.kotlin.multiplatform.SentryOptions
 import io.sentry.kotlin.multiplatform.protocol.UserFeedback
 import me.tatarka.inject.annotations.Inject
@@ -147,15 +149,16 @@ private class ConfiguredTelemetry(
     @OptIn(ExperimentalUuidApi::class)
     override fun captureUserFeedback(
         message: String,
-        isBugReport: Boolean,
+        kind: FeedbackKind,
         eventId: String?,
         errorCode: Int?,
         attachSessionLog: Boolean,
+        screenshots: List<ByteArray>,
     ) {
         val payload = message.trim()
         if (payload.isBlank()) {
             logger.w {
-                it.tag("feedback_type", if (isBugReport) "bug_report" else "feedback")
+                it.tag(FEEDBACK_KIND_TAG, kind.tag)
                 "Ignoring empty feedback payload"
             }
             return
@@ -163,13 +166,20 @@ private class ConfiguredTelemetry(
 
         if (!Sentry.isEnabled()) {
             logger.w {
-                it.tag("feedback_type", if (isBugReport) "bug_report" else "feedback")
+                it.tag(FEEDBACK_KIND_TAG, kind.tag)
                 "Sentry disabled, feedback dropped"
             }
             return
         }
 
-        val typeTag = if (isBugReport) "bug_report" else "feedback"
+        val isBugReport = kind == FeedbackKind.BugReport
+        // The owner writing about their own install is the only caller whose
+        // report carries the evidence unconditionally. See
+        // [FeedbackKind.isOwnerChannel] for why that is a property of the kind
+        // and not a second argument, and Telemetry.captureUserFeedback for why
+        // it is not a hole in the promise C13a made to players.
+        val ownerChannel = kind.isOwnerChannel
+        val wantsLog = ownerChannel || attachSessionLog
 
         // The legacy User Feedback API only persists feedback attached to an
         // event Sentry has already ingested — an empty or unknown event id is
@@ -183,19 +193,48 @@ private class ConfiguredTelemetry(
         // just the carrier event: beforeSend reads it to fingerprint the event
         // into its own issue (see init). Local scope means none of this leaks
         // onto later events.
-        val logDump = if (attachSessionLog) {
+        val logDump = if (wantsLog) {
             sentryLogTree?.snapshot()?.takeIf { it.isNotBlank() }
         } else {
             null
         }
         val feedbackId = Uuid.random().toString()
-        val sentryId = Sentry.captureMessage(if (isBugReport) "Bug report" else "User feedback") { scope ->
-            scope.clearBreadcrumbs()
+        val sentryId = Sentry.captureMessage(kind.carrierMessage) { scope ->
+            // A player's report carries no breadcrumbs, because a breadcrumb
+            // carries the logged event's attributes and `run.end` would put
+            // their score on every report whatever the switch said (L74). An
+            // owner directive keeps them: they are the minutes leading up to the
+            // complaint, and they are the owner's own.
+            if (!ownerChannel) scope.clearBreadcrumbs()
             scope.setTag(FEEDBACK_EVENT_TAG, feedbackId)
+            // The one thing triage filters on. See [FeedbackKind] for why it is
+            // a tag and not part of the message.
+            scope.setTag(FEEDBACK_KIND_TAG, kind.tag)
             scope.setTag(FEEDBACK_DIAGNOSTICS_TAG, attachSessionLog.toString())
+            // Info, not the default. A report is not an error, and a Sentry
+            // issue at error level sorts with the crashes and reads as one in
+            // the list, which pulls triage toward it as if something broke.
+            scope.level = SentryLevel.INFO
+            // The written message goes on the carrier as well as into
+            // captureUserFeedback, and the duplication is the fix rather than an
+            // oversight. The legacy User Feedback API is the only one this SDK
+            // has, and where its comments render depends on the Sentry org's
+            // feedback settings; Sodogku had a real report arrive with the log
+            // and the screenshot visible on the issue and the typed words
+            // nowhere. Extras and attachments are shown on the issue page
+            // unconditionally, so the payload lands beside the evidence it
+            // explains.
+            scope.setExtra(FEEDBACK_MESSAGE_KEY, payload)
+            scope.addAttachment(Attachment(payload.encodeToByteArray(), "feedback.txt", "text/plain"))
             if (logDump != null) {
                 scope.addAttachment(Attachment(logDump.encodeToByteArray(), "session-log.txt", "text/plain"))
             }
+            screenshots.asSequence()
+                .filter { it.isNotEmpty() }
+                .take(MAX_FEEDBACK_SCREENSHOTS)
+                .forEachIndexed { index, bytes ->
+                    scope.addAttachment(Attachment(bytes, "screenshot-${index + 1}.jpg", "image/jpeg"))
+                }
         }
 
         val feedback = UserFeedback(sentryId).apply {
@@ -216,14 +255,15 @@ private class ConfiguredTelemetry(
         Sentry.captureUserFeedback(feedback)
 
         logger.i { scope ->
-            scope.tag("feedback_type", typeTag)
+            scope.tag(FEEDBACK_KIND_TAG, kind.tag)
             scope.extra("event_id", sentryId.toString())
             if (isBugReport) {
                 errorCode?.let { scope.extra("error_code", it) }
             }
             scope.extra("payload_length", payload.length)
             scope.extra("session_log_attached", logDump != null)
-            "Feedback forwarded to Sentry ($typeTag)"
+            scope.extra("screenshots_attached", screenshots.count { it.isNotEmpty() })
+            "Feedback forwarded to Sentry (${kind.tag})"
         }
     }
 }
@@ -251,8 +291,24 @@ private const val FEEDBACK_FINGERPRINT = "feedback"
 
 // Whether the player's diagnostics opt-in was on for this report. A tag rather
 // than an extra so triage can filter to the reports that have a session log
-// before opening any of them.
+// before opening any of them. It records what the *player* chose, so an owner
+// directive can read `false` here and still carry a log — the two facts are
+// different questions and collapsing them would lose the answer to the first.
 private const val FEEDBACK_DIAGNOSTICS_TAG = "diagnostics_opt_in"
+
+// Which channel filed the report. The `feedback-triage` skill's only query, and
+// the single point of coupling between this file and that routine —
+// `FeedbackTriageQueryContractTest` holds the two ends together.
+private const val FEEDBACK_KIND_TAG = "feedback_kind"
+
+// The written words, duplicated onto the carrier because the feedback twin does
+// not always render them. See captureUserFeedback.
+private const val FEEDBACK_MESSAGE_KEY = "feedback_message"
+
+// Enough to show a before and an after and the thing in between. Past that it
+// is a screen recording somebody wanted, and the carrier event is not the place
+// for one.
+private const val MAX_FEEDBACK_SCREENSHOTS = 3
 
 data class SentryRuntimeConfig(
     val dsn: String,

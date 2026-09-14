@@ -2130,3 +2130,100 @@ The perk marks are geometry rather than a check glyph, for the reason
 `SpecialTile` gives: a check character is a bet that every font on every target
 carries that codepoint, and losing it puts a tofu box down the side of the one
 screen that takes money.
+
+### The directive channel is a build seam, not a runtime flag
+
+`DevFeedback` is one composable on an interface, exactly the shape C15 gave
+`HouseAds.Surface()`, and it was chosen because the alternative had already been
+built and rejected once. The tester surface records every frame of the app into a
+graphics layer so it can screenshot itself, draws a draggable button on top of a
+live board, and uploads the session log without asking. `if (isTesterBuild)`
+around all of that is a runtime answer to a question the build can answer, so the
+build answers it: `:libraries:devfeedback:tester` is a `debugImplementation` of
+`:apps:compose`, and an Android release APK contains no button, no panel, no
+layer recording and no JPEG encoder. `verifyNoDevFeedbackInRelease` resolves the
+release runtime classpath and fails if it ever does, because a variant scope is
+structural only until somebody changes one word.
+
+The api module keeps the persisted position and the `hidden` flag, which every
+build carries. That is deliberate: the QA switch writes them, and the QA switch
+has to work on a build the tester module is not linked into. Two floats and a
+boolean nothing reads is not a risk; a button with no off switch is.
+
+iOS gets one layer instead of three, and here that gap is load-bearing rather
+than merely tolerated. A TestFlight build *is* a release binary, so nothing
+structural can tell it apart from the App Store; holding the channel out of every
+release iOS binary would mean the owner could only file a directive from a cable.
+`BuildInfo.isTestFlight` reads the receipt at runtime, which is the only thing
+that can, and `isTesterBuild` is `isDebug || isTestFlight`. Notably it is **not**
+`releaseChannel`: that string says which artifact this is, not who is holding the
+phone, and a channel named "internal" that somebody promotes would hand every
+player a directive button.
+
+### An owner directive carries the session log; a player's report still does not
+
+C13a gated the session-log attachment on `diagnosticsOptIn` and cleared the
+carrier's breadcrumbs, because a breadcrumb carries the logged event's attributes
+and `run.end` was putting `score`, `level` and `highest_tier` on every report
+filed, whatever the switch said (L74). The directive channel wants both
+unconditionally.
+
+That is decided by **kind** rather than by a second argument beside the opt-in.
+`FeedbackKind.isOwnerChannel` is true of exactly one of three values, and
+`captureUserFeedback` reads it; there is no combination of arguments a caller can
+pass that sends a player's board to Sentry, because a caller cannot ask for the
+owner's treatment, only to *be* the owner. The player's own seam,
+`FeedbackRepository`, still takes `isBugReport: Boolean` and cannot name a
+`FeedbackKind` at all, which `PlayerFeedbackSeamTest` pins — a shape that cannot
+express the mistake, the same trade C12 made with `DebugOverrides`.
+
+`diagnostics_opt_in` stays a separate tag from `feedback_kind` and still records
+what the *player* chose, so a directive can read `false` there and carry a log.
+Collapsing the two would lose the answer to the first question.
+
+### The QA menu is its own screen, not a section of the debug menu
+
+The debug menu would have been the obvious home, and two things rule it out, both
+of them properties C12 put there on purpose. `DebugViewModel`'s `init` calls
+`markDebugSession()`, so **opening** the menu silences run history, the Daily
+result and leaderboard submissions for the life of the process (L63); and
+navigating to it clears the back stack, so a tester reaching it loses the screen
+they were on. Hiding a floating button is two seconds of housekeeping. Charging
+it a whole process of silenced telemetry and the screen the button was in the way
+of would make the switch cost more than the button.
+
+`QaToolsViewModel` therefore holds no reference to `DebugController` at all,
+rather than holding one and remembering not to call it.
+
+The split follows Sodogku's, expressed as two routes instead of one `isDebug`
+branch: the QA row shows on any tester build with no seven taps and no
+passphrase, because a TestFlight tester must be able to get the button out of the
+way; everything destructive stays behind the taps. What had to be preserved was
+that the switch is reachable **without** the button it switches off, and it is.
+
+### The floating button stores fractions, and reads them outside composition
+
+Its position is a fraction of its *travel* — the container less the button — so
+`0f` is flush left or top and `1f` flush right or bottom. Pixels would be wrong
+on rotation, in split screen and on a different device; a stored offset that was
+against the right edge in portrait is in the middle in landscape. The fractions
+are clamped on the way in *and* coerced on the way out, with `NaN` taking the
+default rather than a clamp, because they are the only thing between a bad write
+and a button parked where it cannot be tapped.
+
+Neither the placement nor the travel is read during composition. The `offset`
+lambda reads them in the layout phase and the drag callback reads them off the
+pointer coroutine, so a drag relayouts one node per frame and recomposes nothing
+— the same rule as the ban on reading an animated value in a composable body, and
+for the same reason. The host's state read is in a child composable for the
+sharper version of that: the host's content lambda is the entire app, so a read
+there would re-run the whole tree's composition to move a button.
+
+`clickable` and `detectDragGestures` coexist on the button rather than one
+replacing the other. `clickable` consumes the down; `detectDragGestures` arms
+with `requireUnconsumed = false` so both are live; the drag then consumes each
+move past touch slop and `waitForUpOrCancellation` re-checks consumption on the
+`Final` pass. Drop the `clickable` and the button loses its semantics role and
+its ripple; take the ordering for granted and a button that was only moved also
+files a directive. Verified on a device: a 600ms drag across the board moved it
+and opened nothing.

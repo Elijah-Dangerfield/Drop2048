@@ -39,6 +39,21 @@ dependencies {
      * `verifyNoHouseAdsInRelease` below is what stops that being a comment.
      */
     debugImplementation(projects.libraries.ads.fake)
+
+    /**
+     * The owner's directive channel, on the **debug** variant only.
+     *
+     * Same argument as the house network, one step further: this module records
+     * every frame of the app into a graphics layer so it can screenshot itself,
+     * draws a draggable button over the game, and uploads the session log
+     * without asking — because the only person who can reach it wrote the app.
+     * A `BuildInfo.isTesterBuild` check around all of that is a runtime answer
+     * to a question the build can answer, so the build answers it: a release APK
+     * contains no button, no panel, no layer recording and no JPEG encoder.
+     *
+     * `verifyNoDevFeedbackInRelease` below is what stops that being a comment.
+     */
+    debugImplementation(projects.libraries.devfeedback.tester)
 }
 
 /**
@@ -70,6 +85,35 @@ val verifyNoHouseAdsInRelease = tasks.register("verifyNoHouseAdsInRelease") {
 }
 
 tasks.named("check") { dependsOn(verifyNoHouseAdsInRelease) }
+
+/**
+ * Fails the build if the directive channel ever reaches a release artifact.
+ *
+ * The twin of `verifyNoHouseAdsInRelease`, and it earns its own task rather than
+ * a shared one because the two modules are held out for different reasons and a
+ * combined failure message would explain neither. This one is about a surface
+ * that photographs the player's screen and uploads their session log.
+ *
+ * A second `debugImplementation` is a second one-word edit waiting to happen,
+ * and the first one already proved that a variant scope is structural only for
+ * as long as nobody moves it.
+ */
+val verifyNoDevFeedbackInRelease = tasks.register("verifyNoDevFeedbackInRelease") {
+    val classpath = configurations.named("releaseRuntimeClasspath")
+    val names = classpath.map { config ->
+        config.incoming.resolutionResult.allComponents.map { it.id.displayName }
+    }
+    inputs.property("releaseComponents", names)
+    doLast {
+        val offenders = names.get().filter { it.contains(":libraries:devfeedback:tester") }
+        check(offenders.isEmpty()) {
+            "The tester directive channel is on the release runtime classpath: $offenders. " +
+                "It must stay a debugImplementation — see DevFeedback."
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyNoDevFeedbackInRelease) }
 
 /**
  * Sentry's Android Gradle plugin, for exactly one job: making obfuscated crash
@@ -125,6 +169,14 @@ kotlin {
             // `HouseAdNetwork.select`. Stated here rather than assumed: this is
             // the one platform where the guarantee is a runtime check.
             implementation(projects.libraries.ads.fake)
+
+            // Same gap, and here it is load-bearing rather than merely
+            // tolerated: a TestFlight build *is* a release binary, so holding
+            // the directive channel out of every release iOS binary would mean
+            // the owner could only file directives from a cable. The guard is
+            // `BuildInfo.isTesterBuild` inside `DevFeedbackHost.Host`, which on
+            // iOS is `Platform.isDebugBinary` or a sandbox receipt.
+            implementation(projects.libraries.devfeedback.tester)
         }
 
         commonMain.dependencies {
@@ -151,6 +203,7 @@ kotlin {
             implementation(projects.libraries.progress.impl)
             implementation(projects.libraries.ads)
             implementation(projects.libraries.ads.impl)
+            implementation(projects.libraries.devfeedback)
             implementation(projects.libraries.billing)
             implementation(projects.libraries.billing.impl)
             implementation(projects.libraries.achievements)

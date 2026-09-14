@@ -1,6 +1,7 @@
 package com.dangerfield.drop2048.libraries.core
 
 import com.dangerfield.drop2048.buildinfo.Drop2048BuildConfig
+import platform.Foundation.NSBundle
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform as NativePlatform
 
@@ -31,4 +32,19 @@ actual object BuildInfo {
 
     actual val commitBranch: String
         get() = Drop2048BuildConfig.COMMIT_BRANCH
+
+    /**
+     * A TestFlight install carries a sandbox receipt; an App Store install
+     * carries a production one. Both are the same release binary, so this is the
+     * only thing that tells them apart.
+     *
+     * `lazy` because it touches the bundle and the answer cannot change within a
+     * process. `!isDebug` first so a simulator build, which has no receipt at
+     * all, is described as a debug build rather than as an App Store one.
+     */
+    actual val isTestFlight: Boolean by lazy {
+        !isDebug && NSBundle.mainBundle.appStoreReceiptURL?.lastPathComponent == SandboxReceipt
+    }
 }
+
+private const val SandboxReceipt = "sandboxReceipt"

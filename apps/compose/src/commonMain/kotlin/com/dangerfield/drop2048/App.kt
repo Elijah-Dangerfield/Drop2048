@@ -128,66 +128,73 @@ fun App(appComponent: AppComponent) {
         LocalDialogHostState provides dialogHostState
     ) {
         PlayerThemeProvider(appComponent.playerSettingsStore) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Stage 1: null until the async AppData read resolves — the
-                // platform splash (keyed on appViewModel.isReady) covers the
-                // gap. Stage 2: the Compose boot gate holds a loading screen
-                // until app-config resolves, so the first real frame renders
-                // authoritative config values.
-                val bootComplete by appViewModel.isBootComplete.collectAsState()
-                val startDestination by appViewModel.startDestination.collectAsState()
-                val route = startDestination
-                if (bootComplete && route != null) {
-                    // The gate wraps the nav host rather than living inside it.
-                    // A blocking gate renders *instead of* `AppNavigation`, so
-                    // there is no destination behind it to pop back to and
-                    // nothing a deep link can land on. It sits after the boot
-                    // gate on purpose: its inputs are remote-config keys, and
-                    // deciding before config resolves would decide on defaults.
-                    LaunchGateHost(
-                        viewModel = appComponent.launchGateViewModel,
-                        onOpenLink = router::openWebLink,
-                    ) {
-                        AppNavigation(
-                            navController = navController,
-                            floatingWindowNavigator = floatingWindowNavigator,
-                            featureEntryPoints = appComponent.featureEntryPoints,
-                            startDestination = route,
-                            router = router,
-                            telemetry = appComponent.telemetry,
-                            jankMonitor = appComponent.jankMonitor,
-                        )
+            // Outermost inside the theme so the directive panel draws over
+            // dialogs, sheets and the house ad too — the screen a directive is
+            // about is often one of those. `content()` and nothing else in a
+            // player's build; on Android there is no implementation on the
+            // release classpath at all. See `DevFeedback`.
+            appComponent.devFeedback.Host {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Stage 1: null until the async AppData read resolves — the
+                    // platform splash (keyed on appViewModel.isReady) covers the
+                    // gap. Stage 2: the Compose boot gate holds a loading screen
+                    // until app-config resolves, so the first real frame renders
+                    // authoritative config values.
+                    val bootComplete by appViewModel.isBootComplete.collectAsState()
+                    val startDestination by appViewModel.startDestination.collectAsState()
+                    val route = startDestination
+                    if (bootComplete && route != null) {
+                        // The gate wraps the nav host rather than living inside it.
+                        // A blocking gate renders *instead of* `AppNavigation`, so
+                        // there is no destination behind it to pop back to and
+                        // nothing a deep link can land on. It sits after the boot
+                        // gate on purpose: its inputs are remote-config keys, and
+                        // deciding before config resolves would decide on defaults.
+                        LaunchGateHost(
+                            viewModel = appComponent.launchGateViewModel,
+                            onOpenLink = router::openWebLink,
+                        ) {
+                            AppNavigation(
+                                navController = navController,
+                                floatingWindowNavigator = floatingWindowNavigator,
+                                featureEntryPoints = appComponent.featureEntryPoints,
+                                startDestination = route,
+                                router = router,
+                                telemetry = appComponent.telemetry,
+                                jankMonitor = appComponent.jankMonitor,
+                            )
+                        }
+                    } else {
+                        BootLoadingScreen()
                     }
-                } else {
-                    BootLoadingScreen()
-                }
 
-                SplashGate()
+                    SplashGate()
 
-                // Server returned the locked `403` access-denied envelope: push
-                // the blocking AccessDenied screen. launchSingleTop so a burst
-                // of denied calls collapses to one screen on top. The screen
-                // keys title/body off `reason` and surfaces the optional lift
-                // date + appeal link.
-                LaunchedEffect(Unit) {
-                    appViewModel.accessDenied.collect { denial ->
-                        router.navigate(
-                            AccessDeniedRoute(
-                                reason = denial.reason,
-                                until = denial.until,
-                                appealUrl = denial.appealUrl,
-                            ),
-                            NavigationOptions(launchSingleTop = true),
-                        )
+                    // Server returned the locked `403` access-denied envelope: push
+                    // the blocking AccessDenied screen. launchSingleTop so a burst
+                    // of denied calls collapses to one screen on top. The screen
+                    // keys title/body off `reason` and surfaces the optional lift
+                    // date + appeal link.
+                    LaunchedEffect(Unit) {
+                        appViewModel.accessDenied.collect { denial ->
+                            router.navigate(
+                                AccessDeniedRoute(
+                                    reason = denial.reason,
+                                    until = denial.until,
+                                    appealUrl = denial.appealUrl,
+                                ),
+                                NavigationOptions(launchSingleTop = true),
+                            )
+                        }
                     }
+
+                    DialogHost(
+                        modifier = Modifier.matchParentSize(),
+                        hostState = dialogHostState
+                    )
+
+                    appComponent.houseAds.Surface()
                 }
-
-                DialogHost(
-                    modifier = Modifier.matchParentSize(),
-                    hostState = dialogHostState
-                )
-
-                appComponent.houseAds.Surface()
             }
         }
     }

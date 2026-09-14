@@ -128,6 +128,14 @@ object DebugCopy {
     const val ConfigReset = "Remove the override"
     const val ConfigOverridden = "Overridden locally"
 
+    const val QaTitle = "QA tools"
+    const val QaBody =
+        "Reachable on any tester build, with nothing on it that cannot be undone. " +
+            "Opening this does not silence telemetry the way the debug menu does."
+    const val QaFeedbackSection = "Feedback"
+    const val QaFeedbackFab = "Floating directive button"
+    const val QaFeedbackFabHint = "Drag it anywhere. Tap it to file a directive."
+
     const val MessageConfigCleared = "Config overrides cleared."
     const val MessageConfigNotParseable = "That is not a value this key can hold."
 

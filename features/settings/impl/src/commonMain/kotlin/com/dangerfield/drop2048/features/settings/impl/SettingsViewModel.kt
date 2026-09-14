@@ -111,6 +111,7 @@ class SettingsViewModel(
             SettingsAction.OpenPro -> paywall.requestOffer(PaywallTrigger.Direct)
             SettingsAction.OpenAchievements -> sendEvent(SettingsEvent.OpenAchievements)
             SettingsAction.OpenDebugMenu -> sendEvent(SettingsEvent.OpenDebugMenu)
+            SettingsAction.OpenQaTools -> sendEvent(SettingsEvent.OpenQaTools)
             SettingsAction.ReplayTutorial -> sendEvent(SettingsEvent.ReplayTutorial)
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
             SettingsAction.OpenLicenses -> sendEvent(SettingsEvent.OpenLicenses)
@@ -262,6 +263,12 @@ sealed interface SettingsEvent {
     /** SPEC 19's menu (C12). Drawn only once [PlayerSettings.debugMenuUnlocked] is set. */
     data object OpenDebugMenu : SettingsEvent
 
+    /**
+     * C16's QA screen. Drawn on any tester build and behind nothing, because the
+     * switch on it hides the floating directive button. See `QaToolsRoute`.
+     */
+    data object OpenQaTools : SettingsEvent
+
     /** Terms and privacy are hosted pages, so they open in a browser. */
     data class OpenLink(val url: String) : SettingsEvent
 }
@@ -307,6 +314,7 @@ sealed interface SettingsAction {
 
     data object TapVersion : SettingsAction
     data object OpenDebugMenu : SettingsAction
+    data object OpenQaTools : SettingsAction
 
     data class ShowDialog(val dialog: SettingsDialog) : SettingsAction
     data object DismissDialog : SettingsAction

@@ -14,6 +14,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.dangerfield.drop2048.features.debug.DebugMenuLabels
+import com.dangerfield.drop2048.features.debug.QaToolsLabels
+import com.dangerfield.drop2048.libraries.core.BuildInfo
+import com.dangerfield.drop2048.libraries.core.isTesterBuild
 import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.settings.PlayerSettings
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
@@ -156,6 +159,14 @@ fun SettingsScreen(
             DataSection(onAction)
             VerticalSpacerD1000()
             AboutSection(state, onAction)
+            // On any tester build, with no seven taps and no passphrase. The
+            // switch behind it hides the floating directive button, and a
+            // control that is only reachable from behind the thing it controls
+            // is not a control. See `QaToolsRoute`.
+            if (BuildInfo.isTesterBuild) {
+                VerticalSpacerD1000()
+                QaSection(onAction)
+            }
             if (state.settings.debugMenuUnlocked) {
                 VerticalSpacerD1000()
                 DebugSection(onAction)
@@ -469,6 +480,29 @@ private fun AboutSection(state: SettingsState, onAction: (SettingsAction) -> Uni
         color = AppTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * The tester's own row, and the one developer affordance here that is **not**
+ * behind the seven taps.
+ *
+ * It has to be reachable on a TestFlight build, where the debug menu is behind a
+ * passphrase, because the switch it leads to hides the floating directive
+ * button — and a control reachable only from behind the thing it controls is not
+ * a control. Nothing on the screen behind it is destructive, which is what makes
+ * that safe. See `QaToolsRoute`.
+ */
+@Composable
+private fun QaSection(onAction: (SettingsAction) -> Unit) {
+    ListSection(
+        items = listOf(
+            ListSectionItem(
+                headlineText = QaToolsLabels.SettingsRow,
+                supportingText = QaToolsLabels.SettingsRowHint,
+                onClick = { onAction(SettingsAction.OpenQaTools) },
+            ),
+        ),
     )
 }
 

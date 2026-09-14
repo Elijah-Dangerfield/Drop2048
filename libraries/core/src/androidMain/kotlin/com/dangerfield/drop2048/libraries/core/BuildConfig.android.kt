@@ -30,4 +30,12 @@ actual object BuildInfo {
 
     actual val commitBranch: String
         get() = Drop2048BuildConfig.COMMIT_BRANCH
+
+    /**
+     * Android has no TestFlight. Play's internal testing track serves the same
+     * artifact as production through the same store, and the install source is
+     * not something the app can read reliably, so there is nothing honest to
+     * answer here but false.
+     */
+    actual val isTestFlight: Boolean = false
 }

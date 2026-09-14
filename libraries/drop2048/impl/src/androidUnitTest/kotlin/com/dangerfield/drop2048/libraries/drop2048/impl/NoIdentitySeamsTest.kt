@@ -14,6 +14,7 @@ import kotlin.test.assertTrue
  * C13a that was true of the tree and enforced by nothing: `Telemetry.setUser`
  * was declared and implemented against `Sentry.setUser` with no caller, and
  * `captureUserFeedback` carried dead `email` and `screenshots` parameters.
+ * (`screenshots` has a caller again since C16 — see below.)
  *
  * The hazard is not the dead code. It is that a one-line call is the natural
  * thing to write the day somebody adds a contact field to the feedback form, and
@@ -39,15 +40,25 @@ class NoIdentitySeamsTest {
     }
 
     /**
-     * `message`, `isBugReport`, `eventId`, `errorCode`, `attachSessionLog`.
+     * `message`, `kind`, `eventId`, `errorCode`, `attachSessionLog`,
+     * `screenshots`.
      *
      * Counting rather than naming, because JVM method reflection does not carry
-     * Kotlin parameter names. An added `email` or `screenshots` moves the count,
-     * and so does anything else nobody thought about — which is the right
-     * failure: this test should be re-read, not silently widened.
+     * Kotlin parameter names. An added `email` moves the count, and so does
+     * anything else nobody thought about — which is the right failure: this test
+     * should be re-read, not silently widened.
+     *
+     * **`screenshots` came back in C16 and is not the parameter this test was
+     * written about.** The one it objected to was dead: declared, unreachable,
+     * and waiting for the day somebody wired a picker into the player's feedback
+     * form. This one has exactly one caller, in `:libraries:devfeedback:tester`,
+     * a module held off the release classpath by Gradle
+     * (`verifyNoDevFeedbackInRelease`). The player's own seam,
+     * `FeedbackRepository`, still cannot express an image at all, and
+     * `PlayerFeedbackSeamTest` in `:features:home:impl` is what holds that.
      */
     @Test
-    fun `feedback carries five things and none of them is a contact detail`() {
+    fun `feedback carries six things and none of them is a contact detail`() {
         val feedback = methods.single { it.name == "captureUserFeedback" }
         assertEquals(
             FeedbackParameterCount,
@@ -57,13 +68,14 @@ class NoIdentitySeamsTest {
                 "never sent, then update this count.",
         )
         assertTrue(
-            feedback.parameterTypes.none { it == List::class.java },
-            "captureUserFeedback takes a list again. The dead `screenshots` parameter was one, " +
-                "and the app can send no image at all.",
+            feedback.parameterTypes.count { it == List::class.java } == 1,
+            "captureUserFeedback's list parameters changed. There is exactly one, it is the " +
+                "tester panel's screenshots, and a second list is a new way for something to " +
+                "leave that nobody has read the promise for.",
         )
     }
 
     private companion object {
-        const val FeedbackParameterCount = 5
+        const val FeedbackParameterCount = 6
     }
 }

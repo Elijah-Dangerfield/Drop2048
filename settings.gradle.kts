@@ -135,6 +135,13 @@ if (!serverOnly) {
     include(":libraries:config")
     include(":libraries:config:impl")
     include(":libraries:core")
+    // The owner's directive channel. The api module is the `DevFeedback` seam
+    // and the persisted button position, which every build carries because the
+    // QA switch writes it; `:tester` is the floating button, the panel and the
+    // screenshot capture, and it is a `debugImplementation` of `:apps:compose`
+    // so no Android release artifact contains any of it. See `DevFeedback`.
+    include(":libraries:devfeedback")
+    include(":libraries:devfeedback:tester")
     // SPEC 10's remote keys, one `ConfiguredValue` each, plus the assembler that
     // turns the gameplay half into an `EngineConfig`. Sits between :config and
     // :cascade so the engine keeps its zero project dependencies.

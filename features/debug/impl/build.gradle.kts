@@ -48,6 +48,11 @@ kotlin {
             // rather than `:gameconfig` because the screen is over the whole
             // `Set<QaConfigValue>` and never names a key.
             implementation(projects.libraries.config)
+            // The QA screen's one switch writes `DevFeedbackFabCache`. The api
+            // module only: the button, the panel and the screenshot capture live
+            // in `:libraries:devfeedback:tester`, which a release build does not
+            // contain, and a feature that named it would undo that.
+            implementation(projects.libraries.devfeedback)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
@@ -89,6 +94,7 @@ kotlin {
             // rather than `:gameconfig` because the screen is over the whole
             // `Set<QaConfigValue>` and never names a key.
             implementation(projects.libraries.config)
+            implementation(projects.libraries.devfeedback)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)

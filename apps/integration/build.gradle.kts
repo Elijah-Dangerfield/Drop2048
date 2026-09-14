@@ -17,6 +17,20 @@ android {
 // existing Android variants on the host JVM. The one unusual edge this module
 // proves out is consuming the JVM-only `:apps:server` from an Android
 // unit-test classpath.
+/**
+ * The repo root, for the one test that reads the repo as text.
+ *
+ * `FeedbackTriageQueryContractTest` holds `FeedbackKind`'s tag values against the
+ * queries in `.claude/skills/feedback-triage/SKILL.md`, which means reading two
+ * files that are not on any classpath. A unit test's working directory is the
+ * module, so it needs telling where the root is; the alternative is walking up
+ * looking for `settings.gradle.kts`, which is the same fact guessed at instead
+ * of supplied.
+ */
+tasks.withType<Test>().configureEach {
+    systemProperty("drop2048.repoRoot", rootDir.absolutePath)
+}
+
 kotlin {
     sourceSets {
         androidUnitTest.dependencies {

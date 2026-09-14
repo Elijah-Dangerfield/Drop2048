@@ -1,12 +1,23 @@
 package com.dangerfield.drop2048.features.home.impl.feedback
 
 import com.dangerfield.drop2048.libraries.core.Catching
+import com.dangerfield.drop2048.libraries.drop2048.FeedbackKind
 import com.dangerfield.drop2048.libraries.drop2048.Telemetry
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
+/**
+ * The **player's** way into Sentry: the feedback page in Settings and the bug
+ * reporter behind a crash.
+ *
+ * It can only file the two player kinds, and that is the point rather than an
+ * omission. [FeedbackKind.OwnerDirective] is filed from the tester-only panel,
+ * against `Telemetry` directly, by a module a release build does not contain —
+ * so there is no argument a screen in this feature could pass that would dress a
+ * player's report up as the owner's and take their session log with it.
+ */
 interface FeedbackRepository {
     /**
      * @param attachSessionLog the player's `diagnosticsOptIn`. Off unless they
@@ -37,7 +48,7 @@ class FeedbackRepositoryImpl @Inject constructor(
         return Catching {
             telemetry.captureUserFeedback(
                 message = message,
-                isBugReport = isBugReport,
+                kind = if (isBugReport) FeedbackKind.BugReport else FeedbackKind.Feedback,
                 eventId = logId,
                 errorCode = errorCode,
                 attachSessionLog = attachSessionLog,
