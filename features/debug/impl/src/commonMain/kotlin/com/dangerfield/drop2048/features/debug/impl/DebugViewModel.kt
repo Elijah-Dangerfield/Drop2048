@@ -2,6 +2,13 @@ package com.dangerfield.drop2048.features.debug.impl
 
 import androidx.lifecycle.viewModelScope
 import com.dangerfield.drop2048.features.debug.DebugController
+import com.dangerfield.drop2048.libraries.ads.AdDiagnostics
+import com.dangerfield.drop2048.libraries.ads.AdGate
+import com.dangerfield.drop2048.libraries.ads.AdGateSnapshot
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.AdShowResult
+import com.dangerfield.drop2048.libraries.ads.HouseAds
+import com.dangerfield.drop2048.libraries.ads.InterstitialGate
 import com.dangerfield.drop2048.libraries.billing.ProGrant
 import com.dangerfield.drop2048.features.debug.DebugMenuGate
 import com.dangerfield.drop2048.features.debug.DebugOverrides
@@ -62,6 +69,10 @@ class DebugViewModel(
     private val gate: DebugMenuGate,
     private val proGrant: ProGrant,
     private val daily: DailyRepository,
+    private val adGate: AdGate,
+    private val interstitials: InterstitialGate,
+    private val adDiagnostics: AdDiagnostics,
+    private val houseAds: HouseAds,
     private val appCache: AppCache,
     private val clearableDaos: Set<ClearableDao>,
     private val dispatchers: DispatcherProvider,
@@ -89,6 +100,7 @@ class DebugViewModel(
             .collectIn(viewModelScope) { takeAction(DebugAction.TranscriptChanged(it)) }
         gate.isUnlocked.collectIn(viewModelScope) { takeAction(DebugAction.UnlockChanged(it)) }
         proGrant.granted.collectIn(viewModelScope) { takeAction(DebugAction.ProChanged(it)) }
+        houseAds.isSelected.collectIn(viewModelScope) { takeAction(DebugAction.RefreshAds) }
     }
 
     @Suppress("CyclomaticComplexMethod")
@@ -153,10 +165,125 @@ class DebugViewModel(
             DebugAction.CopyDump -> action.copyDump()
             DebugAction.RollSeed -> override { it.copy(seed = Random.nextLong()) }
             DebugAction.ForceCrash -> throw DebugTestCrash()
+
+            DebugAction.RefreshAds -> action.refreshAds()
+            is DebugAction.SelectHouseAds -> action.selectHouseAds()
+            is DebugAction.SetForcedAdOutcome -> action.setForcedAdOutcome()
+            is DebugAction.SetAdReportsReady -> action.setAdReportsReady()
+            DebugAction.NoteRunFinished -> action.noteRunFinished()
+            is DebugAction.ShowRewardedNow -> action.showRewardedNow()
+            DebugAction.ShowInterstitialNow -> action.showInterstitialNow()
+            DebugAction.OpenConfigOverrides -> sendEvent(DebugEvent.OpenConfigOverrides)
         }
     }
 
+    /**
+     * The gate's own inputs, read rather than guessed.
+     *
+     * Called after everything that can move one of them, because the value of
+     * this panel is that it agrees with the gate — a readout refreshed only on
+     * open would show a cooldown that expired two taps ago and send the tester
+     * looking for a bug in the policy.
+     */
+    private suspend fun DebugAction.refreshAds() {
+        val snapshot = Catching { adDiagnostics.snapshot() }
+            .logOnFailure { "Could not read the ad gate snapshot" }
+            .getOrNull()
+        updateState {
+            it.copy(
+                ads = it.ads.copy(
+                    houseAdsAvailable = houseAds.network != null,
+                    houseAdsSelected = houseAds.isSelected.value,
+                    forcedOutcome = houseAds.forcedOutcome.value,
+                    reportsReady = houseAds.reportsReady.value,
+                    snapshot = snapshot,
+                )
+            )
+        }
+    }
+
+    private suspend fun DebugAction.SelectHouseAds.selectHouseAds() {
+        houseAds.select(useHouseAds)
+        takeAction(DebugAction.RefreshAds)
+    }
+
+    private suspend fun DebugAction.SetForcedAdOutcome.setForcedAdOutcome() {
+        houseAds.forceOutcome(result)
+        takeAction(DebugAction.RefreshAds)
+    }
+
+    private suspend fun DebugAction.SetAdReportsReady.setAdReportsReady() {
+        houseAds.reportReady(ready)
+        takeAction(DebugAction.RefreshAds)
+    }
+
+    /**
+     * SPEC 12's fourth-run rule, satisfied without playing four runs.
+     *
+     * `noteRunFinished` is the same call the game makes when a board stacks out
+     * and it shows nothing by construction, so this is the counter and only the
+     * counter. It is here beside the config overrides rather than instead of
+     * them: overriding `minSessionRuns` proves the key is wired, and tapping
+     * this proves the counter is.
+     */
+    private suspend fun DebugAction.noteRunFinished() {
+        interstitials.noteRunFinished()
+        takeAction(DebugAction.RefreshAds)
+    }
+
+    /**
+     * SPEC 19's "force show: rewarded video".
+     *
+     * Straight through [AdGate], not around it, so what the tester sees is the
+     * real path: the rewarded clock held for the length of the ad, the timestamp
+     * written on the way out, and — on anything but a deliberate dismissal — the
+     * grant the call sites would have made.
+     */
+    private suspend fun DebugAction.ShowRewardedNow.showRewardedNow() {
+        updateState { it.copy(ads = it.ads.copy(lastResult = null, showing = true)) }
+        val outcome = adGate.showRewarded(placement)
+        updateState {
+            it.copy(ads = it.ads.copy(lastResult = outcome.toString(), showing = false))
+        }
+        takeAction(DebugAction.RefreshAds)
+    }
+
+    /**
+     * SPEC 19's "force show: interstitial", and it is deliberately not a force.
+     *
+     * It calls [InterstitialGate.showIfReady] — the one method that can show an
+     * interstitial, with the one caller it has always had — so every gate in
+     * SPEC 12.3 still runs. A button that reached past the policy to the network
+     * would prove the SDK works and prove nothing about the app, and the thing
+     * that has never been seen here is not an AdMob interstitial, it is this
+     * app's decision to serve one.
+     *
+     * When it refuses, [AdGateSnapshot.blockedReason] on the panel above says
+     * which rule did it.
+     */
+    private suspend fun DebugAction.showInterstitialNow() {
+        updateState { it.copy(ads = it.ads.copy(lastResult = null, showing = true)) }
+        val shown = interstitials.showIfReady()
+        val snapshot = Catching { adDiagnostics.snapshot() }
+            .logOnFailure { "Could not read the ad gate snapshot" }
+            .getOrNull()
+        updateState {
+            it.copy(
+                ads = it.ads.copy(
+                    showing = false,
+                    lastResult = if (shown) {
+                        DebugCopy.AdShown
+                    } else {
+                        snapshot?.blockedReason ?: DebugCopy.AdNotShown
+                    },
+                )
+            )
+        }
+        takeAction(DebugAction.RefreshAds)
+    }
+
     private suspend fun DebugAction.load() {
+        takeAction(DebugAction.RefreshAds)
         val streak = Catching { daily.status().streak.current }
             .logOnFailure { "Could not read the Daily streak" }
             .getOrNull() ?: 0
@@ -336,6 +463,32 @@ data class DebugState(
     val soak: SoakSummary? = null,
 
     val stateDump: String? = null,
+
+    val ads: AdToolsState = AdToolsState(),
+)
+
+/**
+ * SPEC 19's ad tools, and the gate's own inputs beside them.
+ *
+ * [snapshot] is the whole reason this is a panel rather than two buttons. An
+ * interstitial that does not appear is silent, and the eight things that could
+ * have silenced it are all invisible; C10 gave `ads.interstitial_blocked` a
+ * named reason so a dashboard could be asked which one, and this puts the same
+ * word on the device before the ad is asked for rather than after.
+ */
+data class AdToolsState(
+    /** Whether this build contains a house network at all. False in every release build. */
+    val houseAdsAvailable: Boolean = false,
+    val houseAdsSelected: Boolean = false,
+    val forcedOutcome: AdShowResult? = null,
+    val reportsReady: Boolean = true,
+    val snapshot: AdGateSnapshot? = null,
+
+    /** An ad is on screen. The menu is behind it, and the buttons must not restack. */
+    val showing: Boolean = false,
+
+    /** The outcome, or the block reason, from the last forced show. */
+    val lastResult: String? = null,
 )
 
 /** One finished soak, flattened for display. */
@@ -377,6 +530,9 @@ sealed interface DebugEvent {
     data class Copy(val text: String) : DebugEvent
 
     data class Message(val message: DebugMessage) : DebugEvent
+
+    /** SPEC 10's keys, on their own screen. See `ConfigOverridesRoute`. */
+    data object OpenConfigOverrides : DebugEvent
 }
 
 sealed interface DebugAction {
@@ -420,6 +576,15 @@ sealed interface DebugAction {
     data object CopyDump : DebugAction
     data object RollSeed : DebugAction
     data object ForceCrash : DebugAction
+
+    data object RefreshAds : DebugAction
+    data class SelectHouseAds(val useHouseAds: Boolean) : DebugAction
+    data class SetForcedAdOutcome(val result: AdShowResult?) : DebugAction
+    data class SetAdReportsReady(val ready: Boolean) : DebugAction
+    data object NoteRunFinished : DebugAction
+    data class ShowRewardedNow(val placement: AdPlacement) : DebugAction
+    data object ShowInterstitialNow : DebugAction
+    data object OpenConfigOverrides : DebugAction
 }
 
 /** The block palette the queue picker offers: every tier, plus the three specials. */

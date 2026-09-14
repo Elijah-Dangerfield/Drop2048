@@ -186,6 +186,8 @@ fun App(appComponent: AppComponent) {
                     modifier = Modifier.matchParentSize(),
                     hostState = dialogHostState
                 )
+
+                appComponent.houseAds.Surface()
             }
         }
     }

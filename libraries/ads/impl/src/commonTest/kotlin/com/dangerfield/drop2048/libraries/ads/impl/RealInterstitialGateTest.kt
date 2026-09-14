@@ -184,6 +184,68 @@ class RealInterstitialGateTest : CoroutineTest() {
         assertFalse(scenario.gate.showIfReady())
     }
 
+    /**
+     * A QA override reaches [InterstitialPolicy], and the snapshot says so.
+     *
+     * This is the end of the chain the debug menu's config screen starts: an
+     * override written at `ads.interstitial.suppressDaysSinceInstall` lands in
+     * the merged `AppConfigMap`, `InterstitialSuppressDaysSinceInstall` resolves
+     * it, and the rule that has made this app's interstitial unreachable on
+     * every fresh install since C10 stops firing. Without the override the same
+     * player is refused with `new_install`.
+     */
+    @Test
+    fun `an overridden suppression window reaches the policy`() = runUnitTest {
+        val blocked = scenario(installedDaysAgo = 0)
+        assertFalse(blocked.gate.showIfReady())
+        assertEquals(
+            InterstitialBlock.NewInstall.reason,
+            blocked.gate.snapshot().blockedReason,
+        )
+
+        val overridden = scenario(
+            installedDaysAgo = 0,
+            config = mapOf("ads.interstitial.suppressDaysSinceInstall" to 0),
+        )
+
+        assertTrue(overridden.gate.showIfReady())
+        assertEquals(listOf(AdFormat.Interstitial), overridden.network.shown)
+    }
+
+    /**
+     * The same numbers the decision was made from, which is the only property
+     * that makes a debug readout worth drawing. A snapshot with its own second
+     * set of reads could agree with nothing and still look right.
+     */
+    @Test
+    fun `the snapshot reports the gate's own inputs`() = runUnitTest {
+        val scenario = scenario(
+            runsFinished = 2,
+            config = mapOf("ads.interstitial.minSessionRuns" to 4),
+        )
+
+        val snapshot = scenario.gate.snapshot()
+
+        assertEquals(2, snapshot.runsThisSession)
+        assertEquals(4, snapshot.minSessionRuns)
+        assertEquals(InterstitialBlock.TooFewRunsThisSession.reason, snapshot.blockedReason)
+        assertFalse(scenario.gate.showIfReady())
+    }
+
+    /** SPEC 19's "current interstitial cooldown remaining", in the unit QA reads. */
+    @Test
+    fun `the snapshot reports the cooldown remaining rather than the time elapsed`() = runUnitTest {
+        val scenario = scenario()
+        assertTrue(scenario.gate.showIfReady())
+
+        scenario.clock.advance(60_000)
+        val snapshot = scenario.gate.snapshot()
+
+        assertEquals(180, snapshot.cooldownSeconds)
+        assertEquals(120, snapshot.cooldownRemainingSeconds)
+        assertEquals(InterstitialBlock.Cooldown.reason, snapshot.blockedReason)
+    }
+
     private fun TestScope.scenario(
         pro: Boolean = false,
         runsFinished: Int = 4,
@@ -204,7 +266,8 @@ class RealInterstitialGateTest : CoroutineTest() {
         repeat(runsFinished) { session.noteRunFinished() }
 
         val gate = RealInterstitialGate(
-            network = network,
+            platformNetwork = network,
+            houseAds = TestHouseAds(),
             entitlements = FakeEntitlements(pro),
             runActivity = runActivity,
             rewardedClock = RewardedClock(),

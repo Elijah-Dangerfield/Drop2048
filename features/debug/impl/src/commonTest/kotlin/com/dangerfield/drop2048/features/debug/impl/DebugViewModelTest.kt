@@ -1,5 +1,8 @@
 package com.dangerfield.drop2048.features.debug.impl
 
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.NoHouseAds
+import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.billing.InMemoryProGrant
 import com.dangerfield.drop2048.features.debug.DebugMenuGate
 import com.dangerfield.drop2048.features.debug.PresetBoard
@@ -153,21 +156,92 @@ class DebugViewModelTest : CoroutineTest() {
         assertEquals(1, scenario.dao.clears)
     }
 
+    /**
+     * SPEC 19's "force show: rewarded video", through [AdGate] rather than
+     * around it.
+     *
+     * The assertion is on the placement, because the two rewarded slots are
+     * capped and reported separately and a button wired to the wrong one would
+     * be invisible: both draw the same ad.
+     */
+    @Test
+    fun forcingARewardedAdGoesThroughTheGateAndReportsWhatHappened() = runUnitTest {
+        val adGate = StubAdGate(outcome = RewardOutcome.Dismissed)
+        val scenario = scenario(adGate = adGate)
+
+        scenario.viewModel.takeAction(DebugAction.ShowRewardedNow(AdPlacement.DailyRetry))
+
+        assertEquals(listOf(AdPlacement.DailyRetry), scenario.adGate.shown)
+        assertEquals(RewardOutcome.Dismissed.toString(), scenario.viewModel.state.ads.lastResult)
+    }
+
+    /**
+     * A refusal is the useful answer, so it has to be a readable one.
+     *
+     * C10 gave `ads.interstitial_blocked` a named reason precisely so the gate
+     * could be asked which rule was doing the work; this pins that the name
+     * reaches the screen rather than a blank or a generic "not shown", which is
+     * what the tester was staring at before this chunk.
+     */
+    @Test
+    fun aBlockedInterstitialSaysWhichRuleBlockedIt() = runUnitTest {
+        val scenario = scenario(interstitials = StubInterstitialGate(showsOne = false))
+
+        scenario.viewModel.takeAction(DebugAction.ShowInterstitialNow)
+
+        assertEquals(1, scenario.interstitials.showAttempts)
+        assertEquals("new_install", scenario.viewModel.state.ads.lastResult)
+    }
+
+    /** The fourth-run rule's counter, fed without playing four runs. */
+    @Test
+    fun countingAFinishedRunReachesTheInterstitialGate() = runUnitTest {
+        val scenario = scenario()
+
+        scenario.viewModel.takeAction(DebugAction.NoteRunFinished)
+        scenario.viewModel.takeAction(DebugAction.NoteRunFinished)
+
+        assertEquals(2, scenario.interstitials.runsFinished)
+    }
+
+    /**
+     * The menu can be opened on a build with no house network, and says so.
+     *
+     * That build is every release build, and the row it draws is the only place
+     * anybody will ever read the answer.
+     */
+    @Test
+    fun aBuildWithNoHouseNetworkSaysSo() = runUnitTest {
+        val scenario = scenario()
+
+        assertFalse(scenario.viewModel.state.ads.houseAdsAvailable)
+        assertFalse(scenario.viewModel.state.ads.houseAdsSelected)
+    }
+
     private fun scenario(
         gate: DebugMenuGate = FakeGate(open = true),
         cache: StubAppCache = StubAppCache(),
+        adGate: StubAdGate = StubAdGate(),
+        interstitials: StubInterstitialGate = StubInterstitialGate(),
+        diagnostics: StubAdDiagnostics = StubAdDiagnostics(),
     ): DebugScenario {
         val controller = InMemoryDebugController()
         val dao = CountingClearableDao()
         return DebugScenario(
             controller = controller,
             dao = dao,
+            adGate = adGate,
+            interstitials = interstitials,
             viewModel = DebugViewModel(
                 controller = controller,
                 diagnostics = InMemoryDiagnostics(),
                 gate = gate,
                 proGrant = InMemoryProGrant(),
                 daily = StubDailyRepository(),
+                adGate = adGate,
+                interstitials = interstitials,
+                adDiagnostics = diagnostics,
+                houseAds = NoHouseAds(),
                 appCache = cache,
                 clearableDaos = setOf(dao),
                 dispatchers = dispatchers,
@@ -178,6 +252,8 @@ class DebugViewModelTest : CoroutineTest() {
     private class DebugScenario(
         val controller: InMemoryDebugController,
         val dao: CountingClearableDao,
+        val adGate: StubAdGate,
+        val interstitials: StubInterstitialGate,
         val viewModel: DebugViewModel,
     )
 

@@ -10,6 +10,7 @@ import com.dangerfield.drop2048.libraries.navigation.impl.DelegatingRouter
 import com.dangerfield.drop2048.libraries.telemetry.impl.JankMonitor
 import com.dangerfield.drop2048.libraries.telemetry.impl.StartupReporter
 import com.dangerfield.drop2048.libraries.drop2048.Telemetry
+import com.dangerfield.drop2048.libraries.ads.HouseAds
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -37,6 +38,22 @@ interface AppComponent {
      * reports nothing on purpose (see [ProcessStartTimeProvider]).
      */
     val startupReporter: StartupReporter
+    /**
+     * The house ad network's placeholder, drawn at the root of the app.
+     *
+     * On the component rather than reached for inside a feature because a
+     * full-screen ad is above every feature, and because the binding that
+     * answers it is `NoHouseAds` in any build that does not contain the house
+     * network — which is every release build. See `HouseAds`.
+     *
+     * `App` draws it last, above the dialog host, because a full-screen ad is
+     * above everything — that is what makes it a full-screen ad, and a
+     * placeholder a dialog could cover would be lying about the surface it
+     * stands in for. In a release build it is one resolved binding and an empty
+     * composable.
+     */
+    val houseAds: HouseAds
+
     val shakeHandler: ShakeHandler
     val deepLinkBridge: DeepLinkBridge
 

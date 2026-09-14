@@ -4,6 +4,7 @@ import com.dangerfield.drop2048.libraries.ads.AdFormat
 import com.dangerfield.drop2048.libraries.ads.AdNetwork
 import com.dangerfield.drop2048.libraries.ads.AdShowOutcome
 import com.dangerfield.drop2048.libraries.ads.AdShowResult
+import com.dangerfield.drop2048.libraries.ads.HouseAds
 import com.dangerfield.drop2048.libraries.ads.RunActivity
 import com.dangerfield.drop2048.libraries.billing.Entitlements
 import com.dangerfield.drop2048.libraries.billing.PurchaseOutcome
@@ -71,6 +72,37 @@ class FakeAdNetwork(
     override fun preload(format: AdFormat) {
         preloaded += format
     }
+}
+
+/**
+ * A [HouseAds] a test can hand a network to, standing in for the module a
+ * release build does not contain.
+ *
+ * `Surface` is not overridden with anything: the seam's composable half is the
+ * drawing, and what the gates care about is only which network they end up
+ * talking to.
+ */
+class TestHouseAds(
+    override val network: AdNetwork? = null,
+    selected: Boolean = network != null,
+) : HouseAds {
+    private val selectedState = MutableStateFlow(selected)
+    override val isSelected: StateFlow<Boolean> = selectedState.asStateFlow()
+
+    override fun select(useHouseAds: Boolean) {
+        selectedState.value = useHouseAds
+    }
+
+    override val forcedOutcome: StateFlow<AdShowResult?> = MutableStateFlow(null)
+
+    override fun forceOutcome(result: AdShowResult?) = Unit
+
+    override val reportsReady: StateFlow<Boolean> = MutableStateFlow(true)
+
+    override fun reportReady(ready: Boolean) = Unit
+
+    @androidx.compose.runtime.Composable
+    override fun Surface() = Unit
 }
 
 class FakeEntitlements(pro: Boolean = false) : Entitlements {

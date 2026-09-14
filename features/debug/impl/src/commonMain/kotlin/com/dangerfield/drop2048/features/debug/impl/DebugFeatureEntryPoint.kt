@@ -5,6 +5,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
+import com.dangerfield.drop2048.features.debug.ConfigOverridesRoute
 import com.dangerfield.drop2048.features.debug.DebugRoute
 import com.dangerfield.drop2048.features.game.GameRoute
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
@@ -34,12 +35,17 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * before replaying the tutorial: leaving the debug menu underneath a live board
  * means a back press lands the tester back on a screen full of switches with a
  * run still going.
+ *
+ * `ConfigOverridesRoute` is the exception and is pushed normally. A tester
+ * relaxing a gate is on their way back to the menu they came from, and clearing
+ * the stack there would cost them every switch they had already set.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, multibinding = true)
 @Inject
 class DebugFeatureEntryPoint(
     private val debugViewModelFactory: () -> DebugViewModel,
+    private val configOverridesViewModelFactory: () -> ConfigOverridesViewModel,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
@@ -58,11 +64,32 @@ class DebugFeatureEntryPoint(
 
                     is DebugEvent.Message -> showSnackBar(message = messageFor(event.message))
                     is DebugEvent.Copy -> clipboard.setText(AnnotatedString(event.text))
+                    DebugEvent.OpenConfigOverrides -> router.navigate(ConfigOverridesRoute())
                 }
             }
 
             DebugScreen(state = state, onAction = viewModel::takeAction)
         }
+
+        screen<ConfigOverridesRoute> {
+            val viewModel: ConfigOverridesViewModel = viewModel { configOverridesViewModelFactory() }
+            val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
+
+            viewModel.ObserveEvents { event ->
+                when (event) {
+                    ConfigOverridesEvent.NavigateBack -> router.goBack()
+                    is ConfigOverridesEvent.Message ->
+                        showSnackBar(message = configMessageFor(event.message))
+                }
+            }
+
+            ConfigOverridesScreen(state = state, onAction = viewModel::takeAction)
+        }
+    }
+
+    private fun configMessageFor(message: ConfigOverridesMessage): String = when (message) {
+        ConfigOverridesMessage.Cleared -> DebugCopy.MessageConfigCleared
+        ConfigOverridesMessage.NotParseable -> DebugCopy.MessageConfigNotParseable
     }
 
     private fun messageFor(message: DebugMessage): String = when (message) {

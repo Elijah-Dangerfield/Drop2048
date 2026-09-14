@@ -289,6 +289,9 @@ class OfflineFirstAppConfigRepositoryTest : CoroutineTest() {
         override suspend fun addOverride(override: ConfigOverride<Any>) {
             flow.value = flow.value.filter { it.path != override.path } + override
         }
+        override suspend fun removeOverride(path: String) {
+            flow.value = flow.value.filter { it.path != path }
+        }
         override suspend fun clearAll() { flow.value = emptyList() }
         fun set(overrides: List<ConfigOverride<Any>>) { flow.value = overrides }
     }

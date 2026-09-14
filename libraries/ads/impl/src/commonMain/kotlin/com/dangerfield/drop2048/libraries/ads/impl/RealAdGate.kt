@@ -5,6 +5,8 @@ import com.dangerfield.drop2048.libraries.ads.AdGate
 import com.dangerfield.drop2048.libraries.ads.AdNetwork
 import com.dangerfield.drop2048.libraries.ads.AdPlacement
 import com.dangerfield.drop2048.libraries.ads.AdShowResult
+import com.dangerfield.drop2048.libraries.ads.HouseAds
+import com.dangerfield.drop2048.libraries.ads.networkOr
 import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.ads.UnservedAdGate
 import com.dangerfield.drop2048.libraries.core.AutoInit
@@ -62,7 +64,8 @@ import kotlin.time.ExperimentalTime
 @ContributesBinding(AppScope::class, boundType = AutoInit::class, multibinding = true)
 @Inject
 class RealAdGate(
-    private val network: AdNetwork,
+    private val platformNetwork: AdNetwork,
+    private val houseAds: HouseAds,
     private val adState: AdStateCache,
     private val rewardedClock: RewardedClock,
     private val appScope: AppCoroutineScope,
@@ -71,6 +74,14 @@ class RealAdGate(
 ) : AdGate, AutoInit {
 
     private val logger = KLog.withTag("AdGate")
+
+    /**
+     * Resolved per call rather than held, for the reason every config read here
+     * is: a network captured in a field is a switch that takes effect next
+     * launch. In a release build [HouseAds.network] is null and this is always
+     * the platform network.
+     */
+    private val network: AdNetwork get() = houseAds.networkOr(platformNetwork)
 
     init {
         // SPEC 12's three-day install suppression counts from the first launch

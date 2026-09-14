@@ -682,6 +682,16 @@ Every gate in 12.3 is a branch of one pure function (`InterstitialPolicy`), with
 against a positive baseline that does show. The 8-second countdown is a ViewModel rule rather than
 an animation, which is also what lets the offer be screenshot-tested at all.
 
+**Ads are visible in a debug build (C15).** A **house network** draws the ad
+itself — a full-screen placeholder labelled NOT A REAL AD, naming the placement,
+with a countdown and an early close — so every surface above can be looked at on
+a device without a fill, a network, or waiting out the install grace. It is a
+`debugImplementation` of `:apps:compose` and therefore absent from every release
+artifact; `verifyNoHouseAdsInRelease` fails the build if that changes. The debug
+menu can force either format, reports the gate's own inputs and the named reason
+an interstitial was refused, and writes local overrides for every remote key —
+which is what makes an interstitial reachable by hand at all.
+
 **iOS serves no ads yet.** The Android network is real (AdMob + UMP); iOS falls through to a
 binding that answers `NotShown` and **cannot** report a reward. Sodogku shipped an iOS stub that
 paid out for free and every log read it as a watched ad; this one is honest, and the rewarded

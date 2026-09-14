@@ -57,6 +57,21 @@ class ConfigOverrideRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun removeOverride(path: String) {
+        mutex.withLock {
+            val remaining = overridesState.value.filter { it.path != path }
+            if (remaining.size == overridesState.value.size) return
+            converter.encodeOverrides(remaining)
+                .onSuccess { json ->
+                    logger.d { "Removed the override for $path" }
+                    configCache.update { snapshot -> snapshot.copy(overridesJson = json) }
+                }
+                .onFailure { error ->
+                    logger.e(error) { "Unable to persist overrides" }
+                }
+        }
+    }
+
     override suspend fun clearAll() {
         mutex.withLock {
             logger.d { "Clearing all overrides" }

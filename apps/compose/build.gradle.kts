@@ -23,7 +23,53 @@ baselineProfile {
 
 dependencies {
     baselineProfile(projects.apps.baselineprofile)
+
+    /**
+     * The house ad network, on the **debug** variant only.
+     *
+     * This is the whole structural guarantee behind `HouseAds`. The house
+     * network can answer `AdShowResult.Rewarded` without an ad having played,
+     * which is exactly what L66 says a stand-in must be incapable of; the type
+     * cannot express that impossibility here, so the build does. A release APK
+     * is compiled and merged without this module on the classpath, so it
+     * contains no house network, no binding for one, and no code that draws a
+     * placeholder — `NoHouseAds` is the only `HouseAds` anvil can find, and its
+     * `network` is null.
+     *
+     * `verifyNoHouseAdsInRelease` below is what stops that being a comment.
+     */
+    debugImplementation(projects.libraries.ads.fake)
 }
+
+/**
+ * Fails the build if the house ad network ever reaches a release artifact.
+ *
+ * A dependency scoped to one variant is only structural for as long as nobody
+ * moves it, and moving it is a one-word edit in a file nobody reads twice
+ * (`debugImplementation` → `implementation`). This resolves the release runtime
+ * classpath and looks, which is the same question a reviewer would have to ask
+ * and cannot answer by eye.
+ *
+ * Wired into `check` rather than into `assembleRelease` on purpose: the mistake
+ * has to be caught by the build everyone runs, not by the one nobody runs
+ * locally.
+ */
+val verifyNoHouseAdsInRelease = tasks.register("verifyNoHouseAdsInRelease") {
+    val classpath = configurations.named("releaseRuntimeClasspath")
+    val names = classpath.map { config ->
+        config.incoming.resolutionResult.allComponents.map { it.id.displayName }
+    }
+    inputs.property("releaseComponents", names)
+    doLast {
+        val offenders = names.get().filter { it.contains(":libraries:ads:fake") }
+        check(offenders.isEmpty()) {
+            "The house ad network is on the release runtime classpath: $offenders. " +
+                "It must stay a debugImplementation — see HouseAds."
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyNoHouseAdsInRelease) }
 
 /**
  * Sentry's Android Gradle plugin, for exactly one job: making obfuscated crash
@@ -70,6 +116,15 @@ kotlin {
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.androidx.work.runtime)
             implementation(compose.uiTooling)
+        }
+
+        iosMain.dependencies {
+            // iOS has no build-type source sets, so the house network is linked
+            // into every iOS binary and the guard is `BuildInfo.isDebug`
+            // (`Platform.isDebugBinary`, set by the Xcode configuration) inside
+            // `HouseAdNetwork.select`. Stated here rather than assumed: this is
+            // the one platform where the guarantee is a runtime check.
+            implementation(projects.libraries.ads.fake)
         }
 
         commonMain.dependencies {

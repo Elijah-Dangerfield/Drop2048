@@ -6,6 +6,85 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-14 — Ads are visible in a debug build, and structurally absent from a release one
+
+**What happened:** nobody had ever seen this app's interstitial, including the
+agent that wrote it. SPEC 12.3 stacks a three-day install suppression, a
+fourth-run minimum and a 180-second cooldown in front of it; `date` is refused on
+a non-userdebug emulator; and `ConfigOverrideRepository` had existed since the
+template with **no writer anywhere in the app**, so there was no way to relax a
+gate on a device. The rewarded path was only better by luck: it depended on
+AdMob's test units filling, which makes it a test of Play Services and a network
+rather than of this app.
+
+**The decision:** a **house ad network** — `HouseAdNetwork` in a new
+`:libraries:ads:fake` — that always fills because it draws the ad itself. A
+full-screen placeholder that says NOT A REAL AD in the largest type on screen,
+names the placement it is standing in for, counts down, and can be closed early.
+
+### The safety is in the build, because it cannot be in the type
+
+L66's rule for a stand-in is that it must be *incapable* of the reward:
+`NotWiredAdNetwork` is safe because its type cannot express a grant. A house
+network that could not grant would be useless, so that defence is unavailable and
+the guarantee moves to the build, in three layers:
+
+1. **`:libraries:ads:fake` is a `debugImplementation` of `:apps:compose`.** A
+   release Android artifact does not contain the class, the anvil binding, or the
+   drawing code. Verified against the generated graph:
+   `InjectKotlinInjectAndroidAppComponent` provides `HouseAdNetwork` on debug and
+   `NoHouseAds` on release.
+2. **`:apps:compose:verifyNoHouseAdsInRelease`**, wired into `check`, resolves the
+   release runtime classpath and fails if the module is on it. A variant-scoped
+   dependency is only structural for as long as nobody changes one word in a file
+   nobody reads twice.
+3. **`HouseAdNetwork.select` ands with `BuildInfo.isDebug`.** This is the only
+   layer iOS has: Kotlin/Native has no build-type source sets for layer 1 to hang
+   on, so the fake is linked into every iOS binary and the guard is
+   `Platform.isDebugBinary`, a property of the Xcode configuration rather than of
+   anything the app can set.
+
+`NoHouseAds` — the binding a release build gets — holds a null network, a
+`StateFlow` that is always false, and no way to acquire either.
+
+### The seam carries a composable
+
+`HouseAds.Surface()` is `@Composable` on the interface, so `App` draws the
+placeholder without naming the module that implements it. The alternative — an
+overlay in `apps/compose` keyed on a state flow — would have put the drawing code
+in a source set that compiles into the release binary, which is the property the
+whole design is buying. It cost `:libraries:ads` the compose plugin for exactly
+one declaration.
+
+### Config overrides, at last with a writer
+
+`ConfigOverridesScreen` is over the `Set<QaConfigValue>` multibinding rather than
+a named list of keys, for the reason `Set<ClearableDao>` is: a key added in a
+later chunk is editable without anyone coming back to the file.
+
+**Every value is written at the type its compiled default has.** L48 is why: the
+resolver runs booleans through `toBooleanStrictOrNull` and numbers through
+`toDoubleOrNull`, and anything those return null for falls back to the default
+with nothing on screen to say the override did not take. So a number that does
+not parse is refused with a message rather than persisted, and a flag is written
+as a `Boolean` and never as `"true"`. Removing an override is
+`removeOverride(path)` rather than writing the default back, because an override
+equal to the default still shadows the console for the life of the install.
+
+### The gate is asked, not bypassed
+
+"Force show: interstitial" calls `InterstitialGate.showIfReady()` — the one method
+that can show one, with the one caller it has always had — so every rule in SPEC
+12.3 still runs and a refusal is the interesting outcome. `AdDiagnostics` reports
+the gate's own inputs and `InterstitialPolicy`'s verdict as the same named reason
+`ads.interstitial_blocked` carries, computed from the same gathered conditions the
+decision uses, so the readout cannot disagree with the gate it describes.
+
+On device: two config overrides, four taps, and the interstitial appeared for the
+first time in the project's life.
+
+---
+
 ## 2026-09-11 — R8 has now run, and it broke nothing
 
 **What happened:** `MinifiedReleaseSmokeTest` ran against the minified

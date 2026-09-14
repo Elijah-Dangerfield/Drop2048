@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.features.debug.DiagnosticsSettings
 import com.dangerfield.drop2048.features.debug.PresetBoard
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.AdShowResult
 import com.dangerfield.drop2048.libraries.cascade.autoplay.Policy
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.ListItemAccessory
@@ -84,6 +86,8 @@ fun DebugScreen(
                 RngSection(state, onAction)
                 VerticalSpacerD1000()
                 EconomySection(state, onAction)
+                VerticalSpacerD1000()
+                AdsSection(state.ads, onAction)
                 VerticalSpacerD1000()
                 DiagnosticsSection(state.diagnostics, onAction)
                 VerticalSpacerD1000()
@@ -358,6 +362,132 @@ private fun EconomySection(state: DebugState, onAction: (DebugAction) -> Unit) {
             ),
         ),
     )
+}
+
+/**
+ * SPEC 19's ad tools: which network, what it answers, force one, and why the
+ * last one did not appear.
+ *
+ * The order is the order a tester needs it in. The network switch is first
+ * because everything below means something different depending on it; the gate
+ * inputs are directly above the force buttons because the whole point is to read
+ * them, press one, and watch the reason change.
+ */
+@Composable
+private fun AdsSection(ads: AdToolsState, onAction: (DebugAction) -> Unit) {
+    ListSection(
+        title = DebugCopy.SectionAds,
+        items = listOf(
+            ListSectionItem(
+                headlineText = DebugCopy.HouseAds,
+                supportingText = if (ads.houseAdsAvailable) {
+                    DebugCopy.HouseAdsHint
+                } else {
+                    DebugCopy.HouseAdsUnavailable
+                },
+                accessory = ListItemAccessory.Switch(
+                    checked = ads.houseAdsSelected,
+                    onCheckedChange = { onAction(DebugAction.SelectHouseAds(it)) },
+                ),
+                enabled = ads.houseAdsAvailable,
+                onClick = { onAction(DebugAction.SelectHouseAds(!ads.houseAdsSelected)) },
+            ),
+            ListSectionItem(
+                headlineText = DebugCopy.ForcedOutcome,
+                supportingText = DebugCopy.ForcedOutcomeHint,
+                accessory = ListItemAccessory.Text(
+                    text = DebugCopy.outcomeLabel(ads.forcedOutcome),
+                ),
+                enabled = ads.houseAdsAvailable,
+                onClick = {
+                    onAction(DebugAction.SetForcedAdOutcome(nextOutcome(ads.forcedOutcome)))
+                },
+            ),
+            ListSectionItem(
+                headlineText = DebugCopy.ReportsReady,
+                supportingText = DebugCopy.ReportsReadyHint,
+                accessory = ListItemAccessory.Switch(
+                    checked = ads.reportsReady,
+                    onCheckedChange = { onAction(DebugAction.SetAdReportsReady(it)) },
+                ),
+                enabled = ads.houseAdsAvailable,
+                onClick = { onAction(DebugAction.SetAdReportsReady(!ads.reportsReady)) },
+            ),
+        ),
+    )
+    VerticalSpacerD500()
+    Text(text = DebugCopy.AdGateInputs, typography = AppTheme.typography.Heading.H700)
+    VerticalSpacerD500()
+    ads.snapshot?.let { snapshot ->
+        DebugCopy.gateInputs(snapshot).forEach { line ->
+            Text(
+                text = line,
+                typography = AppTheme.typography.Body.B500,
+                color = AppTheme.colors.textSecondary,
+            )
+        }
+        VerticalSpacerD500()
+        Text(
+            text = snapshot.blockedReason ?: DebugCopy.AdWouldShow,
+            typography = AppTheme.typography.Body.B500,
+            color = if (snapshot.blockedReason == null) {
+                AppTheme.colors.text
+            } else {
+                AppTheme.colors.danger
+            },
+        )
+    }
+    VerticalSpacerD500()
+    ListSection(
+        items = listOf(
+            ListSectionItem(
+                headlineText = DebugCopy.NoteRunFinished,
+                supportingText = DebugCopy.NoteRunFinishedHint,
+                onClick = { onAction(DebugAction.NoteRunFinished) },
+            ),
+            ListSectionItem(
+                headlineText = DebugCopy.ShowInterstitial,
+                supportingText = DebugCopy.ShowInterstitialHint,
+                enabled = !ads.showing,
+                onClick = { onAction(DebugAction.ShowInterstitialNow) },
+            ),
+        ) + AdPlacement.entries.map { placement ->
+            ListSectionItem(
+                headlineText = DebugCopy.placementLabel(placement),
+                enabled = !ads.showing,
+                onClick = { onAction(DebugAction.ShowRewardedNow(placement)) },
+            )
+        } + listOf(
+            ListSectionItem(
+                headlineText = DebugCopy.LastAdResult,
+                accessory = ListItemAccessory.Text(
+                    text = if (ads.showing) {
+                        DebugCopy.AdShowing
+                    } else {
+                        ads.lastResult ?: DebugCopy.PresetNone
+                    },
+                ),
+            ),
+            ListSectionItem(
+                headlineText = DebugCopy.ConfigOverrides,
+                supportingText = DebugCopy.ConfigOverridesHint,
+                onClick = { onAction(DebugAction.OpenConfigOverrides) },
+            ),
+        ),
+    )
+}
+
+/**
+ * Cycles the forced answer through every result the real network can give.
+ *
+ * `null` first, because drawing the placeholder is the interesting case and a
+ * dial parked on a failure is how a tester ends up reporting that house ads do
+ * not work.
+ */
+private fun nextOutcome(current: AdShowResult?): AdShowResult? {
+    if (current == null) return AdShowResult.entries.first()
+    val next = AdShowResult.entries.indexOf(current) + 1
+    return AdShowResult.entries.getOrNull(next)
 }
 
 @Composable

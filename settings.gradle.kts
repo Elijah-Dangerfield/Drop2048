@@ -106,6 +106,11 @@ if (!serverOnly) {
     // `AdFormat`.
     include(":libraries:ads")
     include(":libraries:ads:impl")
+    // The house network: an ad that always fills because it draws itself. It is
+    // a `debugImplementation` of `:apps:compose` and nothing else depends on it,
+    // which is what keeps a network capable of granting a reward out of every
+    // release artifact. See `HouseAds`.
+    include(":libraries:ads:fake")
     // The one-time Pro purchase, and the single `Entitlements` every part of the
     // app reads. It is a leaf library because two features *and* two library
     // impls ask the same question, and before C10 there were two types answering

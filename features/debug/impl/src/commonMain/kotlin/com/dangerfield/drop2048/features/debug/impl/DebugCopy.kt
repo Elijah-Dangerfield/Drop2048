@@ -1,5 +1,8 @@
 package com.dangerfield.drop2048.features.debug.impl
 
+import com.dangerfield.drop2048.libraries.ads.AdGateSnapshot
+import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.AdShowResult
 import com.dangerfield.drop2048.features.debug.PresetBoard
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.numberValue
@@ -92,10 +95,80 @@ object DebugCopy {
 
     const val TranscriptEmpty = "Nothing has resolved yet this launch."
 
+    const val SectionAds = "Advertising"
+    const val HouseAds = "House ads"
+    const val HouseAdsHint = "A placeholder that always fills, drawn by the app. Debug builds only."
+    const val HouseAdsUnavailable = "Not in this build. Ads go to the platform network."
+    const val ForcedOutcome = "Force the next answer"
+    const val ForcedOutcomeHint = "Skips the placeholder and answers this instead"
+    const val ForcedOutcomeNone = "Draw it"
+    const val ReportsReady = "Report an interstitial as preloaded"
+    const val ReportsReadyHint = "Off is SPEC 12's \"skipped silently if not ready\""
+    const val NoteRunFinished = "Count a finished run"
+    const val NoteRunFinishedHint = "Feeds the fourth-run rule without playing four runs"
+    const val ShowInterstitial = "Force show: interstitial"
+    const val ShowInterstitialHint = "Through every gate in SPEC 12.3, so a refusal is the point"
+    const val ShowRewardedContinue = "Force show: rewarded (continue)"
+    const val ShowRewardedDailyRetry = "Force show: rewarded (Daily retry)"
+    const val AdShowing = "Showing..."
+    const val AdShown = "shown"
+    const val AdNotShown = "not shown"
+    const val LastAdResult = "Last result"
+    const val AdGateInputs = "Gate inputs"
+    const val AdWouldShow = "Nothing is blocking it."
+    const val ConfigOverrides = "Config overrides"
+    const val ConfigOverridesHint = "Every remote key, editable here. Survives a relaunch."
+
+    const val ConfigTitle = "Config overrides"
+    const val ConfigBody =
+        "Local overrides shadow remote config and the compiled default, and they survive a " +
+            "relaunch. Clear them before trusting anything this device tells you."
+    const val ConfigClearAll = "Clear all overrides"
+    const val ConfigSet = "Set"
+    const val ConfigReset = "Remove the override"
+    const val ConfigOverridden = "Overridden locally"
+
+    const val MessageConfigCleared = "Config overrides cleared."
+    const val MessageConfigNotParseable = "That is not a value this key can hold."
+
     const val MessageOverridesCleared = "Overrides cleared."
     const val MessageDailyCleared = "Daily ledger cleared."
     const val MessageTutorialReset = "Tutorial reset."
     const val MessageLocalDataReset = "Local data reset."
+
+    fun configDefault(value: String): String = "Default: $value"
+
+    fun overriddenCount(count: Int): String = when (count) {
+        0 -> "No local overrides. This device resolves what everyone else does."
+        1 -> "1 local override in force."
+        else -> "$count local overrides in force."
+    }
+
+    fun outcomeLabel(result: AdShowResult?): String = result?.name ?: ForcedOutcomeNone
+
+    fun placementLabel(placement: AdPlacement): String = when (placement) {
+        AdPlacement.ContinueRun -> ShowRewardedContinue
+        AdPlacement.DailyRetry -> ShowRewardedDailyRetry
+    }
+
+    /**
+     * SPEC 19's two readouts and the six inputs beside them, on one line each.
+     *
+     * The cooldown is printed as *remaining* rather than as elapsed, because
+     * "142s since the last one" needs the tester to remember the configured
+     * window and "38s remaining" does not.
+     */
+    fun gateInputs(snapshot: AdGateSnapshot): List<String> = listOf(
+        "network: ${snapshot.networkName}",
+        "ads.enabled: ${snapshot.adsEnabled}",
+        "pro: ${snapshot.isPro}",
+        "run alive: ${snapshot.runAlive}",
+        "runs this session: ${snapshot.runsThisSession} (need ${snapshot.minSessionRuns})",
+        "days since install: ${snapshot.daysSinceInstall} (suppressed below ${snapshot.suppressDaysSinceInstall})",
+        "cooldown remaining: ${snapshot.cooldownRemainingSeconds}s of ${snapshot.cooldownSeconds}s",
+        "since rewarded: ${snapshot.secondsSinceRewarded ?: "never"} (gap ${snapshot.rewardedGapSeconds}s, in flight ${snapshot.rewardedInFlight})",
+        "interstitial preloaded: ${snapshot.interstitialPreloaded}",
+    )
 
     fun presetLabel(preset: PresetBoard): String = when (preset) {
         PresetBoard.Empty -> "Empty"

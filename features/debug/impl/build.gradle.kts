@@ -39,6 +39,15 @@ kotlin {
             // rather than a type this feature owns, because the Daily's second
             // attempt is decided in a library impl that cannot read a feature.
             implementation(projects.libraries.billing)
+            // SPEC 19's force-show controls and the gate's own inputs. The api
+            // module only: the house network lives in `:libraries:ads:fake`, and
+            // a feature that named it would put it back into the release build
+            // that `HouseAds` exists to keep it out of.
+            implementation(projects.libraries.ads)
+            // `ConfigOverrideRepository` at last has a writer. `:libraries:config`
+            // rather than `:gameconfig` because the screen is over the whole
+            // `Set<QaConfigValue>` and never names a key.
+            implementation(projects.libraries.config)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
@@ -71,6 +80,15 @@ kotlin {
         commonTest.dependencies {
             implementation(projects.features.debug)
             implementation(projects.libraries.billing)
+            // SPEC 19's force-show controls and the gate's own inputs. The api
+            // module only: the house network lives in `:libraries:ads:fake`, and
+            // a feature that named it would put it back into the release build
+            // that `HouseAds` exists to keep it out of.
+            implementation(projects.libraries.ads)
+            // `ConfigOverrideRepository` at last has a writer. `:libraries:config`
+            // rather than `:gameconfig` because the screen is over the whole
+            // `Set<QaConfigValue>` and never names a key.
+            implementation(projects.libraries.config)
             implementation(projects.libraries.cascade)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)

@@ -167,7 +167,8 @@ class RealAdGateTest : CoroutineTest() {
         val network = FakeAdNetwork(rewardedResult = result)
         val cache = FakeAdStateCache()
         val gate = RealAdGate(
-            network = network,
+            platformNetwork = network,
+            houseAds = TestHouseAds(),
             adState = cache,
             rewardedClock = RewardedClock(),
             appScope = AppCoroutineScope(dispatchers),

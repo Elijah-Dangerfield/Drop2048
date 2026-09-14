@@ -1,9 +1,14 @@
 package com.dangerfield.drop2048.libraries.ads.impl
 
 import com.dangerfield.drop2048.libraries.ads.AdFormat
+import com.dangerfield.drop2048.libraries.ads.AdDiagnostics
+import com.dangerfield.drop2048.libraries.ads.AdGateSnapshot
 import com.dangerfield.drop2048.libraries.ads.AdShowResult
 import com.dangerfield.drop2048.libraries.ads.AdNetwork
+import com.dangerfield.drop2048.libraries.ads.HouseAds
 import com.dangerfield.drop2048.libraries.ads.InterstitialGate
+import com.dangerfield.drop2048.libraries.ads.NoAdDiagnostics
+import com.dangerfield.drop2048.libraries.ads.networkOr
 import com.dangerfield.drop2048.libraries.ads.NoInterstitials
 import com.dangerfield.drop2048.libraries.ads.RunActivity
 import com.dangerfield.drop2048.libraries.billing.Entitlements
@@ -55,9 +60,15 @@ import kotlin.time.ExperimentalTime
     boundType = InterstitialGate::class,
     replaces = [NoInterstitials::class],
 )
+@ContributesBinding(
+    scope = AppScope::class,
+    boundType = AdDiagnostics::class,
+    replaces = [NoAdDiagnostics::class],
+)
 @Inject
 class RealInterstitialGate(
-    private val network: AdNetwork,
+    private val platformNetwork: AdNetwork,
+    private val houseAds: HouseAds,
     private val entitlements: Entitlements,
     private val runActivity: RunActivity,
     private val rewardedClock: RewardedClock,
@@ -70,9 +81,11 @@ class RealInterstitialGate(
     private val cooldownSeconds: InterstitialCooldownSeconds,
     private val rewardedGapSeconds: InterstitialRewardedGapSeconds,
     private val suppressDays: InterstitialSuppressDaysSinceInstall,
-) : InterstitialGate {
+) : InterstitialGate, AdDiagnostics {
 
     private val logger = KLog.withTag("Interstitial")
+
+    private val network: AdNetwork get() = houseAds.networkOr(platformNetwork)
 
     override fun noteRunFinished() {
         session.noteRunFinished()
@@ -101,34 +114,81 @@ class RealInterstitialGate(
         }
     }
 
-    private suspend fun show(): Boolean {
+    /**
+     * SPEC 12.3's eight inputs, gathered once.
+     *
+     * Extracted so that [snapshot] reads the **same** numbers the decision is
+     * made from rather than a second, plausible set of its own. A debug readout
+     * that can disagree with the gate it describes is worse than no readout: it
+     * makes a wrong answer look confirmed.
+     *
+     * @param resultsDismissed false has no caller in production. [snapshot]
+     *   passes true because it is answering "would one show at a dismissed
+     *   sheet", which is the only version of the question with a useful answer.
+     */
+    private suspend fun conditions(): InterstitialConditions {
         val state = Catching { adState.get() }
             .logOnFailure { "Could not read the ad state; treating it as a fresh install" }
             .getOrDefault(AdState())
         val now = now()
-
-        val block = InterstitialPolicy.decide(
-            InterstitialConditions(
-                adsEnabled = adsEnabled(),
-                isPro = entitlements.isPro.value,
-                runAlive = runActivity.isRunAlive,
-                // The only caller is the dismissal itself. It is still an input
-                // rather than a constant so the rule has somewhere to be tested,
-                // and so a second call site added later has to say what moment it
-                // is at rather than inheriting an assumption.
-                resultsDismissed = true,
-                runsThisSession = session.runsFinished(),
-                minSessionRuns = minSessionRuns(),
-                millisSinceLastInterstitial = state.lastInterstitialAtMs.elapsedSince(now),
-                cooldownMillis = cooldownSeconds() * MillisPerSecond,
-                millisSinceRewarded = state.lastRewardedAtMs.elapsedSince(now),
-                rewardedInFlight = rewardedClock.inFlight,
-                rewardedGapMillis = rewardedGapSeconds() * MillisPerSecond,
-                daysSinceInstall = daysSince(state.firstSeenAtMs, now),
-                suppressDaysSinceInstall = suppressDays(),
-                preloaded = network.isReady(AdFormat.Interstitial),
-            )
+        return InterstitialConditions(
+            adsEnabled = adsEnabled(),
+            isPro = entitlements.isPro.value,
+            runAlive = runActivity.isRunAlive,
+            // The only caller is the dismissal itself. It is still an input
+            // rather than a constant so the rule has somewhere to be tested,
+            // and so a second call site added later has to say what moment it
+            // is at rather than inheriting an assumption.
+            resultsDismissed = true,
+            runsThisSession = session.runsFinished(),
+            minSessionRuns = minSessionRuns(),
+            millisSinceLastInterstitial = state.lastInterstitialAtMs.elapsedSince(now),
+            cooldownMillis = cooldownSeconds() * MillisPerSecond,
+            millisSinceRewarded = state.lastRewardedAtMs.elapsedSince(now),
+            rewardedInFlight = rewardedClock.inFlight,
+            rewardedGapMillis = rewardedGapSeconds() * MillisPerSecond,
+            daysSinceInstall = daysSince(state.firstSeenAtMs, now),
+            suppressDaysSinceInstall = suppressDays(),
+            preloaded = network.isReady(AdFormat.Interstitial),
         )
+    }
+
+    /**
+     * The gate, asked rather than obeyed.
+     *
+     * Nothing is shown, warmed or recorded — [InterstitialPolicy.decide] is a
+     * pure function, so asking it costs a read of the same values [show] would
+     * have read and cannot move the cooldown it is reporting.
+     */
+    override suspend fun snapshot(): AdGateSnapshot {
+        val conditions = conditions()
+        return AdGateSnapshot(
+            adsEnabled = conditions.adsEnabled,
+            isPro = conditions.isPro,
+            runAlive = conditions.runAlive,
+            runsThisSession = conditions.runsThisSession,
+            minSessionRuns = conditions.minSessionRuns,
+            secondsSinceLastInterstitial = conditions.millisSinceLastInterstitial?.div(MillisPerSecond),
+            cooldownSeconds = cooldownSeconds(),
+            secondsSinceRewarded = conditions.millisSinceRewarded?.div(MillisPerSecond),
+            rewardedInFlight = conditions.rewardedInFlight,
+            rewardedGapSeconds = rewardedGapSeconds(),
+            daysSinceInstall = conditions.daysSinceInstall,
+            suppressDaysSinceInstall = conditions.suppressDaysSinceInstall,
+            interstitialPreloaded = conditions.preloaded,
+            blockedReason = InterstitialPolicy.decide(conditions)?.reason,
+            networkName = if (houseAds.isSelected.value && houseAds.network != null) {
+                HouseNetworkName
+            } else {
+                PlatformNetworkName
+            },
+        )
+    }
+
+    private suspend fun show(): Boolean {
+        val conditions = conditions()
+        val now = now()
+        val block = InterstitialPolicy.decide(conditions)
 
         if (block != null) {
             logger.logEvent("ads.interstitial_blocked", "reason" to block.reason)
@@ -179,5 +239,7 @@ class RealInterstitialGate(
     private companion object {
         const val MillisPerSecond = 1_000L
         const val MillisPerDay = 86_400_000L
+        const val HouseNetworkName = "house"
+        const val PlatformNetworkName = "platform"
     }
 }

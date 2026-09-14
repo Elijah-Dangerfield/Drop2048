@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dangerfield.drop2048.libraries.ads.AdGateSnapshot
 import com.dangerfield.drop2048.features.debug.DebugOverrides
 import com.dangerfield.drop2048.features.debug.DiagnosticsSettings
 import com.dangerfield.drop2048.features.debug.PresetBoard
@@ -104,6 +105,13 @@ class DebugScreenshotTest {
                     hitDropCap = false,
                 ),
                 transcript = SampleTranscript,
+                ads = AdToolsState(
+                    houseAdsAvailable = true,
+                    houseAdsSelected = true,
+                    reportsReady = true,
+                    snapshot = SampleAdSnapshot,
+                    lastResult = "new_install",
+                ),
             ),
             onAction = {},
         )
@@ -122,6 +130,24 @@ class DebugScreenshotTest {
         )
     }
 
+    /**
+     * SPEC 10's keys, and the four rows that turn SPEC 12's three-day wait into
+     * four taps.
+     *
+     * The frame worth pinning is the one with overrides **in force**: a row that
+     * stopped saying which of its two numbers is the override, or stopped
+     * offering the reset, leaves a tester pinning a key for the life of the
+     * install without knowing it — and that is a bug they carry into every
+     * other chunk they test.
+     */
+    @Test
+    fun configOverrides() = compose.capture("config-overrides", height = ConfigHeight) {
+        ConfigOverridesScreen(
+            state = ConfigOverridesState(rows = SampleConfigRows),
+            onAction = {},
+        )
+    }
+
     @Test
     fun overlay() = compose.capture("debug-overlay", height = OverlayHeight) {
         DiagnosticsOverlay(
@@ -135,6 +161,29 @@ class DebugScreenshotTest {
 
     private companion object {
         const val Version = "1.0.0 (12)"
+
+        /**
+         * A gate that is refusing, because that is the state SPEC 19's readout
+         * exists for. A snapshot with nothing blocking would show every number
+         * and prove nothing about the line that names the rule.
+         */
+        val SampleAdSnapshot = AdGateSnapshot(
+            adsEnabled = true,
+            isPro = false,
+            runAlive = false,
+            runsThisSession = 1,
+            minSessionRuns = 4,
+            secondsSinceLastInterstitial = null,
+            cooldownSeconds = 180,
+            secondsSinceRewarded = null,
+            rewardedInFlight = false,
+            rewardedGapSeconds = 45,
+            daysSinceInstall = 0,
+            suppressDaysSinceInstall = 3,
+            interstitialPreloaded = true,
+            blockedReason = "new_install",
+            networkName = "house",
+        )
 
         val SampleTranscript = listOf(
             TranscriptLine(1, "merge (3,6) < (2,6) = 8", 8),
@@ -187,6 +236,9 @@ private val ShortPhoneHeight = 640.dp
 private val FullMenuHeight = 2400.dp
 
 private val OverlayHeight = 240.dp
+
+/** Five keys' worth of rows, each of which is three list items and a field. */
+private val ConfigHeight = 2000.dp
 
 internal const val ROBOLECTRIC_SDK = 34
 internal const val ROBOLECTRIC_QUALIFIERS = "w360dp-h2400dp-xhdpi"
