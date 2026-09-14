@@ -13,6 +13,54 @@ worse than no queue: an agent reading it redoes finished work.
 
 ## Now
 
+### C16 · The owner-directive channel, the debug FAB, and a QA menu
+
+Owner request, 2026-09-11: port Sodogku's system wholesale. Four pieces, and the
+point of the whole thing is that the round trip from "this bothers me while playing" to "it is on
+the list" is one swipe.
+
+**1. `FeedbackKind` as a Sentry tag.** `Sodogku/libraries/sodogku/src/.../FeedbackKind.kt`. Three
+kinds — `feedback`, `bug_report`, `owner_directive` — riding as the `feedback_kind` **tag**, not a
+message prefix, because a carrier event's message is also its issue title and titles get grouped,
+AI-resummarised and edited. A tag is indexed and queryable.
+
+**2. The carrier + twin in Sentry.** `Sodogku/libraries/sodogku/impl/.../AppTelemetry.kt` around
+lines 200-265. A `captureMessage` carrier holds the tags, breadcrumbs and attachments
+(`feedback.txt`, `session-log.txt`, `screenshot-N.jpg`); Sentry's own user-feedback record holds the
+words. **Each report is fingerprinted to its own issue** (`["feedback", uuid]`), set on a *local*
+scope so nothing leaks onto later events, at `INFO` level so it does not sort with crashes.
+
+The message is deliberately duplicated onto the carrier as an extra **and** an attachment: the
+legacy feedback API's comments render wherever the org's settings decide, and a real report arrived
+with the log and screenshot visible and the typed text nowhere.
+
+**3. The draggable FAB.** `Sodogku/apps/compose/src/.../devfeedback/` — `DevFeedbackFab` (48dp,
+position stored as *fractions* so it survives rotation and a different device, clamped so it can
+never be parked off-screen), `DevFeedbackHost` (records the content into a `GraphicsLayer` so a
+screenshot needs no platform API or permission, **tester builds only** — a player's build gets one
+bare `Box`), `DevFeedbackPanel`, `DevFeedbackViewModel`, `DevFeedbackFabCache`.
+
+Read `DevFeedbackFab`'s KDoc before touching the gesture: `clickable` and `detectDragGestures`
+coexist on purpose, and getting the order wrong means a dragged button also files a directive.
+
+**4. The QA menu.** `Sodogku/apps/compose/src/.../qa/QaToolsScreen.kt` + `QaToolsRoute`. Its
+feedback switch is the reason it exists, and it is deliberately **the one screen reachable without
+the button it switches off**. Note its split: the FAB toggle shows on any tester build, everything
+destructive is `isDebug` only, because a TestFlight tester needs to hide the button but must not be
+handed irreversible tools.
+
+**Also port `.claude/skills/feedback-triage/`** and its `docs/feedback-log.md` ledger. The ledger is
+what makes triage idempotent — the TODO queue is not a record of what was seen, because items are
+deleted when they ship, so without it every run after a fix re-files the same report.
+
+**Adapt, do not copy blind.** Drop 2048 already has: a debug menu behind seven taps with a
+`debugMenuUnlocked` flag (C12), `ShakeDialog`, and a feedback path whose session-log attachment C13a
+made **opt-in** with breadcrumbs cleared, because every report was leaking scores. An owner
+directive from the owner's own build wants the log unconditionally — that is a different kind, not a
+reason to undo C13a's fix. `BuildInfo.isTesterBuild` needs checking; Sodogku's is
+`isDebug || isTestFlight`.
+
+
 ### A haptic can be cancelled by the next one a millisecond later
 
 Observed in `dumpsys`: a `Move` and the `Merge` behind it landed 1ms apart and the first came back
