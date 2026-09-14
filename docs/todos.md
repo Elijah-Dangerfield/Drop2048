@@ -61,6 +61,18 @@ reason to undo C13a's fix. `BuildInfo.isTesterBuild` needs checking; Sodogku's i
 `isDebug || isTestFlight`.
 
 
+### `GameQuietButton` has no button semantics and no minimum touch target
+
+A raw `pointerInput` with no `Role.Button` and no 48dp floor. Inherited from `GameScreen`'s private
+`OverlayOption` and **now used on the paywall's Restore**, so it has spread. C11's accessibility
+pass did not cover it because it did not exist yet.
+
+### No harness exercises a `bottomSheet<>` destination
+
+The paywall is the app's first one. Its conversion is verified on Android by hand only, and
+Material draws the sheet in its own window so the goldens pin the content and not the scrim or the
+drag handle. iOS has never rendered it at all.
+
 ### A haptic can be cancelled by the next one a millisecond later
 
 Observed in `dumpsys`: a `Move` and the `Merge` behind it landed 1ms apart and the first came back

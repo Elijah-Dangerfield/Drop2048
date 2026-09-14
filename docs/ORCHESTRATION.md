@@ -36,7 +36,7 @@ things are the way they are, and what bit us.** If you are a subagent, read all 
 | C10 · Ads + billing | **DONE** | `d8035c7`. Android real, iOS unwired but cannot pay (L66) |
 | C11 · Settings, legal, gates, a11y | **DONE** | `655167b`. Accessibility is live at last. 945 tests |
 | C13 · Store prep | **DONE** | `de04f8e`+`5db6699`. Found L71-L73 |
-| C14 · Stats + paywall to handoff fidelity | **IN PROGRESS** | Owner: they read as a settings list |
+| C14 · Stats + paywall to handoff fidelity | **DONE** | `acc948f`. Paywall is a bottom sheet. See L77 |
 | C15 · Visible fake ads in debug | **IN PROGRESS** | Owner: no way to see an ad work |
 | C13a · Make the claims true + validate R8 | **DONE** | `f893a04`. **R8 passed, zero keep rules.** See L74-L76 |
 
@@ -662,6 +662,24 @@ model that decides placement, so adding a step type to the transcript is a balan
 proven otherwise. And **the test that caught it was a property, not an assertion about the feature
 being added**. Nothing in the D21 brief would have suggested checking whether a scoring step could
 move a block three hundred drops later.
+
+### L77 · The hard offset shadow was the whole difference, not the colour
+
+C3c gave the meta screens the dark palette by re-pointing the design system's role ramp. That fixed
+the colour clash and the owner still said they did not match — because **form, not colour, was what
+separated them.** The board is chunky pressable material; the meta screens were flat cards that had
+gone dark.
+
+C14's read from the device: side by side, the stat plates and the perk block now read as the *same
+physical material* as the tiles and the control row, and the single cheapest tie on the page is
+drawing highest-tier-reached as a real `Tile` in the live `BlockPalette`.
+
+Generalisable: when a screen "does not match" and the palette is already shared, look at the
+material — shadow, radius, press behaviour — before the hues.
+
+A second-order win worth copying: `GameScreen` had a private `OverlayOption` identical to what the
+paywall needed. Promoting it to `GameQuietButton` in `:libraries:ui` left **the game goldens
+byte-identical**, which is the proof the extraction changed nothing.
 
 ### L74 · The audit found the smaller leak
 
