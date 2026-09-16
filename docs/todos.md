@@ -13,6 +13,19 @@ worse than no queue: an agent reading it redoes finished work.
 
 ## Now
 
+### Template port candidate: let the init script ask whether the app has a backend
+
+Both server deploy workflows were disabled on 2026-09-16 because they fire on every push to main
+and fail without a Fly app. A generated app should not have to discover that.
+
+`scripts/init_project.main.kts` in `../KMPTemplate` should ask, and on "no backend" drop
+`:apps:server`, `:apps:admin`, `:apps:integration`, the two deploy workflows and the Fly config.
+Goes in that repo's `docs/PORT-CANDIDATES.md`, which is currently empty.
+
+**Note Drop 2048 does have a backend** and the workflows are disabled only until a Fly app exists.
+See the correction below before anyone acts on this.
+
+
 ### Point the legal config keys at the real Pages URLs
 
 `legal.privacyUrl` and `legal.termsUrl` default to `https://drop2048.app/terms` and `/privacy`,
