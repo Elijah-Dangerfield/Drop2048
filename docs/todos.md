@@ -13,6 +13,21 @@ worse than no queue: an agent reading it redoes finished work.
 
 ## Now
 
+### Point the legal config keys at the real Pages URLs
+
+`legal.privacyUrl` and `legal.termsUrl` default to `https://drop2048.app/terms` and `/privacy`,
+which have never existed. The pages are now live and serving:
+
+- `https://elijah-dangerfield.github.io/Drop2048/privacy.html`
+- `https://elijah-dangerfield.github.io/Drop2048/terms.html`
+
+Both returned HTTP 200. Change the compiled defaults in `:libraries:gameconfig`. Both are
+remote-overridable, so a custom domain later is a config push rather than a release.
+
+Note C13a rewrote `privacy.html` to describe the app that actually exists (AdMob, Grafana, the
+install id), so what is being served is accurate — it was just unreachable.
+
+
 ### C16 · The owner-directive channel, the debug FAB, and a QA menu
 
 Owner request, 2026-09-11: port Sodogku's system wholesale. Four pieces, and the
