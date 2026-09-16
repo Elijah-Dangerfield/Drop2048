@@ -44,6 +44,27 @@ Creates new KMP modules with proper structure and configuration.
 ./scripts/create_module.main.kts library user:preferences  # sub-module
 ```
 
+## setup_sentry.main.kts
+
+Turns crash reporting on. Run once, right after init:
+
+```bash
+./scripts/setup_sentry.main.kts
+```
+
+Asks for a Sentry **user** auth token (`project:read`, `project:write`,
+`org:read` — an organization `sntrys_…` token has only `org:ci` and 403s every
+read endpoint), creates or adopts the project, writes the DSN into the
+committed `telemetry.properties`, sets the CI variables and secret, then sends
+a test event and waits for it to arrive before declaring success. Idempotent.
+
+With no GitHub remote configured it prints "No GitHub repo reachable via gh"
+and skips the CI step. That is expected here, not an error.
+
+Commit `telemetry.properties` afterwards. A DSN is a write-only ingest
+endpoint shipped inside every store binary, not a secret — keeping it per
+developer is what leaves fresh clones silently reporting nothing.
+
 ## cleanup.sh
 
 Cleans build artifacts and caches:

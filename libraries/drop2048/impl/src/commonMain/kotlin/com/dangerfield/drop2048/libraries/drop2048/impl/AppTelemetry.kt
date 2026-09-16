@@ -226,6 +226,14 @@ private class ConfiguredTelemetry(
             // explains.
             scope.setExtra(FEEDBACK_MESSAGE_KEY, payload)
             scope.addAttachment(Attachment(payload.encodeToByteArray(), "feedback.txt", "text/plain"))
+            // Same reasoning as the message: these are the handles that lead
+            // back to the log line, and they rode only in the comment. Commit
+            // and branch are already global tags, so the rest of the build line
+            // needs no mirror.
+            if (isBugReport) {
+                errorCode?.let { scope.setExtra(FEEDBACK_ERROR_CODE_KEY, it.toString()) }
+                eventId?.let { scope.setExtra(FEEDBACK_LOG_ID_KEY, it) }
+            }
             if (logDump != null) {
                 scope.addAttachment(Attachment(logDump.encodeToByteArray(), "session-log.txt", "text/plain"))
             }
@@ -304,6 +312,11 @@ private const val FEEDBACK_KIND_TAG = "feedback_kind"
 // The written words, duplicated onto the carrier because the feedback twin does
 // not always render them. See captureUserFeedback.
 private const val FEEDBACK_MESSAGE_KEY = "feedback_message"
+
+// A bug report's correlation handles, mirrored for the same reason as the
+// message. `feedback_log_id` is this app's KLog id, never a Sentry event id.
+private const val FEEDBACK_ERROR_CODE_KEY = "feedback_error_code"
+private const val FEEDBACK_LOG_ID_KEY = "feedback_log_id"
 
 // Enough to show a before and an after and the thing in between. Past that it
 // is a screen recording somebody wanted, and the carrier event is not the place

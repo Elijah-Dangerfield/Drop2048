@@ -31,11 +31,56 @@ To bypass in scripted contexts (not CI — `CI` env var is honored): `-Ddrop2048
 
 ---
 
+## Sentry (one script)
+
+The app ships with crash reporting off: `telemetry.properties` has a blank
+`sentry.dsn`, nothing initialises, and nothing costs anything at runtime. Turn
+it on once and it is on for every developer and every build type:
+
+```sh
+./scripts/setup_sentry.main.kts
+```
+
+It asks for one thing, a Sentry **user** auth token, then creates or adopts the
+project, writes the DSN into `telemetry.properties`, sets the CI variables, and
+finishes by sending a real event and waiting for it to arrive. It prints
+whether that worked. If it says the event did not arrive, the setup is not done
+— the whole point of the check is that a broken Sentry setup otherwise looks
+identical to a working one.
+
+Re-run it any time; every step is an upsert.
+
+**Get the right token.** Sentry has two kinds and they are not interchangeable:
+
+| Token | Where | Scopes | Use it for |
+| --- | --- | --- | --- |
+| **User** | Settings → Account → API → [Auth Tokens](https://sentry.io/settings/account/api/auth-tokens/) | Selectable — tick `project:read`, `project:write`, `org:read` | This script. Used during the run, never stored. |
+| **Organization** (`sntrys_…`) | Settings → Organization Tokens | Exactly `org:ci`, not selectable | CI only (`SENTRY_AUTH_TOKEN`). 403s every read endpoint, so the script cannot use it. |
+
+Handing the script an organization token gets a 403 from the first call and
+looks like a broken token. It isn't; it's the wrong one.
+
+Then **commit `telemetry.properties`.** The DSN belongs in git. It is a
+write-only ingest endpoint that ships inside every store binary — anyone can
+read it out of a published build in minutes — so it is not a secret, and any
+scheme where each developer configures it locally means fresh clones silently
+report nothing.
+
+This repo has no GitHub remote, so the CI step prints "No GitHub repo reachable
+via gh" and skips. That is the expected path here, not a failure — the DSN and
+the test event are the parts that matter.
+
+Dev versus prod needs no extra work. One project takes everything; the
+`environment` tag is `{releaseChannel}-{platform}-{buildType}`, giving
+`dev-android-debug` through `store-ios-release`.
+
+---
+
 ## GitHub secrets (only if you enabled CI)
 
 Set under **Settings → Secrets and variables → Actions**. All are required for `release.yml` to ship.
 
-**Do this once, not once per app.** Every value below except `SENTRY_DSN` and `SENTRY_PROJECT` belongs to your Apple team, your Play developer account, or your Sentry org, and is identical for every project this template generates. Keep the certificate, the `.p8`, the upload keystore and the service-account JSON in one private folder outside any repo, with a script that runs `gh secret set` against a named repo. A new app then costs two values, not fifteen. See [release-automation.md → Secrets and variables](../docs/release-automation.md#secrets-and-variables).
+**Do this once, not once per app.** Every value below except `SENTRY_PROJECT` belongs to your Apple team, your Play developer account, or your Sentry org, and is identical for every project this template generates. Keep the certificate, the `.p8`, the upload keystore and the service-account JSON in one private folder outside any repo, with a script that runs `gh secret set` against a named repo. A new app then costs two values, not fifteen. See [release-automation.md → Secrets and variables](../docs/release-automation.md#secrets-and-variables).
 
 The one item that cannot be reissued is the Android upload keystore: once an app has shipped a build signed with it, losing it means asking Google to reset the upload key. Everything else on this page can be regenerated from a console in minutes.
 
@@ -66,14 +111,25 @@ The one item that cannot be reissued is the Android upload keystore: once an app
 | Secret | Notes |
 | --- | --- |
 | `SENTRY_AUTH_TOKEN` | Sentry → **Settings → Organization Tokens** → Create New Organization Token (`sntrys_…`). Used by `beta.yml`/`release.yml` to create releases + upload mappings/dSYMs. Organization tokens carry exactly one scope, `org:ci`, and it is not selectable: release creation, source map upload, code mappings. That is all CI needs. Do **not** go looking for `org:read` or `project:releases` to tick; those belong to personal tokens and are not offered here. A healthy org token also answers 403 to Sentry's read endpoints, so do not treat that as a broken token. |
-| `SENTRY_DSN` | Sentry → Project Settings → Client Keys (DSN). Baked into store builds so crash reporting is live; blank leaves crash reporting dormant. |
 
-And under **Settings → Secrets and variables → Actions → Variables** (not secrets):
+`./scripts/setup_sentry.main.kts` sets this one for you, along with the two
+variables below, under **Settings → Secrets and variables → Actions →
+Variables** (not secrets):
 
 | Var | Value |
 | --- | --- |
 | `SENTRY_ORG` | Your Sentry org slug |
 | `SENTRY_PROJECT` | Your Sentry project slug |
+
+There is no `SENTRY_DSN` secret. The DSN lives in the committed
+`telemetry.properties` — see [Sentry](#sentry-one-script) for why. The
+environment variable is still read first, so you can point one workflow
+somewhere else, but you should not need to, and setting it silently overrides
+the committed file for every build in the repo (see the 2026-09-16 entry in
+`docs/decisions.md`).
+`release.yml` fails before it builds anything if neither is set: a store build
+with crash reporting off ships blind, and that is not something to discover
+from a review rejection.
 
 ### Grafana Cloud telemetry (optional)
 

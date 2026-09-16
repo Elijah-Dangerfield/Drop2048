@@ -6,6 +6,53 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-16 — The Sentry DSN is committed, and the `SENTRY_DSN` secret stays as an escape hatch
+
+**What happened:** the DSN lived only in the gitignored `local.properties`, so a
+fresh clone reported nothing and said nothing about it — blank is a supported
+value meaning "off". Ported from the template (`e8492f3`, `0f44f9f`, `e02a438`,
+`77b7c42`): a committed `telemetry.properties` at the repo root, a
+`scripts/setup_sentry.main.kts` that fills it from the Sentry API, and a fourth
+resolution tier in `loadTelemetryMetadata`.
+
+**Why committing it is safe:** a DSN is a write-only ingest endpoint. It ships
+inside every store binary on both platforms, so anyone can read it out of a
+published build in minutes. Treating it as a secret buys nothing and costs the
+thing that matters. The Grafana `glc_` token is the opposite — a real write
+credential, auto-revoked by Grafana when it appears in a public repo — and stays
+in CI secrets or `local.properties`.
+
+**The precedence, which is the part that will bite somebody.** Resolution is
+env → `local.properties` → `telemetry.properties` → blank. So a set `SENTRY_DSN`
+secret **silently wins over the committed file for every build in the repo**,
+with no log line and no failed step. Nothing about that is discoverable from the
+workflow file alone, which is why it is written here.
+
+**The decision: keep the `SENTRY_DSN` env line** in `beta.yml` and `release.yml`
+rather than deleting it, mirroring the template. It is the only way to point one
+workflow at a different Sentry project without a commit, and it is what makes the
+release guard able to accept either source. It is expected to be **unset**.
+
+Two things make the override visible rather than silent, which is what was
+actually wrong with keeping it:
+
+- The release preflight logs a **warning** when both a secret and a committed
+  value are present and they differ.
+- `SETUP.md` now says there is no `SENTRY_DSN` secret to set, and says why.
+
+**Rejected: deleting the env lines.** It would make the committed file the only
+source, which reads cleaner, but it diverges from the template for no gain here
+and removes the one hatch that does not require a commit to a tagged release.
+Currently academic either way — this repo has no GitHub remote and no secrets
+are set — which is exactly why it is cheap to settle now rather than after
+somebody sets one.
+
+**Also landed:** the release job `build-number` becomes `Resolve build number +
+preflight` and fails the release if neither source has a DSN. Both `android` and
+`ios` already depend on that job, so one check covers the whole ship. It was
+landed after `telemetry.properties` existed, not before, or the next release
+would have failed on a file that was not there yet.
+
 ## 2026-09-14 — Ads are visible in a debug build, and structurally absent from a release one
 
 **What happened:** nobody had ever seen this app's interstitial, including the

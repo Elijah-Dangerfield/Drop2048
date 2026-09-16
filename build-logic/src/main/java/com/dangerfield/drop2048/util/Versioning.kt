@@ -121,17 +121,24 @@ data class TelemetryMetadata(
 )
 
 /**
- * Client telemetry credentials, injected at build time so no secret lives in
- * source. Resolution for each value: CI env (`GRAFANA_OTLP_BASE_URL` /
- * `GRAFANA_OTLP_INSTANCE_ID` / `GRAFANA_LOGS_WRITE_TOKEN` / `SENTRY_DSN`, set
- * from repo secrets in beta/release workflows) → `local.properties`
- * (`grafana.otlpBaseUrl` / `grafana.otlpInstanceId` / `grafana.logsWriteToken`
- * / `sentry.dsn`, per-dev) → blank.
+ * Client telemetry credentials. Resolution for each value: CI env
+ * (`GRAFANA_OTLP_BASE_URL` / `GRAFANA_OTLP_INSTANCE_ID` /
+ * `GRAFANA_LOGS_WRITE_TOKEN` / `SENTRY_DSN`, set from repo secrets in
+ * beta/release workflows) → `local.properties` (per-dev) → the committed
+ * `telemetry.properties` → blank.
+ *
+ * Only the Sentry DSN is meant to be in the committed file. It is a write-only
+ * ingest endpoint that ships inside every store binary, so it is not a secret,
+ * and keeping it in a per-developer file is what made every fresh clone report
+ * nothing. `scripts/setup_sentry.main.kts` writes it there. The Grafana values
+ * are real write credentials — Grafana auto-revokes `glc_` tokens it finds in
+ * public repos — so they stay in CI secrets or `local.properties`.
  *
  * Blank values leave the corresponding pipe dormant: no Grafana credentials →
  * `GrafanaCloud.isConfigured` is false and app events stay local; no Sentry
- * DSN → `SentryRuntimeConfig.isEnabled` is false and crash reporting no-ops.
- * The app builds and runs either way, so a fresh clone works with zero setup.
+ * DSN → `SentryRuntimeConfig.isEnabled` is false, `Sentry.init` is never
+ * called, and crash reporting costs nothing at runtime. The app builds and runs
+ * either way, so a fresh clone works with zero setup.
  */
 fun Project.loadTelemetryMetadata(): TelemetryMetadata {
     val properties = Properties()
@@ -140,9 +147,16 @@ fun Project.loadTelemetryMetadata(): TelemetryMetadata {
         FileInputStream(localProperties).use(properties::load)
     }
 
+    val committed = Properties()
+    val telemetryProperties = rootProject.file("telemetry.properties")
+    if (telemetryProperties.exists()) {
+        FileInputStream(telemetryProperties).use(committed::load)
+    }
+
     fun resolve(env: String, key: String): String =
         System.getenv(env)?.takeIf { it.isNotBlank() }
             ?: properties.stringOrNull(key)
+            ?: committed.stringOrNull(key)
             ?: (findProperty(key) as? String)?.takeIf { it.isNotBlank() }
             ?: ""
 

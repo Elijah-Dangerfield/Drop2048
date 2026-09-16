@@ -33,7 +33,8 @@ Submitting feedback produces **two linked records**, and you usually need both:
    `Bug report` or `User feedback`, at `INFO` level so it does not sort with the
    crashes. It carries the tags (`feedback_kind`, `diagnostics_opt_in`,
    `session_id`, `install_id`, `route`, `commit_sha`, `commit_branch`), the
-   `feedback_message` extra, and the attachments: `feedback.txt`, sometimes
+   `feedback_message` extra (plus `feedback_error_code` and `feedback_log_id`
+   on a bug report that had them), and the attachments: `feedback.txt`, sometimes
    `session-log.txt`, and up to three `screenshot-N.jpg`.
 2. **The feedback twin.** Sentry's own user-feedback record, linked by
    `associated_event_id`. Same words, plus the build line.
