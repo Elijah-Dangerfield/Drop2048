@@ -6,6 +6,177 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-16 · D25 — A config key with no reader fails the build, and `pro.price.tier` is deleted
+
+**What happened:** D24 found that `feature.leaderboards` had been declared,
+documented as a kill switch, covered by its own unit test, listed in the admin
+console and shown in the QA menu, while being read by nothing at all. Flipping it
+switched nothing off. This is the audit of every other key.
+
+**Result: one more.** `ProPriceTier` (`pro.price.tier`) had no production
+consumer either. The other thirty-six all do, and every one of them is genuinely
+*read* rather than merely accepted as a constructor parameter, which was checked
+separately because an injected-and-ignored value fails in exactly the same silent
+way.
+
+### `pro.price.tier` is deleted, not wired
+
+Its `description` said "Store product id the paywall requests". Three things were
+wrong with that, and none of them could be seen from the key:
+
+1. **The paywall does not request it.** `PaywallViewModel` and `RealEntitlements`
+   both use `ProductIds.pro`, whose own KDoc says in as many words that a product
+   id is a store operation and is deliberately not in remote config, because an
+   outage that emptied it would take Pro down. Two committed positions in direct
+   contradiction, with the code implementing the other one.
+2. **Its default was wrong.** `pro_299`, against a real product id of
+   `drop2048_pro`. Wiring it as documented would have asked the store for a
+   product that does not exist, and Pro would have become unbuyable. A default
+   nobody reads is a default nobody checks.
+3. **It could have revoked a paid entitlement.** `RealEntitlements.restore` and
+   `refreshFromStore` key ownership on the same id, and `StoreOwnership.NotOwned`
+   writes `setPurchased(false)`. A remote product-id change would therefore have
+   read every existing purchase as absent and cleared it. That is not a price
+   experiment, it is a remote kill switch for things people paid for.
+
+The price itself already comes from the store through `priceLabel`, which is the
+correct source and was already wired. A real price experiment is a store-side
+price change on one product, not a client config that swaps product ids.
+
+**Alternative considered:** wiring it with the correct default and keying
+entitlement checks on a separate, non-remote id, so only the *purchase* path used
+the configured one. Rejected: two ids for one product is a state where a player
+can buy something the app will not then recognise, and the feature being bought
+is a price experiment nobody has asked for.
+
+### The guard is a source scan, and the reasoning is about what a runtime cannot see
+
+`ConfigValuesHaveReadersTest` walks the repo, finds every concrete
+`ConfiguredValue` declaration, and fails when one has no constructor-injection or
+construction site in non-test, non-QA production code.
+
+**Reflection was the first idea and it cannot work.** The question is "does
+anything inject this", and a DI graph only knows what it can *provide*. By the
+time a test can enumerate the `Set<QaConfigValue>` multibinding, an unread key and
+a read one are the same object with the same bindings. The injection site exists
+only in source, so the test reads source.
+
+That makes it a grep with a reason, and it is worth saying plainly: a consumer
+written in a shape the pattern does not recognise would be a false alarm, and the
+fix then is to widen the pattern rather than to add an exemption. What it cannot
+be defeated by is forgetting, which is the failure that actually happened twice.
+
+Two guards against it passing vacuously, both of which earn their keep: a floor on
+the number of Kotlin files found, because a wrong repo root would otherwise make
+it green by finding nothing, and a floor on the number of declarations matched,
+because a declaration pattern that stopped matching looks exactly like a codebase
+with no config in it.
+
+**It was proved by failing.** A throwaway unread key was added, the test named it,
+and the key was removed again — the same method AGENTS.md prescribes for detekt
+rules, and for the same reason: a structural check that never fires and a
+structural check that is not running are identical from the build output. The
+first real run also earned its place immediately by reporting `LevelLadderConfig`,
+a class that exists only inside a KDoc worked example, which is why the scan
+strips comments before matching. The mirror case is the one that would have been
+silent: `OfflineFirstAppConfigRepository` names `ConfigRefreshThrottleMs` twice in
+prose, and a key counted as read on the strength of a sentence describing it would
+have reintroduced the whole bug.
+
+**Alternative considered:** a detekt rule. Rejected because detekt rules run
+per-file and this is a whole-project question, and because the repo has already
+been bitten by custom rules that silently fail to dispatch (AGENTS.md). A plain
+unit test in CI has neither problem.
+
+**The doctrine that caused this is retired.** `MonetizationConfigValues` used to
+open by saying its keys had no consumer yet and that this was the point, which was
+true and reasonable at C7, when `:libraries:ads`, `:libraries:billing`, the Daily
+Challenge and the leaderboards were all still ahead. Every one of those has landed.
+Declaring a key ahead of its reader is now how a key ends up never having one, so
+the rule is: add the reader in the same change, or do not add the key.
+
+---
+
+## 2026-09-16 · D24 — There is no Daily leaderboard, and the boards that remain got four fixes
+
+**Decision:** `Leaderboard.DailyScore` is deleted. SPEC 15 asked for three boards
+and two ship: all-time high score, which is the one this feature exists for, and
+the weekly recurring window on the same value. A finished Daily run now posts to
+no board at all.
+
+**Why.** A board ranks players on a quantity. The Daily gives everybody one seed
+and a capped number of attempts, so the ceiling of a Daily score is a property of
+that day's board rather than of the player, and the top of the table is whoever
+got the kindest drops rather than whoever plays best. D19 had already ruled that
+a Daily score cannot be compared to an Endless one; the part that was wrong was
+assuming it was therefore comparable to another Daily score. Two players who
+both played the seed perfectly do not tie, they differ by spawn luck, and one
+attempt each means there is no second sample to average it out.
+
+The Daily keeps its streak badges, which reward turning up rather than rolling
+well, and SPEC 14 is otherwise untouched.
+
+**Alternative considered:** keeping it and accepting the noise, on the grounds
+that a shared seed is the fairest comparison any daily puzzle game offers.
+Rejected because the fairness argument is about the *seed* and the noise is in
+the *spawns*, and because a third board splits a small player base three ways.
+A leaderboard nobody is on is worse than no leaderboard.
+
+`GameViewModel.postToLeaderboards` keeps its exhaustive `when` with an empty
+`DAILY` arm rather than dropping to an `else`. An `else` would silently route the
+next mode anyone adds onto the all-time board, which is the exact failure D19 is
+about.
+
+### Four things found in the same pass, all of them silent
+
+**A recurring board cannot be deduplicated on this side.** `RealLeaderboards`
+remembers the best value the platform has accepted and declines to resend
+anything no better. Correct for an all-time board, wrong for the weekly one: the
+platform resets that window on its own clock, this process cannot see the reset,
+so an app alive across the boundary drops its first score of the new week for
+failing to beat last week's, and the player is absent from the new board
+entirely. `Leaderboard.recurring` now exempts it. Modelling the window here
+instead was rejected: it means agreeing with a recurrence start the owner typed
+into App Store Connect, and a disagreement is the same silent skip somewhere
+harder to find. The cost of the fix is one network call per run.
+
+**`feature.leaderboards` had no reader.** The kill switch was defined in
+`:libraries:gameconfig`, documented as "off hides the entry point", covered by
+its own unit test, and consulted by nothing anywhere in the app. Switching it off
+switched nothing off. It is now read in `RealLeaderboards`, and it stops
+submissions and reports as well as the entry point: the reason to reach for this
+switch is a board that has gone wrong, and hiding the row while still posting to
+it is not what anybody flipping it expects. This is worth a second look at the
+other SPEC 10 flags, since nothing in the build can tell a wired kill switch from
+an unwired one.
+
+**Twenty-four achievements existed and none of them reached Game Center.**
+`GameServices` had no achievement surface at all, so every badge was local and
+invisible on the player's profile, which is most of the reason a player cares
+about one. `GKAchievement.reportAchievements` now backs a new seam, and
+`AchievementPlatformSync` observes the stored unlock set rather than hooking
+`endRun`. Observing is what makes the signed-out case work: the set is re-folded
+from the fact log on every launch, so a player who earned five badges before
+signing in gets all five when they do, and a report that dies mid-flight is
+retried on the next launch rather than lost. The ids are derived from
+`AchievementId.name` for the reason `ScoreLadder` derives its rungs, and
+`PlatformAchievementIdTest` is what holds the two catalogs together.
+
+**The sign-in entry point could go dead.** `GameCenterServices.present` cleared
+the held sign-in view controller as it presented it, assuming GameKit would call
+the authentication handler again to say what happened. A player who swipes the
+sheet away without finishing may produce no such call: the status stays
+`SignInRequired`, so the row stays drawn, and with the screen already discarded
+every later tap did nothing at all. The screen is now dropped only by
+`onAuthenticationChanged`, once the platform has actually changed its mind.
+
+**Unrelated, found while reading the project file:** the iOS target's Release
+configuration had `IPHONEOS_DEPLOYMENT_TARGET = 26.1` against Debug's `18.2`, so
+a store build would have been installable on almost nothing. Release now matches
+Debug.
+
+---
+
 ## 2026-09-16 — The Sentry DSN is committed, and the `SENTRY_DSN` secret stays as an escape hatch
 
 **What happened:** the DSN lived only in the gitignored `local.properties`, so a

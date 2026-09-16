@@ -23,9 +23,10 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * When Play Games does arrive it replaces this file and nothing else. The seam
  * above is already the right shape for it: `GamesSignInClient` answers
  * [startAuthentication], `LeaderboardsClient.submitScore(id, value)` answers
- * [submit], and `getLeaderboardIntent` answers [presentDashboard]. What it does
- * need is a second id per board, because Play mints its own, and `Leaderboard`
- * says where that goes.
+ * [submit], `AchievementsClient.unlock(id)` answers [reportAchievement], and
+ * `getLeaderboardIntent` answers [presentDashboard]. What it does need is a
+ * second id per board, because Play mints its own, and `Leaderboard` says where
+ * that goes — along with the same treatment for `platformAchievementId`.
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
@@ -39,6 +40,9 @@ class NoGameServices : GameServices {
     override fun startAuthentication() = Unit
 
     override suspend fun submit(leaderboardId: String, value: Long): SubmitResult =
+        SubmitResult.NotAuthenticated
+
+    override suspend fun reportAchievement(achievementId: String): SubmitResult =
         SubmitResult.NotAuthenticated
 
     override suspend fun presentDashboard(leaderboardId: String?) = Unit

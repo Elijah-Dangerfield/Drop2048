@@ -272,8 +272,12 @@ or a file.
 14. **The Pro IAP product**, `drop2048_pro`, non-consumable / managed, $2.99, created on both
     stores.
 15. **Game Center leaderboard ids**, exactly as typed in `Leaderboard.kt`:
-    `com.dangerfield.drop2048.leaderboard.score_alltime`, `…score_weekly` (recurring weekly),
-    `…daily` (recurring daily, rolling at **00:00 UTC**, SPEC 14's boundary).
+    `com.dangerfield.drop2048.leaderboard.score_alltime` (classic) and `…score_weekly`
+    (recurring weekly). There is no Daily board; D24 cut it.
+15b. **Game Center achievement ids**, all 24, one per `AchievementId` entry under the
+    `com.dangerfield.drop2048.achievement.` prefix. The full list is in `OWNER-TODO.md`. Each is
+    one-step and not hidden. An id changed after a player earns it orphans that badge on their
+    profile, so treat these as permanent once the first build ships.
 16. **Sentry DSN** per environment, and **Grafana OTLP endpoint, instance id and write token**.
     Without them both telemetry pipes are off in any build, and every analytics row in
     `data-safety.md` describes a build that does not exist yet.

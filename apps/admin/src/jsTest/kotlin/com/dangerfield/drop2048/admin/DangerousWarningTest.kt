@@ -51,7 +51,7 @@ class DangerousWarningTest {
     fun `the ad and Pro keys do not warn`() {
         assertNull(dangerousWarning("ads.enabled", "false"))
         assertNull(dangerousWarning("ads.interstitial.cooldownSeconds", "300"))
-        assertNull(dangerousWarning("pro.price.tier", "\"pro_499\""))
+        assertNull(dangerousWarning("pro.upsell.enabled", "false"))
         assertNull(dangerousWarning("feature.dailyChallenge", "false"))
     }
 

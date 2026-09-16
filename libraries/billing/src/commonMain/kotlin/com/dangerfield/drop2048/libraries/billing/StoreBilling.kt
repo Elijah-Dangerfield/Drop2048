@@ -83,9 +83,10 @@ interface StoreBilling {
      * Localised price as the store formats it ("$2.99", "2,99 €"), or null when
      * the store could not be reached.
      *
-     * Never hardcode a price. It is set per storefront, and SPEC 10 keeps it out
-     * of remote config for the same reason: `pro.price.tier` chooses *which*
-     * configured product to ask for, and the store owns what it costs.
+     * Never hardcode a price. It is set per storefront and the store owns it,
+     * which is why SPEC 10 keeps the amount out of remote config. The *product*
+     * is not remote either — see [ProductIds.pro], and D25 for the key that
+     * claimed otherwise and was deleted.
      */
     suspend fun priceLabel(productId: String): String?
 }

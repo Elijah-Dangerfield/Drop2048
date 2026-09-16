@@ -544,10 +544,17 @@ internal class FakeLeaderboards : Leaderboards {
     val submissions = mutableListOf<Pair<Leaderboard, Long>>()
     val dashboards = mutableListOf<Leaderboard?>()
 
+    /** Every set declared to the platform, in order. The ViewModel never calls this. */
+    val reportedUnlocks = mutableListOf<Set<String>>()
+
     override val isOfferable = MutableStateFlow(false)
 
     override fun submit(board: Leaderboard, value: Long) {
         submissions += board to value
+    }
+
+    override fun reportUnlocked(achievementNames: Set<String>) {
+        reportedUnlocks += achievementNames
     }
 
     override fun openDashboard(board: Leaderboard?) {

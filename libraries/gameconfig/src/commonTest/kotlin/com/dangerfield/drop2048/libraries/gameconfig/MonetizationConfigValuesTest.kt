@@ -26,7 +26,6 @@ class MonetizationConfigValuesTest {
         assertEquals(3, InterstitialSuppressDaysSinceInstall(map)())
         assertEquals(2, RewardedContinuesPerRun(map)())
         assertEquals(1, RewardedDailyRetriesPerDay(map)())
-        assertEquals("pro_299", ProPriceTier(map)())
         assertTrue(ProUpsellEnabled(map)())
     }
 
@@ -49,7 +48,6 @@ class MonetizationConfigValuesTest {
                 "ads.interstitial.suppressDaysSinceInstall" to 7,
                 "ads.rewarded.continuesPerRun" to 1,
                 "ads.rewarded.dailyRetriesPerDay" to 2,
-                "pro.price.tier" to "pro_499",
                 "pro.upsell.enabled" to false,
                 "feature.dailyChallenge" to false,
                 "feature.leaderboards" to false,
@@ -63,7 +61,6 @@ class MonetizationConfigValuesTest {
         assertEquals(7, InterstitialSuppressDaysSinceInstall(map)())
         assertEquals(1, RewardedContinuesPerRun(map)())
         assertEquals(2, RewardedDailyRetriesPerDay(map)())
-        assertEquals("pro_499", ProPriceTier(map)())
         assertFalse(ProUpsellEnabled(map)())
         assertFalse(DailyChallengeEnabled(map)())
         assertFalse(LeaderboardsEnabled(map)())

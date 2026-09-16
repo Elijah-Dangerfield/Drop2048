@@ -6,12 +6,14 @@ import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.logEvent
 import com.dangerfield.drop2048.libraries.flowroutines.AppCoroutineScope
+import com.dangerfield.drop2048.libraries.gameconfig.LeaderboardsEnabled
 import com.dangerfield.drop2048.libraries.leaderboards.GameServices
 import com.dangerfield.drop2048.libraries.leaderboards.GameServicesStatus
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
 import com.dangerfield.drop2048.libraries.leaderboards.NoLeaderboards
 import com.dangerfield.drop2048.libraries.leaderboards.SubmitResult
+import com.dangerfield.drop2048.libraries.leaderboards.platformAchievementId
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -25,8 +27,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
- * The real [Leaderboards]: when a number is worth sending, and what happens to
- * one that could not be sent yet.
+ * The real [Leaderboards]: when something is worth sending, and what happens to
+ * something that could not be sent yet.
  *
  * ## The case this exists for
  *
@@ -36,15 +38,14 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * nothing, and without somewhere to put it the score is lost until the *next*
  * run, which on a first session is often never. So an unsendable value is held,
  * one slot per board, newest wins, and flushed the moment authentication lands.
- * That single behaviour is most of what this class is.
+ * That single behaviour is most of what this class is. Badges go through the
+ * same hold: a player who earns five of them before signing in gets all five.
  *
  * The held values are in memory only. A process death loses them, which is
- * correct rather than a shortcut: [Leaderboard.AllTimeScore] and
- * [Leaderboard.WeeklyScore] are recomputed and resent at the end of the next
- * run, so persisting them would be caching something already on disk in a more
- * fragile form. A Daily score is the one that a process death can strand for the
- * day, and that is the accepted cost of not adding an outbox for a value the
- * player can resend by playing.
+ * correct rather than a shortcut: both boards are recomputed and resent at the
+ * end of the next run, and the badge set is re-derived from the fact log on
+ * every launch, so persisting either would be caching something already on disk
+ * in a more fragile form.
  *
  * ## The other half: not sending
  *
@@ -53,6 +54,15 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * best is submitted after every run and only changes on a personal best, so
  * without this the app would spend a network call per run to tell Game Center a
  * number it already has.
+ *
+ * **[Leaderboard.recurring] boards are exempt**, and that exemption is a bug fix
+ * rather than an optimisation the recurring case happens to miss. The platform
+ * resets a recurring window on its own clock; this process cannot see the reset,
+ * so [submitted] goes on describing a board that no longer exists. An app alive
+ * across the weekly boundary would drop its first score of the new week for not
+ * beating last week's, and the player would be absent from the new board
+ * entirely. [Leaderboard] carries the reasoning for fixing it there rather than
+ * by modelling the window here.
  *
  * ## Failure
  *
@@ -77,11 +87,12 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 class RealLeaderboards(
     private val services: GameServices,
     private val appScope: AppCoroutineScope,
+    private val featureEnabled: LeaderboardsEnabled,
 ) : Leaderboards, AutoInit {
 
     private val logger = KLog.withTag("Leaderboards")
 
-    /** Guards [pending] and [submitted], which are read-modify-write from several coroutines. */
+    /** Guards every map and set below, all of which are read-modify-write from several coroutines. */
     private val lock = Mutex()
 
     /** The best value per board that has not been accepted yet. At most one entry per board. */
@@ -90,8 +101,24 @@ class RealLeaderboards(
     /** The best value per board the platform has accepted this process. */
     private val submitted = mutableMapOf<Leaderboard, Long>()
 
+    /** Badge names the platform has not been told about yet. */
+    private val pendingAchievements = mutableSetOf<String>()
+
+    /** Badge names the platform has accepted this process. */
+    private val reportedAchievements = mutableSetOf<String>()
+
+    /**
+     * The kill switch is read on every emission rather than once, so flipping
+     * `feature.leaderboards` off takes the entry point away at the next status
+     * change instead of at the next launch. It is not observable on its own —
+     * `ConfiguredValue` is a read, not a flow — which is the honest limit of a
+     * kill switch built on a config map, and the reason [submit] checks it too.
+     */
     override val isOfferable: StateFlow<Boolean> = services.status
-        .map { it == GameServicesStatus.Authenticated || it == GameServicesStatus.SignInRequired }
+        .map { status ->
+            featureEnabled() &&
+                (status == GameServicesStatus.Authenticated || status == GameServicesStatus.SignInRequired)
+        }
         .stateIn(appScope, SharingStarted.Eagerly, false)
 
     init {
@@ -105,10 +132,17 @@ class RealLeaderboards(
     }
 
     override fun submit(board: Leaderboard, value: Long) {
+        if (!featureEnabled()) return
         appScope.launch { record(board, value) }
     }
 
+    override fun reportUnlocked(achievementNames: Set<String>) {
+        if (!featureEnabled()) return
+        appScope.launch { recordUnlocked(achievementNames) }
+    }
+
     override fun openDashboard(board: Leaderboard?) {
+        if (!featureEnabled()) return
         appScope.launch {
             Catching { services.presentDashboard(board?.id) }
                 .logOnFailure { "Could not present the leaderboard dashboard" }
@@ -118,12 +152,13 @@ class RealLeaderboards(
     /**
      * There is no separate guard for zero, which is what a run that stacked out
      * on the opening drop reports. Nothing has been accepted yet, so [submitted]
-     * reads as 0 and the improvement test below already drops it. A second guard
-     * would be a second thing to keep in step.
+     * reads as 0 and the improvement test below already drops it — including on
+     * a recurring board, where the floor is the only part of that test left.
      */
     private suspend fun record(board: Leaderboard, value: Long) {
         val worthSending = lock.withLock {
-            if (value <= submitted.bestFor(board)) {
+            val floor = if (board.recurring) 0L else submitted.bestFor(board)
+            if (value <= floor) {
                 false
             } else {
                 pending[board] = maxOf(pending.bestFor(board), value)
@@ -133,8 +168,17 @@ class RealLeaderboards(
         if (worthSending) flush()
     }
 
+    private suspend fun recordUnlocked(names: Set<String>) {
+        val worthSending = lock.withLock {
+            val unreported = names - reportedAchievements
+            pendingAchievements += unreported
+            pendingAchievements.isNotEmpty()
+        }
+        if (worthSending) flush()
+    }
+
     /**
-     * The whole flush holds the lock, including the network call inside it.
+     * The whole flush holds the lock, including the network calls inside it.
      * Nothing on a screen is waiting on this, and the alternative is two
      * concurrent flushes sending the same value twice.
      */
@@ -143,6 +187,7 @@ class RealLeaderboards(
 
         lock.withLock {
             pending.toMap().forEach { (board, value) -> send(board, value) }
+            pendingAchievements.toSet().forEach { name -> report(name) }
         }
     }
 
@@ -150,6 +195,11 @@ class RealLeaderboards(
      * Both writes at the end are plain rather than a max, because [flush] holds
      * the lock across the whole network call: nothing can have raised either map
      * since this value was read out of it.
+     *
+     * A recurring board is cleared from [pending] like any other but its accepted
+     * value is deliberately *not* written to [submitted] — leaving it out is what
+     * keeps [record]'s exemption true for the life of the process rather than
+     * only until the first acceptance.
      */
     private suspend fun send(board: Leaderboard, value: Long) {
         val result = Catching { services.submit(board.id, value) }
@@ -161,13 +211,29 @@ class RealLeaderboards(
             return
         }
 
-        submitted[board] = value
+        if (!board.recurring) submitted[board] = value
         pending.remove(board)
         logger.logEvent(
             "leaderboard.submitted",
             "board" to board.name,
             "value" to value,
         )
+    }
+
+    private suspend fun report(name: String) {
+        val id = platformAchievementId(name)
+        val result = Catching { services.reportAchievement(id) }
+            .logOnFailure { "Achievement report threw for $id" }
+            .getOrDefault(SubmitResult.Failed)
+
+        if (result != SubmitResult.Submitted) {
+            logger.d { "Achievement $name not reported ($result); holding it" }
+            return
+        }
+
+        reportedAchievements += name
+        pendingAchievements -= name
+        logger.logEvent("leaderboard.achievement_reported", "achievement" to name)
     }
 
     private fun Map<Leaderboard, Long>.bestFor(board: Leaderboard): Long = this[board] ?: 0L

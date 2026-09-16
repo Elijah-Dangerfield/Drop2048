@@ -137,7 +137,7 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
   | Tutorial | `tutorial.started`, `tutorial.skipped`, `tutorial.completed` | `GameViewModel.kt:393,413,454` |
   | Ads | `ads.rewarded_requested`, `ads.rewarded_result`, `ads.continue_offered`, `ads.continue_result`, `ads.continue_declined`, `ads.interstitial_blocked` | `RealAdGate.kt:106-133`, `RealInterstitialGate.kt:134,146`, `GameViewModel.kt:1173,1227,1277` |
   | Monetization | `iap.paywall_shown`, `iap.purchase_result` (`outcome`, `error_kind`, `trigger`), `iap.restore_result` | `RealPaywallCoordinator.kt:65`, `RealEntitlements.kt:133,164` |
-  | Leaderboards | `leaderboard.submitted` (`board`, `value`) | `RealLeaderboards.kt:166` |
+  | Leaderboards | `leaderboard.submitted` (`board`, `value`), `leaderboard.achievement_reported` (`achievement`) | `RealLeaderboards.kt` |
   | Reliability | `net.backend_unreachable`, `net.offline_banner`, jank | `NetworkCall.kt:159`, `AppStateImpl.kt:66`, `AndroidJankMonitor.kt:68` |
   | Launch gates | `gate.raised` (`gate`, `blocking`) | `LaunchGateViewModel.kt:151` |
 
@@ -276,14 +276,19 @@ Product Interaction row now cover a good deal more, which is what those rows are
 ### 2.11 Game Center, iOS only
 
 - `libraries/leaderboards/impl/src/iosMain/.../GameCenterServices.kt` authenticates via
-  `GKLocalPlayer.local.authenticateHandler` (`:103`) and submits through `GKLeaderboard.submitScore`
-  (`:115-121`).
-- Three boards (`Leaderboard.kt`): `…leaderboard.score_alltime`, `…score_weekly`, `…daily`. The
-  value submitted is a score and nothing else. It goes to Apple, under the player's Game Center
-  identity; we receive nothing back and store nothing.
+  `GKLocalPlayer.local.authenticateHandler`, submits through `GKLeaderboard.submitScore`, and
+  reports badges through `GKAchievement.reportAchievements`.
+- Two boards (`Leaderboard.kt`): `…leaderboard.score_alltime` and `…score_weekly`. The Daily board
+  was cut by D24. The value submitted is a score and nothing else. It goes to Apple, under the
+  player's Game Center identity; we receive nothing back and store nothing.
+- **Achievements are also sent** (D24), as an id and a completion of 100%, nothing more. The ids
+  are the badge names already in the app's own catalog, which describe the badge and not the player.
+  The set of badges a player has earned is a thing we already hold locally, so nothing new about
+  them leaves the device beyond the fact that they earned it, sent to Apple under their own Game
+  Center identity.
 - We never read the Game Center player id, alias or display name. The only trace on our side is
-  `leaderboard.submitted` with `board` and `value`, which carries a score and a board name and no
-  identity.
+  `leaderboard.submitted` with `board` and `value`, and `leaderboard.achievement_reported` with an
+  achievement name. Neither carries an identity.
 - On Android there is no path at all: `NoGameServices` reports unavailable from construction.
 - **`iosApp.entitlements` now asks for Game Center and no longer asks for Sign in with Apple**
   (C13a, §8.4). That is a file edit, not a build: nobody on this machine can open Xcode

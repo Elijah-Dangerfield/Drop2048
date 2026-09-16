@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.libraries.leaderboards.impl
 
+import com.dangerfield.drop2048.libraries.config.AppConfigMap
+import com.dangerfield.drop2048.libraries.gameconfig.LeaderboardsEnabled
 import com.dangerfield.drop2048.libraries.leaderboards.GameServices
 import com.dangerfield.drop2048.libraries.leaderboards.GameServicesStatus
 import com.dangerfield.drop2048.libraries.leaderboards.SubmitResult
@@ -29,14 +31,22 @@ class FakeGameServices(
     /** Every dashboard request, including the nulls that mean "no focused board". */
     val dashboards = mutableListOf<String?>()
 
+    /** Every achievement id that reached the platform, in order, duplicates included. */
+    val reports = mutableListOf<String>()
+
     var startCalls = 0
         private set
 
     /** What [submit] answers. Flip it to model a rejection. */
     var result: SubmitResult = SubmitResult.Submitted
 
+    /** What [reportAchievement] answers, separately from [result]. */
+    var reportResult: SubmitResult = SubmitResult.Submitted
+
     /** Models a platform that throws rather than returning, which must not escape. */
     var throwOnSubmit: Boolean = false
+
+    var throwOnReport: Boolean = false
 
     fun becomes(next: GameServicesStatus) {
         state.value = next
@@ -52,7 +62,26 @@ class FakeGameServices(
         return result
     }
 
+    override suspend fun reportAchievement(achievementId: String): SubmitResult {
+        reports += achievementId
+        if (throwOnReport) error("Game Center exploded")
+        return reportResult
+    }
+
     override suspend fun presentDashboard(leaderboardId: String?) {
         dashboards += leaderboardId
     }
 }
+
+/**
+ * `LeaderboardsEnabled` over a map that answers one key, for the kill-switch
+ * tests. `AppConfigMap` is abstract rather than an interface and the only method
+ * that matters here is the `Boolean` read, so this stubs the flag rather than
+ * building a config layer the test does not otherwise use.
+ */
+fun leaderboardsEnabled(enabled: Boolean): LeaderboardsEnabled =
+    LeaderboardsEnabled(
+        object : AppConfigMap() {
+            override val map: Map<String, *> = mapOf("feature" to mapOf("leaderboards" to enabled))
+        },
+    )

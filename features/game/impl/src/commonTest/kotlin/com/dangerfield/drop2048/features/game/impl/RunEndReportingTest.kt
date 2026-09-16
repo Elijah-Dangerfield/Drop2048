@@ -48,13 +48,15 @@ class RunEndReportingTest : CoroutineTest() {
     }
 
     /**
-     * Decision D19. A Daily score is set on a seed everybody else also played,
-     * so it cannot be ranked against Endless runs — and this is the assertion
-     * that keeps the two apart, because nothing below the ViewModel knows which
-     * mode a value came from.
+     * Decisions D19 and D24. There is no Daily board, and a Daily score is set on
+     * a seed everybody else also played, so it cannot be ranked against Endless
+     * runs either — which leaves nowhere for it to go. This is the assertion that
+     * keeps it from going somewhere anyway, because nothing below the ViewModel
+     * knows which mode a value came from, and a Daily score on the all-time board
+     * is a leaderboard that no longer measures one thing.
      */
     @Test
-    fun aFinishedDailyRunPostsOnlyToTheDailyBoard() = runUnitTest {
+    fun aFinishedDailyRunPostsToNoBoardAtAll() = runUnitTest {
         val daily = FakeDailyRepository().grant()
         playing(picture = StackedOutBoard, fallingAt = Cell(2, 0), daily = daily) {
             act(GameAction.StartDaily)
@@ -62,10 +64,9 @@ class RunEndReportingTest : CoroutineTest() {
             waitOutResolution()
             declineContinue()
 
-            assertEquals(
-                listOf(Leaderboard.DailyScore to state.score),
-                leaderboards.submissions,
-                "a Daily score reached an Endless board, or none at all",
+            assertTrue(
+                leaderboards.submissions.isEmpty(),
+                "a Daily score reached a board: ${leaderboards.submissions}",
             )
         }
     }

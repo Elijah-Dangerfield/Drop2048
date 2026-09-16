@@ -19,9 +19,10 @@ import me.tatarka.inject.annotations.Inject
  *
  * [PaywallState.price] is null until the store answers, and the screen draws the
  * buy button without a number rather than with a guess. Hardcoding "$2.99" would
- * be wrong in every storefront that is not the US one and illegal in a few, and
- * `pro.price.tier` deliberately does not carry an amount — it chooses *which*
- * product to ask for, and the store owns what it costs.
+ * be wrong in every storefront that is not the US one and illegal in a few, so
+ * the number is whatever `priceLabel` returns for [ProductIds.pro] and nothing
+ * else. There is no config key in this path: `pro.price.tier` used to claim the
+ * product id was remote, was never read, and was deleted by D25.
  *
  * **There is no loading state, and that is a fix rather than an omission.** The
  * first version gated the whole sheet on `loading` until the price arrived. On a

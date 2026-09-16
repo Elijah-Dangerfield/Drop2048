@@ -4,7 +4,6 @@ import com.dangerfield.drop2048.libraries.config.AppConfigMap
 import com.dangerfield.drop2048.libraries.config.FlagConfigValue
 import com.dangerfield.drop2048.libraries.config.IntConfigValue
 import com.dangerfield.drop2048.libraries.config.QaConfigValue
-import com.dangerfield.drop2048.libraries.config.StringConfigValue
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
@@ -13,16 +12,28 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 /**
  * SPEC 10's ad, Pro and kill-switch keys.
  *
- * **These have no consumer yet and that is the point.** `:libraries:ads`,
- * `:libraries:billing`, C6's Daily Challenge and C9's leaderboards all land
- * later; BUILD-PLAN lists C10 as unblocked by C7 precisely because its gates are
- * config-driven. Declaring the keys now means each of those chunks reads a value
- * that already exists, already has a compiled-in default, and is already
- * editable in the admin console — instead of inventing a path and a default
- * under deadline.
- *
  * Every default is the number SPEC 12 states, so the compiled-in behaviour with
  * the server unreachable is the behaviour SPEC 12 describes.
+ *
+ * ## Declaring a key ahead of its reader is over
+ *
+ * This file used to open by saying these keys had no consumer yet and that this
+ * was the point: `:libraries:ads`, `:libraries:billing`, the Daily Challenge and
+ * the leaderboards all landed after C7, and declaring the paths early meant each
+ * chunk read a value that already existed rather than inventing one under
+ * deadline. Every one of those chunks has now landed.
+ *
+ * What the practice cost is recorded in D25. Two keys stayed unread after their
+ * feature shipped, and neither could be seen: a `ConfiguredValue` with no
+ * injection site compiles, passes its own unit test, appears in the QA menu, and
+ * is editable in the admin console. `feature.leaderboards` was a kill switch
+ * that killed nothing for a full release; `pro.price.tier` was deleted outright,
+ * because by the time anyone read it the id it defaulted to had stopped being
+ * the product id and wiring it would have revoked Pro from paying players.
+ *
+ * `ConfigValuesHaveReadersTest` in `androidUnitTest` now fails on a key with no
+ * production reader. **Add the reader in the same change as the key**, or do not
+ * add the key.
  */
 
 @Inject
@@ -99,21 +110,6 @@ class RewardedDailyRetriesPerDay(appConfigMap: AppConfigMap) : IntConfigValue(ap
     override val description = "Rewarded Daily Challenge retries per UTC day. SPEC 12: 1."
     override val path = "ads.rewarded.dailyRetriesPerDay"
     override val default = 1
-}
-
-/**
- * The store's price tier id, not a currency amount. Price is set per-store and
- * this key only chooses which configured product the paywall asks for, so a
- * price experiment does not need a binary.
- */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class ProPriceTier(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap) {
-    override val name = "Pro price tier"
-    override val description = "Store product id the paywall requests. SPEC 12: \$2.99 at v1 scope."
-    override val path = "pro.price.tier"
-    override val default = "pro_299"
 }
 
 @Inject

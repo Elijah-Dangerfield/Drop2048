@@ -43,7 +43,6 @@ class ConfigCatalogTest {
             "ads.interstitial.suppressDaysSinceInstall",
             "ads.rewarded.continuesPerRun",
             "ads.rewarded.dailyRetriesPerDay",
-            "pro.price.tier",
             "pro.upsell.enabled",
             "feature.dailyChallenge",
             "feature.leaderboards",

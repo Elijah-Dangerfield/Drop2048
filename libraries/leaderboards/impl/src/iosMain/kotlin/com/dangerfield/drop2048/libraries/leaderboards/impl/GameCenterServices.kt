@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Inject
 import platform.Foundation.NSError
 import platform.Foundation.NSOperationQueue
+import platform.GameKit.GKAchievement
 import platform.GameKit.GKGameCenterControllerDelegateProtocol
 import platform.GameKit.GKGameCenterViewController
 import platform.GameKit.GKGameCenterViewControllerStateLeaderboards
@@ -85,7 +86,11 @@ class GameCenterServices : GameServices {
     /** Main queue only, like everything GameKit hands back. */
     private var installed = false
 
-    /** Main queue only. The sign-in screen GameKit gave us, held until asked for. */
+    /**
+     * Main queue only. The sign-in screen GameKit gave us, held until asked for,
+     * and dropped **only** by [onAuthenticationChanged] — never by presenting it.
+     * [present] says why.
+     */
     private var signInViewController: UIViewController? = null
 
     /**
@@ -131,6 +136,41 @@ class GameCenterServices : GameServices {
             .getOrDefault(SubmitResult.Failed)
     }
 
+    /**
+     * `reportAchievements` takes an array because Game Center would rather have
+     * one call for a batch; it gets one at a time here anyway, because the layer
+     * above holds an unreported badge until the platform accepts it and a batch
+     * that half-succeeded would report a single verdict for several badges. A
+     * badge is reported once in a player's lifetime, so there is no volume to
+     * optimise for.
+     *
+     * `percentComplete = 100.0` and nothing else: see [GameServices.reportAchievement].
+     * `showsCompletionBanner` is left at its default `false`. The app draws its
+     * own unlock toast at the same instant, and two banners for one badge is a
+     * bug the player attributes to us.
+     */
+    override suspend fun reportAchievement(achievementId: String): SubmitResult {
+        if (!GKLocalPlayer.local.authenticated) return SubmitResult.NotAuthenticated
+
+        return Catching {
+            val achievement = GKAchievement(identifier = achievementId).apply {
+                percentComplete = 100.0
+            }
+            suspendCancellableCoroutine { continuation ->
+                GKAchievement.reportAchievements(listOf(achievement)) { error ->
+                    if (!continuation.isActive) return@reportAchievements
+                    if (error == null) {
+                        continuation.resume(SubmitResult.Submitted)
+                    } else {
+                        logger.w { "Game Center rejected $achievementId: ${error.localizedDescription}" }
+                        continuation.resume(SubmitResult.Failed)
+                    }
+                }
+            }
+        }.logOnFailure { "Game Center achievement report threw for $achievementId" }
+            .getOrDefault(SubmitResult.Failed)
+    }
+
     override suspend fun presentDashboard(leaderboardId: String?) {
         withContext(Dispatchers.Main) {
             Catching { present(leaderboardId) }
@@ -143,6 +183,20 @@ class GameCenterServices : GameServices {
      * a signed-out player on a leaderboard, and this is the moment they asked
      * for it.
      *
+     * **The held screen is not cleared here**, and that is the fix for a dead
+     * entry point. Clearing it on presentation assumed the player would either
+     * sign in or be told they could not, and that GameKit would call the
+     * authentication handler again to say which. A player who swipes the sheet
+     * away without finishing may produce neither: the status stays
+     * `SignInRequired`, so the row is still drawn, and with the screen already
+     * thrown away every later tap did *nothing at all* — no sheet, no dashboard,
+     * no error. Keeping it means the second tap offers the sheet again, which is
+     * the only useful answer available. [onAuthenticationChanged] is the one
+     * place it is dropped, once the platform has actually changed its mind.
+     *
+     * `presentingViewController` is the guard against handing UIKit a screen it
+     * is already showing, which is a thrown exception rather than a no-op.
+     *
      * `GKGameCenterViewController.create` is one of the Objective-C factory
      * bridges Kotlin/Native still marks as beta, hence the opt-in. The
      * alternative is the deprecated `initWithState` / `initWithLeaderboardID`
@@ -153,8 +207,9 @@ class GameCenterServices : GameServices {
         val host = topViewController() ?: return
 
         signInViewController?.let { signIn ->
-            signInViewController = null
-            host.presentViewController(signIn, animated = true, completion = null)
+            if (signIn.presentingViewController == null) {
+                host.presentViewController(signIn, animated = true, completion = null)
+            }
             return
         }
 

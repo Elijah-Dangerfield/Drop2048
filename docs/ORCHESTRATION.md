@@ -267,6 +267,59 @@ Wildcard merges with it, not only the reverse. SPEC 5.2 permits an inert Wildcar
 symmetry that Wildcard is a permanent obstacle players read as a bug, because the obvious move
 does nothing.
 
+### D25 · A config key with no reader fails the build
+
+The audit D24 triggered. Every `ConfiguredValue` in the repo was checked for a production consumer,
+and for whether that consumer actually *reads* it rather than merely accepting it as a constructor
+parameter. Thirty-six pass. One did not.
+
+**`pro.price.tier` is deleted rather than wired.** It claimed to choose the product id the paywall
+requests. `ProductIds.pro` says in its own KDoc that the product id is deliberately not remote; its
+default had drifted to `pro_299` against a real id of `drop2048_pro`, so wiring it would have made
+Pro unbuyable; and `RealEntitlements` keys ownership on the same id and writes `setPurchased(false)`
+on `NotOwned`, so a remote change to it could have revoked Pro from players who had paid for it.
+
+**The guard is `ConfigValuesHaveReadersTest`, and it reads source.** Reflection cannot answer "does
+anything inject this": a DI graph knows what it can provide, not what asked, so an unread key and a
+read one are the same object by the time a test can see the multibinding. Proved by adding a
+throwaway unread key, watching the test name it, and removing it again — the method AGENTS.md
+prescribes for detekt rules, because a check that never fires and a check that is not running look
+identical in the build output. Its first real run caught a class that exists only inside a KDoc
+example, which is why it strips comments first.
+
+**The practice that caused it is retired.** `MonetizationConfigValues` used to say its keys having no
+consumer was the point, which was true at C7 and is how two keys then ended up never getting one.
+Add the reader in the same change, or do not add the key.
+
+### D24 · No Daily leaderboard, and four silent faults in the boards that stay
+
+SPEC 15 asked for three boards. Two ship. `Leaderboard.DailyScore` is gone, because a board over
+one seed with a capped attempt count ranks spawn luck rather than skill: D19 was right that a Daily
+score cannot be compared to an Endless one and wrong to assume it was therefore comparable to
+another Daily score. The Daily keeps its streak badges and loses nothing else.
+
+`GameViewModel.postToLeaderboards` keeps an exhaustive `when` with an empty `DAILY` arm. An `else`
+would route the next mode anyone adds straight onto the all-time board.
+
+The four faults found in the same pass, each of which failed by doing nothing:
+
+- **`Leaderboard.recurring`.** The weekly board was deduplicated against a best-so-far this process
+  could not invalidate, because the platform resets the window on its own clock. An app alive across
+  the boundary dropped its first score of the new week and the player never appeared on it.
+- **`feature.leaderboards` was read by nothing.** A kill switch, defined, documented and unit
+  tested, that killed nothing. Now read in `RealLeaderboards`, where it stops submissions and
+  reports as well as the entry point. **Worth auditing the other SPEC 10 flags the same way**,
+  because the build cannot tell a wired kill switch from an unwired one.
+- **No achievement reached Game Center.** Twenty-four badges, all local, none on a player's
+  profile. `AchievementPlatformSync` mirrors the stored unlock set rather than hooking `endRun`, so
+  badges earned signed-out are reported on the sign-in that follows.
+- **The sign-in entry point could go dead.** `present` discarded the held sign-in screen as it
+  showed it; a player who swiped it away without finishing left the row drawn over a tap that did
+  nothing at all, forever.
+
+Also fixed in passing: the iOS Release configuration's deployment target was `26.1` against Debug's
+`18.2`, so a store build would have been installable on almost nothing.
+
 ### D23 · The QA screen is its own destination, not a section of the debug menu
 
 The FAB's show/hide switch cannot live in the debug menu, because C12 gave that menu two properties

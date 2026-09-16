@@ -106,7 +106,6 @@ object ConfigCatalog {
         ),
         int("ads.rewarded.continuesPerRun", 2, "Hard cap on rewarded continues in one run (SPEC 12: 2)."),
         int("ads.rewarded.dailyRetriesPerDay", 1, "Rewarded Daily Challenge retries per UTC day (SPEC 12: 1)."),
-        string("pro.price.tier", "pro_299", "Store product id the paywall requests. SPEC 12 prices v1 at \$2.99."),
         flag("pro.upsell.enabled", true, "The Settings entry and the once-per-session stacked-out card (SPEC 12)."),
         flag("feature.dailyChallenge", true, "Kill switch for SPEC 14. Off hides the entry point."),
         flag("feature.leaderboards", true, "Kill switch for the platform boards. Off hides the entry point."),

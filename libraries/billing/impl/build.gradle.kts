@@ -18,10 +18,10 @@ kotlin {
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.flowroutines)
             implementation(projects.libraries.storage)
-            // `pro.upsell.enabled` and `pro.price.tier`, wired by C7.
+            // `pro.upsell.enabled`.
             implementation(projects.libraries.gameconfig)
-            // ConfiguredValue is the supertype of both keys and :gameconfig keeps
-            // it internal to its own compilation, so calling one needs it here.
+            // ConfiguredValue is the key's supertype and :gameconfig keeps it
+            // internal to its own compilation, so calling one needs it here.
             implementation(projects.libraries.config)
         }
 

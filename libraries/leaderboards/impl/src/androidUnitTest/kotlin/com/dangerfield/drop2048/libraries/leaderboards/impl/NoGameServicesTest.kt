@@ -15,7 +15,7 @@ import kotlin.test.assertFalse
  * Asserting `Unavailable` on its own would prove very little, so the second test
  * runs the real `RealLeaderboards` over it and checks the *observable* Android
  * behaviour: nothing is offered to the player and the platform is never asked
- * for anything, however many scores the game reports.
+ * for anything, however many scores and badges the game reports.
  */
 class NoGameServicesTest : CoroutineTest() {
 
@@ -25,14 +25,20 @@ class NoGameServicesTest : CoroutineTest() {
 
         assertEquals(GameServicesStatus.Unavailable, services.status.value)
         assertEquals(SubmitResult.NotAuthenticated, services.submit("any.board", 100L))
+        assertEquals(SubmitResult.NotAuthenticated, services.reportAchievement("any.badge"))
     }
 
     @Test
     fun noEntryPointIsOfferedAndScoresGoNowhere() = runUnitTest {
-        val leaderboards = RealLeaderboards(NoGameServices(), AppCoroutineScope(dispatchers))
+        val leaderboards = RealLeaderboards(
+            services = NoGameServices(),
+            appScope = AppCoroutineScope(dispatchers),
+            featureEnabled = leaderboardsEnabled(true),
+        )
 
         leaderboards.submit(Leaderboard.AllTimeScore, 4_200L)
         leaderboards.submit(Leaderboard.WeeklyScore, 4_200L)
+        leaderboards.reportUnlocked(setOf("FirstMerge"))
         leaderboards.openDashboard()
 
         assertFalse(leaderboards.isOfferable.value)

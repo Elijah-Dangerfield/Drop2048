@@ -147,6 +147,69 @@ constant in `BlockFace.kt`.
 With C3a's per-step pacing (L58) the chain steps read well, and the single merge is now the one beat
 that looks plain by comparison.
 
+### Drag becomes the default control scheme, and the tutorial is rewritten for it
+
+**Owner ruling, 2026-09-16.** `PlayerSettings.controlScheme` defaults to `ControlScheme.Both`
+today. It becomes `Drag`. Not urgent, but it is a decision, not an experiment, so nothing should be
+built that assumes the button row is present.
+
+The tutorial is the load-bearing half and it is currently written entirely around the button:
+
+- Every string names the control as a button. `tutorial_first_drop_body` is "Nothing falls on its
+  own. Tap ▼ and it goes straight to the bottom", `tutorial_third_title` is "You will use ▼ a lot".
+  Under `Drag` there is no ▼ on screen and the hard drop is a downward flick.
+- `TutorialFocus.Drop` spotlights `DropFocusKey`, which is only registered by `GameControlRow`
+  (`GameScreen.kt`). Under `Drag` the key never registers, so the beat that exists to point at the
+  drop control points at nothing.
+- **This is already reachable today**, before any default changes: set `Drag` in Settings, then
+  Replay tutorial. The flick still works so the run completes, which is why it has not been noticed.
+
+SPEC 13's mechanism is untouched by any of this. The frozen timer still means the drop control is
+the only thing that moves a block downward, and the habit is still the thing being taught. What
+changes is the verb and the thing being lit. The flick thresholds (30dp, 450ms) are unvalidated
+guesses and a tutorial that teaches the flick is the first thing that will find out.
+
+While the script is open: the owner has ruled the specials **do not** need contextual tooltips
+(2026-09-16, against SPEC 13's "one contextual tooltip the first time they become relevant") on the
+grounds that Wildcard, Bomb and Stone read for themselves. If a beat for them is cheap inside the
+rewritten script, take it there; do not build a separate first-seen tooltip system for it.
+
+### The level-up callout overwrites the chain callout it lands on
+
+`ResolutionStep.LevelUp` is appended last in `Cascade.kt` and gets `ScoreOnlyMillis` (60) in
+`Playback.kt`. A later callout replaces the one before it by design (`Playback.callout()`'s KDoc
+makes that the precedence rule). So on any drop that both chains and levels up, `CHAIN xN` is on
+screen for 60ms and is then replaced by a routine `LEVEL n`.
+
+That is the exact failure C3a raised `CascadeStepMillis` from 195 to 300 to fix, undone from the
+other end. `Motion.CascadeStepMillis`'s own KDoc argues at length that the number the player is
+being congratulated on has to stay readable.
+
+Two shapes, and they are not equivalent: give `LevelUp` a real hold so both are read in order, or
+take the level announcement out of the toast channel entirely and put it on the level meter, which
+is the surface that already means "level". The second is better and is the same work as the entry
+below it.
+
+### Level up is not distinguishable from anything else on screen
+
+`LEVEL n` is the same font, size, position and animation as `CHAIN x3` and `WILD!`. It is a state
+change wearing a reward's clothes, and it is the only signal the player gets that the game just got
+harder.
+
+It is also the *wrong* signal for most players. C1e pinned
+`theDropControlChangesTheWallClockAndNothingElse`: the drop control moves the wall clock by a factor
+of four and moves no outcome column at all, and C1c measured three opening curves with every outcome
+column identical to the digit. **The difficulty is the rising spawn floor, not the speed**, so a
+player who uses the drop control (which the tutorial exists to make habitual) never experiences the
+speed change at all. What they experience is a 32 landing on a board of 4s, with nothing anywhere
+saying that was the game and not bad luck.
+
+The level meter is the surface with room to say it. `game-danger.png` is the model for what a
+legible state change looks like in this app.
+
+Note the start overlay copy has the same problem from the other side: "Blocks fall on their own" is
+true of a player who never presses the drop control and of nobody else.
+
 ## Soon
 
 ### The saved-run blob carries a full `EngineConfig` copy, ~3KB
@@ -217,6 +280,83 @@ best, which is a real trigger — but confirm the library is wired rather than a
 with its verification trap, the palette property test, the transcript playback architecture, the
 Room migration test, the debug session latch. Collect and write back in one pass.
 
+### The board stops growing before it runs out of vertical space
+
+**Owner, 2026-09-16: the board should grow vertically when the control row is gone.** It does grow,
+and then it stops early, and the reason is worth reading before anyone changes a constant.
+
+`GameScreen` sizes the well as `min(maxWidth, BoardMaxWidth, fromHeight)` where `fromHeight` is the
+width a `rows/cols` box would have at the available height. Hiding the control row under
+`ControlScheme.Drag` raises `fromHeight`, so the board does get bigger: comparing
+`game-playing.png` to `game-drag-only.png`, cell pitch goes from about 111px to about 122px at the
+harness's 720px width, roughly 10%. Then `BoardMaxWidth` (370dp, the handoff's `max-width: 370px`)
+or the phone's own width binds instead, and every remaining pixel of height becomes the `Spacer`
+under the well. The board is top-aligned, so on a tall phone in drag mode the dead space sits at the
+bottom.
+
+Cells are square and derived from the pitch (`GameBoard`, `BoardScale`), so with five columns fixed
+there are exactly three ways to spend that height and they are not the same decision:
+
+1. **Raise or drop `BoardMaxWidth`.** Cheapest. Lets height stay the binding constraint on tall
+   devices and makes the blocks bigger everywhere. Changes no rule and no score. The handoff's 370
+   was a CSS number for a design canvas, not a measurement.
+2. **Centre the board in the freed space** rather than leaving the gutter at the bottom. Cosmetic,
+   independent of 1, and worth doing either way.
+3. **More rows.** The only option that is *literally* vertical growth, and the expensive one.
+   `board.rows` is a remote key (SPEC 10) precisely so the 7-versus-8 question can be reopened, but
+   SPEC 3 also says the high score table is not comparable across dimensions and so rows do not move
+   mid-version. C1a's finding is the other half: the spawn table sets the tier ceiling and **the
+   board geometry sets the level**, so a ninth row is a balance change, not a layout change, and it
+   wants a harness pass before it wants a UI pass.
+
+1 and 2 are a layout fix and should just be done. 3 is a design decision and should be made on
+`tools/balance` output, not on a screenshot.
+
+### The stacked-out sheet under-reports the run it is summarising
+
+It shows SCORE and BIGGEST. `run_record` already holds level reached, longest cascade, bursts,
+blocks placed and duration, and the ViewModel already knows the best score it is comparing against
+(it draws "new best!" from it).
+
+The two worth adding are **level reached**, because it is the run's difficulty and it is the number
+the player was watching all game, and a **distance-to-best** read for a run that did not set one.
+"4,896" against a best of 130,450 is the standard near-miss beat and the data is sitting there
+unused.
+
+### `GameControls` argues for the quiet ▼ with the number that argues against it
+
+`GameControlRow`'s KDoc calls the drop control's recessiveness "intentional and load-bearing" and
+then cites C1c: a player who reaches for it hits level 4 in 33 seconds against 289 for one who does
+not. That measurement is the case for making ▼ *prominent*. "Steer first" is a defensible design
+position and the muted treatment may well be right, but it is currently justified by evidence
+pointing the other way, and the comment will mislead whoever reads it next.
+
+Partly overtaken by the drag-default ruling above, which removes the button row from the default
+experience entirely. It still governs `Both` and `Buttons`, and it is one colour constant either
+way.
+
+### There is no rules reference anywhere after the tutorial
+
+SPEC 8.4 lists How to Play on the pause overlay. The overlay ships Resume, Restart, Quit, Stats and
+Settings. A player who skips the tutorial from drop 3 (which SPEC 13 explicitly allows) has no way
+to learn the priority order, that a Stone is permanent, or that 2048 takes the row with it.
+
+Settings' Replay tutorial is the closest thing and it is a six-drop scripted run, not a reference.
+Small: one screen, and the copy is mostly already written in SPEC 4.3 and 5.2.
+
+### No policy in `tools/balance` models a player who plans
+
+Since D11 removed the preview, `Lookahead-1` sees a block the player cannot and never will. SPEC 4.4
+already says it must not be quoted as a prediction of play, which is the honest framing, but the
+consequence is that **the declared ceiling is a policy playing a different game** and nothing
+measures the ceiling of the game that shipped.
+
+This matters more now than it did: the owner has ruled the next-block preview permanently out
+(2026-09-16, "it's too easy with that"), so the no-preview game is the only game there will be. A
+policy that plans against board shape rather than against a known next block would give the tail
+past 1024 an honest ceiling. Pairs with "Re-run `tools/balance` with measured constants" above: both
+are waiting on the same harness pass.
+
 ## Later
 
 ### Zen mode is nearly free
@@ -228,6 +368,18 @@ which makes its value proposition much less thin.
 
 All five powerups are designed against board state the engine already exposes, and Undo ships
 internally (SPEC 5.6). Keep it additive: no engine change should make a powerup harder to add later.
+
+### Nothing rewards two good drops in a row
+
+The cascade multiplier resets at every lock (SPEC 7). Within a drop, chains pay enormously; across
+drops, a player who sets up three merges in a row is paid exactly as if they had got lucky three
+times. It is the cheapest lever left for making skill *feel* like skill, and it needs no change to
+the merge rules.
+
+Filed under Later because it is not free. Scoring formulas are on SPEC 10's **never remote** list
+and a new payout invalidates every banked score, so it lands at a version boundary alongside
+anything else that moves `PINNED_DIGEST`, or not at all. The five derived achievement score targets
+(SPEC 15) move with it by construction, which is the reason they were derived.
 
 ---
 

@@ -1450,10 +1450,18 @@ class GameViewModel(
      * the guard.
      *
      * Which board depends on the mode, and it is not a preference (decision D19).
-     * A Daily score is set on a seed everybody else also played, so it goes to
-     * the Daily board and nowhere near the two Endless ones. Submitting is
-     * fire-and-forget by design — nothing here suspends, nothing returns a
-     * result, and a player with no Game Center account notices nothing.
+     * **A Daily score goes nowhere**: there is no Daily board (D24), and it must
+     * not be allowed to fall through to the Endless ones, which is exactly what
+     * an `else ->` here would do the next time `GameMode` gains an entry. Hence
+     * the exhaustive `when` over a mode that now has one empty arm — deleting
+     * that arm is a compile error, which is the point of it.
+     *
+     * Submitting is fire-and-forget by design — nothing here suspends, nothing
+     * returns a result, and a player with no Game Center account notices nothing.
+     *
+     * Badges are not posted from here. `AchievementPlatformSync` mirrors the
+     * stored unlock set instead, which survives a player who was signed out at
+     * the moment they earned one; the reasoning is in that file.
      */
     private fun postToLeaderboards(score: Long) {
         when (started.mode) {
@@ -1462,7 +1470,7 @@ class GameViewModel(
                 leaderboards.submit(Leaderboard.WeeklyScore, score)
             }
 
-            GameMode.DAILY -> leaderboards.submit(Leaderboard.DailyScore, score)
+            GameMode.DAILY -> Unit
         }
     }
 

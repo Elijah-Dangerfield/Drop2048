@@ -614,7 +614,7 @@ Keys for v1:
 | `level.blocksPerLevel` | The clock. |
 | `ads.interstitial.*` | Every gate input in 12.3: session run count, cooldown, days-since-install suppression. |
 | `ads.enabled`, `ads.rewarded.caps` | Kill switch and per-placement caps. |
-| `pro.price.tier`, `pro.upsell.enabled` | |
+| `pro.upsell.enabled` | The Settings entry and the stacked-out card. **`pro.price.tier` was here and is gone** (D25): the product id is a store operation, and a remote one could revoke a paid entitlement. |
 | `feature.dailyChallenge`, `feature.leaderboards` | Kill switches for anything with a server or platform dependency. |
 
 **Never remote:** the merge priority order, the resolution algorithm, the burst rule, scoring
@@ -792,7 +792,8 @@ first burst, two bursts in a run, 5-step cascade, 10-step cascade, clear the boa
 danger state, 7-day and 30-day streaks, plus five score and five playtime milestones.
 
 The coin payouts attached to achievements in the original spec are cut with the economy. They
-unlock, they post to the platform, they do not pay.
+unlock, they post to the platform, they do not pay. Posting to the platform is `AchievementPlatformSync`,
+added by D24; the first release of this section had the badges and no reporting at all.
 
 **The five score targets are derived, not written down.** Each is the score a run is guaranteed to
 have banked by the time it reaches a given level — survival plus level-up bonuses out of 7's
@@ -807,18 +808,38 @@ three-quarters of a million drops, and a row holding three Stones is not a board
 builds.
 
 **Leaderboards.** Game Center and Play Games, plus the platform's own dashboard as the in-app view.
-All-time high score, weekly high score, Daily Challenge. Sodogku shipped a Game Center
-implementation and then had zero production call sites for `submit` for a while; do not repeat
-that. The submit call site is part of the same chunk as the integration, and a test asserts it
-fires on run end.
+Two boards: all-time high score, which is the one this feature is for, and weekly high score on the
+platform's own recurring window. Sodogku shipped a Game Center implementation and then had zero
+production call sites for `submit` for a while; do not repeat that. The submit call site is part of
+the same chunk as the integration, and a test asserts it fires on run end.
+
+**There is no Daily board. D24 cut the third one.** A board over a single seed with a capped attempt
+count ranks the luck of the spawns rather than the player, so a Daily score now posts nowhere.
+D19 was right that it cannot be compared to an Endless score and wrong that it could therefore be
+compared to another Daily one. The Daily's streak badges are what reward playing it.
 
 **Which board depends on the mode, and it is not a preference.** An Endless score goes to the
-all-time and weekly boards; a Daily score goes to the Daily board and nowhere near the other two
-(D19). Nothing below the ViewModel knows what mode a value came from, so the call site is the only
-place that rule can live.
+all-time and weekly boards; a Daily score goes to neither (D19, D24). Nothing below the ViewModel
+knows what mode a value came from, so the call site is the only place that rule can live, and it
+holds an exhaustive `when` rather than an `else` so the next mode cannot fall onto a board by
+default.
+
+**A recurring board is never deduplicated locally.** The platform resets the weekly window on its
+own clock and the app cannot see the reset, so the "do not resend a value the platform already has"
+rule is skipped for it. Modelling the week on this side would mean agreeing with a recurrence start
+typed into a store console, and a disagreement is a silently skipped submission.
+
+**`feature.leaderboards` is read in `RealLeaderboards`, not at the entry point**, so switching it
+off stops submissions and achievement reports as well as hiding the row. It shipped once with no
+reader at all, which is the failure mode every SPEC 10 kill switch is exposed to: nothing in the
+build can tell a wired one from an unwired one.
+
+**Achievements post to the platform too**, so a badge earned here shows up on the player's Game
+Center profile. The reporting watches the stored unlock set rather than the end of a run, which is
+what makes it survive a player who was signed out when they earned one.
 
 **Play Games is not in v1.** Android binds an inert seam, which is enough for the whole feature to
-be silent there, and the board ids do not exist in either console yet.
+be silent there, and the board and achievement ids do not exist in either console yet.
 
 ## 16. Accessibility
 

@@ -85,6 +85,21 @@ interface GameServices {
     suspend fun submit(leaderboardId: String, value: Long): SubmitResult
 
     /**
+     * Marks one achievement fully earned on the platform.
+     *
+     * Only ever 100%: the app owns its own progress and renders its own grid, so
+     * a partial platform report would be a second, slower copy of a number
+     * already on screen, and it would need re-sending on every drop. What the
+     * platform is for here is the player's profile — a badge that shows up
+     * outside the app.
+     *
+     * Reporting one that is already earned is defined to be harmless, which is
+     * what lets the layer above resend the whole set after a late sign-in
+     * without tracking what the platform already had.
+     */
+    suspend fun reportAchievement(achievementId: String): SubmitResult
+
+    /**
      * Shows the platform's own leaderboard screen, focused on [leaderboardId]
      * when one is given.
      *

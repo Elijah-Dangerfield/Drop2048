@@ -140,6 +140,8 @@ private class FakeLeaderboards : Leaderboards {
 
     override fun submit(board: Leaderboard, value: Long) = Unit
 
+    override fun reportUnlocked(achievementNames: Set<String>) = Unit
+
     override fun openDashboard(board: Leaderboard?) {
         dashboards += board
     }
