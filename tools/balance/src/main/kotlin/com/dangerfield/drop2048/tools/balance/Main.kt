@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.tools.balance
 
 import com.dangerfield.drop2048.libraries.cascade.autoplay.Policy
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
+import com.dangerfield.drop2048.libraries.cascade.SpecialRate
 import java.util.stream.Collectors
 import kotlin.system.exitProcess
 import kotlin.system.measureTimeMillis
@@ -16,11 +17,21 @@ import kotlin.system.measureTimeMillis
  * ./gradlew :tools:balance:run --args="--clock average --curve fast500"
  * ./gradlew :tools:balance:run --args="--clock average --blocks-per-level 12"
  * ./gradlew :tools:balance:run --args="--clock average --decision-millis 350"
+ * ./gradlew :tools:balance:run --args="--clock average --specials-from 4,6,9"
  * ```
  *
  * `--clock off` is C1a's clock-free harness and reports a ceiling. Any other
  * value is a [PlayerProfile] and puts SPEC 5.5's drop timer and SPEC 6's
  * controls in the loop.
+ *
+ * `--specials-from` is SPEC 10's `special.firstLevel`, one level per special in
+ * the order `SpecialRate.Default` declares them — Wildcard, Bomb, Stone. It is
+ * here because the owner asked on 2026-09-20 whether the three arrive too late,
+ * and the honest answer needed a sweep rather than an opinion. Unlike
+ * `--decision-millis` it *is* an engine input: it travels inside `EngineConfig`
+ * and therefore inside `GameState`, so a run played with it is a run under a
+ * different config and its numbers are not comparable to a default one's by
+ * anything except this harness.
  *
  * `--decision-millis` and `--tap-millis` are the two dials of the player model.
  * Neither touches anything the engine can see, so neither can move the
@@ -46,6 +57,7 @@ fun main(args: Array<String>) {
         ?: EngineConfig.DEFAULT_BLOCKS_PER_LEVEL
     val decisionMillis = args.value("--decision-millis")?.toIntOrNull()
     val tapMillis = args.value("--tap-millis")?.toIntOrNull()
+    val specialsFrom = args.value("--specials-from")?.let(::specialLevels)
 
     val table = Tables.Named[tableName] ?: fail(
         "unknown --table $tableName, expected one of ${Tables.Named.keys.joinToString()}"
@@ -73,6 +85,7 @@ fun main(args: Array<String>) {
         spawnTable = table,
         speed = curve,
         blocksPerLevel = blocksPerLevel,
+        specialRates = specialsFrom ?: EngineConfig.Default.specialRates,
     )
 
     policies.forEach { policy ->
@@ -85,6 +98,7 @@ fun main(args: Array<String>) {
         val label = buildString {
             append("$curveName/$blocksPerLevel@${profile?.name ?: "off"}")
             if (profile != null) append("(${profile.decisionMillis}/${profile.tapMillis})")
+            append("/sp=${config.specialRates.joinToString("+") { it.fromLevel.toString() }}")
         }
         print(Report.render(policy, tableName, label, outcomes, millis))
         println()
@@ -93,6 +107,18 @@ fun main(args: Array<String>) {
 
 private const val DEFAULT_RUNS = 10_000
 private const val DEFAULT_SEED = 1L
+
+private fun specialLevels(raw: String): List<SpecialRate> {
+    val levels = raw.split(",").map { part ->
+        part.trim().toIntOrNull()?.takeIf { it >= 1 }
+            ?: fail("--specials-from takes positive levels, got '$part'")
+    }
+    val defaults = SpecialRate.Default
+    if (levels.size != defaults.size) {
+        fail("--specials-from takes ${defaults.size} levels (${defaults.joinToString(",") { it.special.name.lowercase() }}), got ${levels.size}")
+    }
+    return defaults.mapIndexed { index, rate -> rate.copy(fromLevel = levels[index]) }
+}
 
 private fun Array<String>.value(flag: String): String? {
     val index = indexOf(flag)

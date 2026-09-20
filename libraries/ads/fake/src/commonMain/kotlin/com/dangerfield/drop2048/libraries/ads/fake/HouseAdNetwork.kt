@@ -59,12 +59,17 @@ data class HouseAdShowing(
  *    Android artifact contains this class, the binding, or the drawing code.
  *    `:apps:compose:verifyNoHouseAdsInRelease` fails the build if that stops
  *    being true.
- * 2. iOS has no build-type source sets, so on that platform the class is linked
- *    in and [select] refuses instead — `BuildInfo.isDebug` is
+ * 2. iOS has no build-type source sets, so `:apps:compose` reads Xcode's
+ *    `CONFIGURATION` instead and adds this module to the iOS compile classpath
+ *    only for a Debug build. `:apps:compose:verifyNoHouseAdsInIosRelease` checks
+ *    the graph and `verifyNoHouseAdsInIosSimulatorArm64ReleaseFramework` reads
+ *    the linked `ComposeApp` itself, because the flag is the thing most likely
+ *    to be wrong.
+ * 3. [select] refuses anyway unless `BuildInfo.isDebug`, which on Native is
  *    `Platform.isDebugBinary`, set by the Xcode configuration and not reachable
- *    from app code or config.
+ *    from app code or config. This used to be all iOS had.
  *
- * Neither layer is a flag anybody has to remember.
+ * No layer is a flag anybody has to remember.
  *
  * ## Every outcome, not just the happy one
  *
@@ -112,7 +117,8 @@ class HouseAdNetwork : AdNetwork, HouseAds {
     override val network: AdNetwork get() = this
 
     /**
-     * The second layer, and the one iOS relies on.
+     * The last layer, and the one that covers a binary which contains this class
+     * when it should not.
      *
      * `&&` rather than an early return so that a release binary which somehow
      * contains this class still cannot be talked into selecting it, including by
@@ -147,6 +153,15 @@ class HouseAdNetwork : AdNetwork, HouseAds {
      * screen — as unexercised as it was before.
      */
     override suspend fun show(format: AdFormat): AdShowOutcome {
+        // A banner is drawn in the game's own layout by `BannerSurface`, never
+        // shown over the app, so there is no house placeholder for it and
+        // nothing to suspend on. On a debug build the real AdMob test unit
+        // always fills, which is why the banner needs no stand-in the way the
+        // two full-screen formats did.
+        if (format == AdFormat.Banner) {
+            return AdShowOutcome(AdShowResult.NotShown, errorKind = "banner_is_not_shown")
+        }
+
         _forcedOutcome.value?.let { forced ->
             logger.i { "House ad for $format forced to $forced" }
             return AdShowOutcome(forced, errorKind = ForcedErrorKind)
@@ -160,7 +175,7 @@ class HouseAdNetwork : AdNetwork, HouseAds {
             format = format,
             totalSeconds = when (format) {
                 AdFormat.Rewarded -> RewardedSeconds
-                AdFormat.Interstitial -> InterstitialSeconds
+                AdFormat.Interstitial, AdFormat.Banner -> InterstitialSeconds
             },
         )
         return try {

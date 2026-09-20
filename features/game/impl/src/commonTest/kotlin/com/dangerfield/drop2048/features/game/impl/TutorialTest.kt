@@ -1,8 +1,10 @@
 package com.dangerfield.drop2048.features.game.impl
 
 import com.dangerfield.drop2048.features.game.impl.GameScenario.Companion.playing
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Cell
+import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
 import com.dangerfield.drop2048.libraries.ui.system.Cue
@@ -22,11 +24,15 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
  * — six drops, a three-step cascade and a 2048 burst — runs in a ViewModel test
  * in milliseconds, with no renderer and no device.
  *
- * **Every drop here is landed by pressing ▼ and by nothing else**, which is not
- * an artefact of the harness. The tutorial's drop clock is frozen (SPEC 13), so
- * gravity never moves a block and there is no other way down. That is the point
- * of the chunk: L29 measured the nudge at 223 seconds against 56 to reach level
- * 4, and a player who finishes this has pressed it on all six drops.
+ * **Every drop here is landed by the player's own drop input and by nothing
+ * else**, which is not an artefact of the harness. The tutorial's drop clock is
+ * frozen (SPEC 13), so gravity never moves a block and there is no other way
+ * down. That is the point of the chunk: L29 measured the drop control at 223
+ * seconds against 56 to reach level 4, and a player who finishes this has used
+ * it on all six drops.
+ *
+ * Drop 1 is also the only one that cannot be landed without steering, which is
+ * the owner's 2026-09-20 ruling and the one asymmetry in the harness below.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TutorialTest : CoroutineTest() {
@@ -51,15 +57,15 @@ class TutorialTest : CoroutineTest() {
     }
 
     /**
-     * Decision D21 collapsed drop 1's two ▼ beats into one, because there is no
-     * "press it again" left to ask for: the first press finishes the drop. The
+     * Decision D21 collapsed drop 1's two drop beats into one, because there is
+     * no "do it again" left to ask for: the first drop finishes the block. The
      * steer beat still hands over to the drop beat, and the drop beat is the one
      * that lights the control.
      */
     @Test
     fun firstDrop_teachesSteeringThenTheDrop() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            act(GameAction.MoveLeft)
+            steerOntoTheOutline()
             assertEquals(TutorialStep.FirstDrop, state.tutorial?.step)
             assertEquals(TutorialFocus.Drop, state.tutorial?.focus)
 
@@ -70,18 +76,88 @@ class TutorialTest : CoroutineTest() {
     }
 
     /**
-     * **Every scripted merge happens for a player who never steers.**
+     * **The opening beat's whole problem, and the reason this round happened.**
      *
-     * This is the property the whole script rests on and it had no test. With the
-     * clock frozen, ▼ is the only input that makes progress (L49), so the player
-     * the tutorial is designed to produce is one who reaches for ▼ and never
-     * drags at all — and every partner therefore sits beside the spawn column so
-     * that dropping straight down still merges.
+     * "Slide it over" was said to a block that spawned in the column it was
+     * being asked to reach, over a drop where every allowed column resolved the
+     * same way, so the player could satisfy the first instruction the game ever
+     * gives them by doing nothing at all. Worse than useless: the first thing
+     * they learned was that the card can be ignored.
+     *
+     * Three assertions, one per half of the fix. The block does not start on the
+     * target, the board says where the target is, and the drop is refused until
+     * the block is there — so a player who only presses the drop control cannot
+     * finish the beat, which is the exact opposite of every other drop in the
+     * script and is true only of this one.
+     */
+    @Test
+    fun theOpeningBeat_cannotBeSatisfiedByDoingNothing() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            val target = assertNotNull(state.tutorial?.target, "the beat outlines a cell")
+            assertTrue(
+                state.falling?.cell?.col != target.col,
+                "the block spawns somewhere it is not being asked to be",
+            )
+
+            val board = state.board
+            val falling = state.falling
+            repeat(TrampleDrops) { land() }
+            waitOutResolution()
+
+            assertEquals(TutorialStep.Steer, state.tutorial?.step, "the beat has not been satisfied")
+            assertEquals(board, state.board, "and nothing has landed")
+            assertEquals(falling, state.falling, "the block has not moved either")
+        }
+    }
+
+    /**
+     * A steer that stops short does not count, which is the other half of "the
+     * taught gesture is the only one available".
+     *
+     * The beat used to end on any movement at all. Under the arrows that is one
+     * tap of three, so the card would have said "now drop it" while the drop was
+     * still being refused — a worse dead end than the one it replaced, and the
+     * reason the signal carries the column rather than a boolean.
+     */
+    @Test
+    fun theOpeningBeat_endsOnlyWhenTheBlockReachesTheOutline() = runUnitTest {
+        playing(teach = true, pressPlay = false) {
+            val target = assertNotNull(state.tutorial?.target)
+            val spawn = assertNotNull(state.falling?.cell?.col)
+
+            act(GameAction.SteerTo(spawn - 1))
+            assertEquals(spawn - 1, state.falling?.cell?.col, "it moved")
+            assertEquals(TutorialStep.Steer, state.tutorial?.step, "but it is not there yet")
+
+            act(GameAction.SteerTo(target.col))
+            assertEquals(TutorialStep.FirstDrop, state.tutorial?.step)
+            assertEquals(
+                target,
+                state.tutorial?.target,
+                "the outline stays for as long as the restriction does, which is the whole drop",
+            )
+        }
+    }
+
+    /**
+     * **Every scripted merge after the first happens for a player who never
+     * steers.**
+     *
+     * This is the property the rest of the script rests on and it had no test.
+     * With the clock frozen the drop control is the only input that makes
+     * progress (L49), so the player the tutorial is designed to produce is one
+     * who reaches for it and never drags at all — and every partner therefore
+     * sits beside the spawn column so that dropping straight down still merges.
      *
      * If it did not, the merge would be missed and the *next* drop's board would
      * arrive already holding the tier it was supposed to make. Nothing would look
      * broken and nothing would be: the board would just have corrected itself
      * behind the player, which is what makes a scripted run read as arbitrary.
+     *
+     * Drop 1 is the deliberate exception and is played with a steer here, because
+     * it is the drop that *teaches* steering. It is the only beat in the script
+     * that refuses to resolve itself around an idle player, and
+     * `theOpeningBeat_cannotBeSatisfiedByDoingNothing` is the test for that half.
      *
      * The ladder is asserted at each rung rather than at the end, so a board that
      * is moved fails on the drop that moved it.
@@ -91,7 +167,7 @@ class TutorialTest : CoroutineTest() {
         playing(teach = true, pressPlay = false) {
             val ladder = Cell(1, 7)
 
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             assertEquals(NumberBlock(BlockValue.V4), state.board[ladder])
             act(GameAction.TutorialAdvance)
 
@@ -113,8 +189,15 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun steering_isClampedToTheScriptedColumns() = runUnitTest {
         playing(teach = true, pressPlay = false) {
+            act(GameAction.SteerTo(0))
+            assertEquals(2, state.falling?.cell?.col, "drop one allows columns 2..4")
+
+            land()
+            waitOutResolution()
+            act(GameAction.TutorialAdvance)
+
             act(GameAction.SteerTo(4))
-            assertEquals(2, state.falling?.cell?.col, "drop one allows columns 1..2")
+            assertEquals(2, state.falling?.cell?.col, "drop two allows columns 1..2")
 
             act(GameAction.SteerTo(0))
             assertEquals(1, state.falling?.cell?.col)
@@ -124,7 +207,7 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun sixDrops_endWithA2048Burst() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
             assertEquals(NumberBlock(BlockValue.V4), state.board[Cell(1, 7)])
             act(GameAction.TutorialAdvance)
@@ -194,7 +277,7 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun pressingDropUnderACard_doesNotStrandTheScript() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             act(GameAction.TutorialAdvance)
             playDrop(TutorialStep.SecondDrop)
             playDrop(TutorialStep.ThirdDrop)
@@ -224,7 +307,7 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun steeringUnderACard_isIgnoredToo() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
 
             assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
             val board = state.board
@@ -233,6 +316,69 @@ class TutorialTest : CoroutineTest() {
 
             assertEquals(board, state.board)
             assertEquals(TutorialStep.FirstMerge, state.tutorial?.step)
+        }
+    }
+
+    /**
+     * The script finishes under every scheme the player can be in, driven by the
+     * inputs that scheme actually offers.
+     *
+     * Drag is the default and is what the copy is written for. `Buttons` is the
+     * hostile one and the reason the script adapts rather than being written once
+     * for drag: the board refuses drags there outright, so every steer in this
+     * run is an arrow press, and a tutorial that told the player to drag would be
+     * telling them to do something the game ignores on the one beat that cannot
+     * be finished any other way.
+     *
+     * `Both` is covered because it is what the settings toggle produces, and it
+     * is the scheme where the two inputs coexist.
+     */
+    @Test
+    fun theScript_completesUnderDrag() = runUnitTest {
+        playing(teach = true, pressPlay = false, scheme = ControlScheme.Drag) {
+            playWholeScript()
+            act(GameAction.TutorialAdvance)
+            assertNull(state.tutorial, "the guided run finished on drag alone")
+            assertTrue(cache.snapshot.hasUserOnboarded)
+        }
+    }
+
+    @Test
+    fun theScript_completesUnderButtons() = runUnitTest {
+        playing(teach = true, pressPlay = false, scheme = ControlScheme.Buttons) {
+            playWholeScript(arrows = true)
+            act(GameAction.TutorialAdvance)
+            assertNull(state.tutorial, "the guided run finished on the arrows alone")
+            assertTrue(cache.snapshot.hasUserOnboarded)
+        }
+    }
+
+    @Test
+    fun theScript_completesUnderBoth() = runUnitTest {
+        playing(teach = true, pressPlay = false, scheme = ControlScheme.Both) {
+            playWholeScript(arrows = true)
+            act(GameAction.TutorialAdvance)
+            assertNull(state.tutorial)
+        }
+    }
+
+    /**
+     * A beat that hangs its card off an outlined cell must belong to a drop that
+     * outlines one.
+     *
+     * The pure half of the focus-key check. `TutorialFocusKeysTest` renders the
+     * screen and proves the *screen* draws what the script points at; this proves
+     * the *script* asks for something the board will have. Split because one of
+     * them needs a renderer and the other is a property of a list, and the list
+     * is where the mistake would be made.
+     */
+    @Test
+    fun everyOutlineBeat_belongsToADropThatHasAnOutline() {
+        Tutorial.Script.filter { it.focus == TutorialFocus.Target }.forEach { lesson ->
+            assertNotNull(
+                Tutorial.drop(lesson.drop, EngineConfig.Default).target,
+                "${lesson.step} anchors on an outline, but drop ${lesson.drop} has no target cell",
+            )
         }
     }
 
@@ -248,7 +394,7 @@ class TutorialTest : CoroutineTest() {
         playing(teach = true, pressPlay = false) {
             assertFalse(state.tutorial?.canSkip == true, "drop one cannot be skipped")
 
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             act(GameAction.TutorialAdvance)
             assertFalse(state.tutorial?.canSkip == true, "drop two cannot be skipped")
 
@@ -261,7 +407,7 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun skip_endsTheScriptAndFlipsTheFlag() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             act(GameAction.TutorialAdvance)
             playDrop(TutorialStep.SecondDrop)
 
@@ -282,7 +428,7 @@ class TutorialTest : CoroutineTest() {
     @Test
     fun aScriptedRun_isNeverWrittenToDisk() = runUnitTest {
         playing(teach = true, pressPlay = false) {
-            playDrop(TutorialStep.Steer)
+            playFirstDrop()
             assertNull(savedRun(), "nothing scripted reaches the saved-run store")
 
             act(GameAction.TutorialAdvance)
@@ -330,7 +476,8 @@ class TutorialTest : CoroutineTest() {
 }
 
 /**
- * Land the block the way the tutorial forces a player to: ▼, and only ▼.
+ * Land the block the way the tutorial forces a player to: the drop control, and
+ * nothing else.
  *
  * [expected] is asserted before the drop rather than after, so a script that
  * reorders itself fails on the step that moved instead of three assertions later.
@@ -343,9 +490,46 @@ private fun GameScenario.playDrop(expected: TutorialStep) {
     waitOutResolution()
 }
 
+/**
+ * Drop 1, which is the only one a player cannot finish without steering.
+ *
+ * Every other drop is `playDrop`; this one has to put the block on the outlined
+ * cell first, because the drop is refused anywhere else. That asymmetry in the
+ * harness is the feature — a helper that quietly landed drop 1 from wherever it
+ * spawned would be re-creating the bug this round fixed.
+ */
+private fun GameScenario.playFirstDrop(arrows: Boolean = false) {
+    assertEquals(TutorialStep.Steer, state.tutorial?.step, "the beat the board is waiting on")
+    steerOntoTheOutline(arrows)
+    land()
+    waitOutResolution()
+}
+
+/**
+ * Put the block on the outlined cell, with the input the scheme offers.
+ *
+ * The arrow path walks a column a press, which is the thing a single `SteerTo`
+ * would paper over: under `Buttons` the beat is several inputs long and the one
+ * that matters is the last.
+ */
+private fun GameScenario.steerOntoTheOutline(arrows: Boolean = false) {
+    val target = requireNotNull(state.tutorial?.target) { "this beat outlines no cell" }
+    if (!arrows) {
+        act(GameAction.SteerTo(target.col))
+        return
+    }
+    var steps = 0
+    while (steps++ <= state.board.cols) {
+        val col = state.falling?.cell?.col ?: break
+        if (col == target.col) break
+        act(if (col > target.col) GameAction.MoveLeft else GameAction.MoveRight)
+    }
+    assertEquals(target.col, state.falling?.cell?.col, "the arrows reached the outline")
+}
+
 /** Every scripted drop, up to but not including the handoff's own button. */
-private fun GameScenario.playWholeScript() {
-    playDrop(TutorialStep.Steer)
+private fun GameScenario.playWholeScript(arrows: Boolean = false) {
+    playFirstDrop(arrows)
     act(GameAction.TutorialAdvance)
     playDrop(TutorialStep.SecondDrop)
     playDrop(TutorialStep.ThirdDrop)

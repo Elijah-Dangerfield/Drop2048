@@ -6,7 +6,6 @@ package com.dangerfield.drop2048.libraries.sharing
  * ```
  * Drop 2048 · Endless
  * 🏆 83,330   🧱 1024   ⛓ x7   ⬆ 19   ⏱ 6:12
- * 🔥 12 day streak
  *
  * drop2048.app
  * ```
@@ -18,18 +17,14 @@ package com.dangerfield.drop2048.libraries.sharing
  * everything else is cut, and a share that only carried a score would say
  * nothing about the part of the game that is actually the game.
  *
- * A [ShareResult] holds no board, so there is nothing here that could leak the
- * Daily's seed to somebody who has not played it.
+ * A [ShareResult] holds no board, so there is nothing here that could leak a
+ * run to somebody who has not played it.
  */
 object ShareText {
 
     fun format(result: ShareResult, labels: ShareLabels): String = buildString {
         appendLine(labels.title)
         append(statsLine(result))
-        labels.streak?.let {
-            appendLine()
-            append(it)
-        }
         labels.footer?.let {
             appendLine()
             appendLine()

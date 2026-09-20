@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import com.dangerfield.drop2048.libraries.ads.LocalBannerSurface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -125,7 +126,12 @@ fun App(appComponent: AppComponent) {
         LocalAppState provides appState,
         LocalClock provides appComponent.provideClock(),
         LocalBuildInfo provides BuildInfo,
-        LocalDialogHostState provides dialogHostState
+        LocalDialogHostState provides dialogHostState,
+        // D28's banner. Provided here rather than passed down because the one
+        // screen that draws it is several levels below and nothing in between
+        // should have to know an ad exists. Defaults to `NoBannerSurface`, so a
+        // build with no ad SDK gets the "no ad arrived" case for free.
+        LocalBannerSurface provides appComponent.bannerSurface,
     ) {
         PlayerThemeProvider(appComponent.playerSettingsStore) {
             // Outermost inside the theme so the directive panel draws over

@@ -25,16 +25,12 @@ class MonetizationConfigValuesTest {
         assertEquals(45, InterstitialRewardedGapSeconds(map)())
         assertEquals(3, InterstitialSuppressDaysSinceInstall(map)())
         assertEquals(2, RewardedContinuesPerRun(map)())
-        assertEquals(1, RewardedDailyRetriesPerDay(map)())
         assertTrue(ProUpsellEnabled(map)())
     }
 
     @Test
-    fun `the kill switches default on so an unreachable server is not a smaller game`() {
-        val map = TestAppConfigMap.Empty
-
-        assertTrue(DailyChallengeEnabled(map)())
-        assertTrue(LeaderboardsEnabled(map)())
+    fun `the kill switch defaults on so an unreachable server is not a smaller game`() {
+        assertTrue(LeaderboardsEnabled(TestAppConfigMap.Empty)())
     }
 
     @Test
@@ -47,9 +43,7 @@ class MonetizationConfigValuesTest {
                 "ads.interstitial.rewardedGapSeconds" to 60,
                 "ads.interstitial.suppressDaysSinceInstall" to 7,
                 "ads.rewarded.continuesPerRun" to 1,
-                "ads.rewarded.dailyRetriesPerDay" to 2,
                 "pro.upsell.enabled" to false,
-                "feature.dailyChallenge" to false,
                 "feature.leaderboards" to false,
             )
         )
@@ -60,9 +54,7 @@ class MonetizationConfigValuesTest {
         assertEquals(60, InterstitialRewardedGapSeconds(map)())
         assertEquals(7, InterstitialSuppressDaysSinceInstall(map)())
         assertEquals(1, RewardedContinuesPerRun(map)())
-        assertEquals(2, RewardedDailyRetriesPerDay(map)())
         assertFalse(ProUpsellEnabled(map)())
-        assertFalse(DailyChallengeEnabled(map)())
         assertFalse(LeaderboardsEnabled(map)())
     }
 

@@ -47,30 +47,6 @@ class RunEndReportingTest : CoroutineTest() {
         }
     }
 
-    /**
-     * Decisions D19 and D24. There is no Daily board, and a Daily score is set on
-     * a seed everybody else also played, so it cannot be ranked against Endless
-     * runs either — which leaves nowhere for it to go. This is the assertion that
-     * keeps it from going somewhere anyway, because nothing below the ViewModel
-     * knows which mode a value came from, and a Daily score on the all-time board
-     * is a leaderboard that no longer measures one thing.
-     */
-    @Test
-    fun aFinishedDailyRunPostsToNoBoardAtAll() = runUnitTest {
-        val daily = FakeDailyRepository().grant()
-        playing(picture = StackedOutBoard, fallingAt = Cell(2, 0), daily = daily) {
-            act(GameAction.StartDaily)
-            land()
-            waitOutResolution()
-            declineContinue()
-
-            assertTrue(
-                leaderboards.submissions.isEmpty(),
-                "a Daily score reached a board: ${leaderboards.submissions}",
-            )
-        }
-    }
-
     @Test
     fun nothingIsPostedWhileARunIsStillGoing() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
@@ -101,7 +77,6 @@ class RunEndReportingTest : CoroutineTest() {
             val fact = achievements.recorded.single()
 
             assertEquals(record.score, fact.score)
-            assertEquals(record.mode, fact.mode)
             assertEquals(record.endedAt, fact.endedAt)
             assertEquals(record.longestCascade, fact.longestCascade)
             assertEquals(record.merges, fact.merges)

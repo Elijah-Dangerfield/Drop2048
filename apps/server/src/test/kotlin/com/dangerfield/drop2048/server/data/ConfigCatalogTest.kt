@@ -41,10 +41,9 @@ class ConfigCatalogTest {
             "ads.interstitial.cooldownSeconds",
             "ads.interstitial.rewardedGapSeconds",
             "ads.interstitial.suppressDaysSinceInstall",
+            "ads.banner.enabled",
             "ads.rewarded.continuesPerRun",
-            "ads.rewarded.dailyRetriesPerDay",
             "pro.upsell.enabled",
-            "feature.dailyChallenge",
             "feature.leaderboards",
         )
 

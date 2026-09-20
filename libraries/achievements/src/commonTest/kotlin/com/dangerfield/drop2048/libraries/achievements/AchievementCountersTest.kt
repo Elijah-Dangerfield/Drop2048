@@ -1,6 +1,5 @@
 package com.dangerfield.drop2048.libraries.achievements
 
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -47,26 +46,19 @@ class AchievementCountersTest {
     }
 
     /**
-     * Decision D19: a Daily score is set on a seed everybody else also played, so
-     * it cannot own the headline number. Everything else about the run still
-     * counts, because a merge is a merge.
+     * The best score is a high-water mark, so a worse run after a good one
+     * cannot lower it. D19 used to carve Daily runs out of this counter; D27
+     * removed the mode, so every run is eligible and the carve-out is gone.
      */
     @Test
-    fun aDailyRunFeedsEveryCounterExceptTheBestScore() {
-        val counters = foldAll(outcome(mode = GameMode.DAILY, score = 500_000, merges = 40))
-
-        assertEquals(0L, counters[Stat.BestScore])
-        assertEquals(40L, counters[Stat.TotalMerges])
-    }
-
-    @Test
-    fun theDailyStreakIsAHighWaterMarkAndABrokenStreakDoesNotLowerIt() {
+    fun theBestScoreIsAHighWaterMarkAcrossRuns() {
         val counters = foldAll(
-            outcome(mode = GameMode.DAILY, dailyStreakDays = 9, endedAt = 1),
-            outcome(mode = GameMode.DAILY, dailyStreakDays = 1, endedAt = 2),
+            outcome(score = 500_000, merges = 40, endedAt = 1),
+            outcome(score = 12, merges = 2, endedAt = 2),
         )
 
-        assertEquals(9L, counters[Stat.BestDailyStreak])
+        assertEquals(500_000L, counters[Stat.BestScore])
+        assertEquals(42L, counters[Stat.TotalMerges])
     }
 
     /**

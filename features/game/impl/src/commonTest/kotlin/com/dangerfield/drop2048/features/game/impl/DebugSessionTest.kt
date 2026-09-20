@@ -13,11 +13,11 @@ import kotlin.test.assertTrue
 /**
  * The guard SPEC 19 is really about: a QA run must not become a player's data.
  *
- * Four things claim a player did something — `run_record`, `daily_result`,
+ * Three things claim a player did something — `run_record`,
  * `Leaderboards.submit` and the achievement fact log — and a debug session has
- * to silence all four. This is the file that goes red if one of them is added
+ * to silence all three. This is the file that goes red if one of them is added
  * back, and it is paired with the opposite assertion in `RunEndReportingTest`,
- * which proves the same four fire on a normal run. Neither is worth much alone:
+ * which proves the same three fire on a normal run. Neither is worth much alone:
  * a guard that suppresses everything is indistinguishable from a broken run end
  * (L35).
  */
@@ -54,29 +54,6 @@ class DebugSessionTest : CoroutineTest() {
                 leaderboards.submissions.isEmpty(),
                 "a debug run posted ${leaderboards.submissions}",
             )
-        }
-    }
-
-    /**
-     * A Daily played in a debug session must not close the day, because the row
-     * it would write is the only record of what the player scored on a board
-     * everybody else also played.
-     */
-    @Test
-    fun aDailyInADebugSessionBanksNothing() = runUnitTest {
-        val daily = FakeDailyRepository().grant()
-        playing(
-            picture = StackedOutBoard,
-            fallingAt = Cell(2, 0),
-            daily = daily,
-            debug = FakeDebugController(),
-        ) {
-            act(GameAction.StartDaily)
-            land()
-            waitOutResolution()
-            declineContinue()
-
-            assertTrue(daily.banked.isEmpty(), "a debug Daily banked ${daily.banked}")
         }
     }
 

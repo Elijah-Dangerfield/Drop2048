@@ -67,6 +67,57 @@ import kotlin.test.assertTrue
  * reinstated bonus: 90 skipped rows at two points, or 4.1 rows a drop across 22
  * drops, which is what a script that locks from wherever it happens to be should
  * average on an eight-row board.
+ *
+ * Re-pinned a **fourth** time, 2026-09-20, for the owner's ruling that the game
+ * does not get hard quickly enough. Two engine changes shipped together so the
+ * pin only had to move once, exactly as D11's three did:
+ *
+ * 1. A block enters in a uniform random column instead of `cols / 2`. The column
+ *    comes off the run's own RNG, so both halves of a draw moved at once — the
+ *    stream gained a roll per draw, and the board the run builds is a different
+ *    board.
+ * 2. `blocksPerLevel` went 20 to 15, so levels arrive on different drops and
+ *    every survival and level-up payout lands at a different level.
+ *
+ * `772 / 22 drops / level 2` became `7166 / 87 drops / level 6`, and the size of
+ * that is the finding rather than a worry. The script below is a random walk
+ * that starts wherever the block spawns, so under a centre spawn it piled
+ * everything into the middle columns and stacked out in 22 drops; spread over
+ * five columns it survives four times as long. **This says nothing about
+ * difficulty for a player who steers** — a player picks a column and the spawn
+ * only decides how far they have to carry the block. `tools/balance` measured
+ * that question and `decisions.md` D26 carries the numbers; this constant
+ * measures bytes.
+ *
+ * Re-derived by running the engine and reading the values out (L17), and the
+ * arithmetic closes on all four channels rather than on a residual:
+ *
+ * - **692** hard drop — 346 skipped rows at two points, over 80 of the 87 drops.
+ * - **2,970** survival — 15 drops at each of levels 1-5 paying 10/20/30/40/50 is
+ *   2,250, then the 12 drops spent at level 6 paying 60 is 720.
+ * - **2,000** level-up — `100 x (2+3+4+5+6)`, five of them, which is the 87 drops
+ *   over a 15-block level.
+ * - **1,504** over 65 merges.
+ *
+ * They sum to 7,166. The 87 spawns landed 22/20/10/21/14 across the five
+ * columns; the middle column's 10 against an expected 17 is about two standard
+ * deviations on 87 draws, and `SpawnTest` asserts the uniformity over 50,000.
+ *
+ * **This is the fourth re-pin and it is the last cheap one**, and D27 changed what
+ * makes the next one expensive. The freeze used to trigger on the first Daily
+ * Challenge result, because everyone played one shared board and a digest move
+ * split that board between app versions. The Daily is gone, so that trigger is
+ * gone with it.
+ *
+ * What replaces it is weaker and still real: SPEC 3's rule that a score is only
+ * comparable to another score played under the same rules. The all-time and
+ * weekly boards survive, so **the trigger is now the first score posted to a
+ * live board**. Until then nothing is banked, because there are no store
+ * accounts and no shipped build (SPEC 0).
+ *
+ * `SAVE_FORMAT_VERSION` went to 7 in this change, which is what stops a run
+ * saved under the old rules coming back under these. D27 took it to 8 for the
+ * same reason a chunk later.
  */
 class DeterminismTest {
 
@@ -167,9 +218,9 @@ class DeterminismTest {
         const val FNV_OFFSET = -0x340d631b7bdddcdbL
         const val FNV_PRIME = 0x100000001b3L
 
-        const val PINNED_SCORE = 772L
-        const val PINNED_BLOCKS_DROPPED = 22
-        const val PINNED_LEVEL = 2
-        const val PINNED_DIGEST = 931_206_270_441_098_336L
+        const val PINNED_SCORE = 7_166L
+        const val PINNED_BLOCKS_DROPPED = 87
+        const val PINNED_LEVEL = 6
+        const val PINNED_DIGEST = 7_004_126_634_716_158_444L
     }
 }

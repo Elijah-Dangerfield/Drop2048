@@ -53,7 +53,7 @@ object ConfigCatalog {
         int(
             path = "level.blocksPerLevel",
             default = 20,
-            description = "MOVES THE DETERMINISM DIGEST. Changing this invalidates every Daily Challenge score and " +
+            description = "MOVES THE DETERMINISM DIGEST. Changing this invalidates every replayable run and " +
                 "every seed-attached bug report recorded under the old value (D9). Reach for the speed curve first.",
         ),
         int(
@@ -104,10 +104,14 @@ object ConfigCatalog {
             default = 3,
             description = "Interstitials suppressed entirely for this many days after install (SPEC 12: 3).",
         ),
+        flag(
+            path = "ads.banner.enabled",
+            default = true,
+            description = "The banner below the board, drawn only where the arrow row would be (D28). " +
+                "Off gives the strip back to the board, which is also what a no-fill does.",
+        ),
         int("ads.rewarded.continuesPerRun", 2, "Hard cap on rewarded continues in one run (SPEC 12: 2)."),
-        int("ads.rewarded.dailyRetriesPerDay", 1, "Rewarded Daily Challenge retries per UTC day (SPEC 12: 1)."),
         flag("pro.upsell.enabled", true, "The Settings entry and the once-per-session stacked-out card (SPEC 12)."),
-        flag("feature.dailyChallenge", true, "Kill switch for SPEC 14. Off hides the entry point."),
         flag("feature.leaderboards", true, "Kill switch for the platform boards. Off hides the entry point."),
     )
 

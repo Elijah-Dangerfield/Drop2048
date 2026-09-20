@@ -1,7 +1,5 @@
 package com.dangerfield.drop2048.libraries.achievements
 
-import com.dangerfield.drop2048.libraries.progress.GameMode
-
 /**
  * A finished run that earns nothing at all.
  *
@@ -12,7 +10,6 @@ import com.dangerfield.drop2048.libraries.progress.GameMode
  * counting the neutral outcome, half the file would fail at once.
  */
 fun outcome(
-    mode: GameMode = GameMode.ENDLESS,
     score: Long = 0,
     level: Int = 1,
     blocksPlaced: Int = 0,
@@ -22,10 +19,8 @@ fun outcome(
     bursts: Int = 0,
     merges: Int = 0,
     facts: RunFacts = RunFacts.Empty,
-    dailyStreakDays: Int = 0,
     endedAt: Long = 1,
 ): RunOutcome = RunOutcome(
-    mode = mode,
     score = score,
     level = level,
     blocksPlaced = blocksPlaced,
@@ -35,7 +30,6 @@ fun outcome(
     bursts = bursts,
     merges = merges,
     facts = facts,
-    dailyStreakDays = dailyStreakDays,
     endedAt = endedAt,
 )
 

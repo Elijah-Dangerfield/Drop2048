@@ -1,6 +1,36 @@
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
+    // R8, pinned ahead of the one AGP ships with.
+    //
+    // AGP 8.13.1 shades R8 8.13.17 into `com.android.tools.build:builder`, and
+    // that build of R8 links a kotlin-metadata-jvm that reads metadata up to
+    // version 2.2.0. This project is on Kotlin 2.3.21, which emits 2.3.0, so
+    // every release build printed 93 copies of
+    //
+    //   WARNING: R8: An error occurred when parsing kotlin metadata
+    //
+    // with no class named unless you ran with --info. Android's own table
+    // (developer.android.com/studio/build/kotlin-d8-r8-versions) puts the floor
+    // for Kotlin 2.3 at R8 8.13.19, two patches above what is bundled. R8 is
+    // published separately for exactly this, and putting it on the settings
+    // buildscript classpath shadows the shaded copy.
+    //
+    // Everything R8 failed to parse was a *synthetic* class — a lambda, an
+    // inlined flow operator, a SAM conversion, all `k=3` metadata — so the
+    // warnings were cosmetic. This is a version bump rather than a fix for a
+    // bug; it is here so the next person reading a release log does not have to
+    // rediscover that.
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+        dependencies {
+            classpath("com.android.tools:r8:8.13.19")
+        }
+    }
+
     includeBuild("build-logic")
     repositories {
         google {
@@ -71,10 +101,6 @@ if (!serverOnly) {
     // :libraries:achievements; this is the screen that draws them.
     include(":features:achievements")
     include(":features:achievements:impl")
-    // SPEC 14's Daily Challenge screen. The board it opens is :features:game
-    // with a mode argument, not a second game screen.
-    include(":features:daily")
-    include(":features:daily:impl")
     // SPEC 19's QA menu and the in-game diagnostics overlay. Reachable only
     // after seven taps on the version number, and on a release build only after
     // a passphrase as well — it can grant Pro and it silences the analytics

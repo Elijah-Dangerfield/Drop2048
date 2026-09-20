@@ -21,6 +21,38 @@ baselineProfile {
     automaticGenerationDuringBuild = false
 }
 
+/**
+ * Whether this invocation may put the house ad network on an iOS compile
+ * classpath.
+ *
+ * Kotlin/Native has no build-type source sets. `iosArm64CompileKlibraries` and
+ * `iosSimulatorArm64CompileKlibraries` are one configuration each, shared by the
+ * debug and the release framework link, so there is no `debugImplementation` to
+ * scope `:libraries:ads:fake` to and it used to be linked into every iOS binary:
+ * a release `ComposeApp` contained the anvil provider
+ * `provideHouseAdNetworkHouseAds`, the `HouseAdHost` composable and every
+ * `HouseAdNetwork` member. iOS was left holding only the `BuildInfo.isDebug`
+ * check inside `HouseAds`, which is the weakest of the three layers.
+ *
+ * The build type is known one level up, so that is where it is read. Xcode sets
+ * `CONFIGURATION` for the run-script phase that calls
+ * `embedAndSignAppleFrameworkForXcode`, which is how every shipped iOS artifact
+ * is produced, and it is the same signal the Kotlin plugin itself reads to pick
+ * which framework to embed.
+ *
+ * **Fail closed.** Anything that is not demonstrably a Debug Xcode build counts
+ * as a release build, so a bare `./gradlew linkReleaseFramework…`, CI, fastlane
+ * and an unset environment all land on the safe side. A command-line debug link
+ * that actually wants to see house ads opts back in with
+ * `-Pdrop2048.iosHouseAds=true`. Getting this wrong costs a debug build its
+ * placeholder ads; getting it wrong the other way ships a network that can grant
+ * a reward without an ad.
+ */
+val iosLinksHouseAds: Boolean = providers.environmentVariable("CONFIGURATION")
+    .map { it.startsWith("Debug", ignoreCase = true) }
+    .orElse(providers.gradleProperty("drop2048.iosHouseAds").map(String::toBoolean))
+    .getOrElse(false)
+
 dependencies {
     baselineProfile(projects.apps.baselineprofile)
 
@@ -85,6 +117,107 @@ val verifyNoHouseAdsInRelease = tasks.register("verifyNoHouseAdsInRelease") {
 }
 
 tasks.named("check") { dependsOn(verifyNoHouseAdsInRelease) }
+
+/**
+ * The iOS twin of [verifyNoHouseAdsInRelease], on the graph.
+ *
+ * `iosLinksHouseAds` is the exclusion; this is what stops it being a comment,
+ * and it is not a tautology over that flag. It also catches the module arriving
+ * **transitively**. `:libraries:ads:impl` or `:features:debug:impl` picking up
+ * `:libraries:ads:fake` would put the house network back into every iOS binary
+ * without anyone editing the `iosMain` block this file guards.
+ *
+ * Both Apple targets, because the simulator one is the target everybody builds
+ * and `iosArm64` is the one that reaches the App Store.
+ *
+ * Skipped, rather than inverted, when the invocation *is* a debug iOS build:
+ * there is nothing it could truthfully assert then, and `check` is not something
+ * Xcode runs.
+ */
+val verifyNoHouseAdsInIosRelease = tasks.register("verifyNoHouseAdsInIosRelease") {
+    val classpaths = listOf("iosArm64CompileKlibraries", "iosSimulatorArm64CompileKlibraries")
+        .map { name ->
+            name to configurations.named(name).map { config ->
+                config.incoming.resolutionResult.allComponents.map { it.id.displayName }
+            }
+        }
+    val required = !iosLinksHouseAds
+    classpaths.forEach { (name, components) -> inputs.property(name, components) }
+    onlyIf("this invocation is not building a debug iOS binary") { required }
+    doLast {
+        val offenders = classpaths.flatMap { (name, components) ->
+            components.get().filter { it.contains(":libraries:ads:fake") }.map { "$name: $it" }
+        }
+        check(offenders.isEmpty()) {
+            "The house ad network is on an iOS release compile classpath: $offenders. " +
+                "It may only be linked when `iosLinksHouseAds`. See HouseAds."
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyNoHouseAdsInIosRelease) }
+
+/**
+ * The same question asked of the linked artifact, which is the only thing that
+ * actually proves anything.
+ *
+ * The graph check above trusts `iosLinksHouseAds` to have decided correctly. If
+ * that flag ever reads true during a release link, whether from a renamed Xcode
+ * variable, a daemon holding a stale environment or a future edit to the
+ * expression, then the graph check *skips itself* and the module is linked.
+ * That is precisely the silent regression this whole exercise is about, and the
+ * only thing that can see it is `ComposeApp` itself.
+ *
+ * Free, because it only runs as a finalizer of a link that already took minutes.
+ *
+ * The `NoHouseAds` probe is not belt and braces. A search for an absent string
+ * passes whether or not the search works, so a toolchain that stopped embedding
+ * Kotlin type names would turn this task into a green light forever (L: a clean
+ * run does not prove the check ran). `NoHouseAds` is the binding a release build
+ * must resolve `HouseAds` to, so it has to be present; if neither string is
+ * there, the task is not looking at what it thinks it is and says so.
+ */
+listOf("IosArm64", "IosSimulatorArm64").forEach { target ->
+    val binary = layout.buildDirectory.file(
+        "bin/${target.replaceFirstChar(Char::lowercaseChar)}/releaseFramework/" +
+            "ComposeApp.framework/ComposeApp",
+    )
+    val houseNetwork = "com.dangerfield.drop2048.libraries.ads.fake"
+    val probe = "NoHouseAds"
+
+    val verify = tasks.register("verifyNoHouseAdsIn${target}ReleaseFramework") {
+        outputs.upToDateWhen { false }
+        doLast {
+            val file = binary.get().asFile
+            check(file.isFile) { "No linked release framework at $file to check." }
+            val bytes = file.readBytes()
+            val present = listOf(houseNetwork, probe).filter { needle ->
+                val pattern = needle.encodeToByteArray()
+                var start = 0
+                var found = false
+                while (!found && start <= bytes.size - pattern.size) {
+                    var i = 0
+                    while (i < pattern.size && bytes[start + i] == pattern[i]) i++
+                    found = i == pattern.size
+                    start++
+                }
+                found
+            }
+            check(houseNetwork !in present) {
+                "The house ad network is linked into ${file.name} for $target. " +
+                    "A release iOS binary must contain no house network. See HouseAds."
+            }
+            check(probe in present) {
+                "Found neither $houseNetwork nor $probe in ${file.name}. This check reads " +
+                    "Kotlin type names out of the binary, and finding neither means it is no " +
+                    "longer reading them, not that the binary is clean."
+            }
+        }
+    }
+
+    tasks.matching { it.name == "linkReleaseFramework$target" }
+        .configureEach { finalizedBy(verify) }
+}
 
 /**
  * Fails the build if the directive channel ever reaches a release artifact.
@@ -163,12 +296,15 @@ kotlin {
         }
 
         iosMain.dependencies {
-            // iOS has no build-type source sets, so the house network is linked
-            // into every iOS binary and the guard is `BuildInfo.isDebug`
-            // (`Platform.isDebugBinary`, set by the Xcode configuration) inside
-            // `HouseAdNetwork.select`. Stated here rather than assumed: this is
-            // the one platform where the guarantee is a runtime check.
-            implementation(projects.libraries.ads.fake)
+            // The house network, on debug iOS binaries only. Kotlin/Native has
+            // no `debugImplementation`, so the build type comes from
+            // `iosLinksHouseAds` above and the two `verifyNoHouseAdsInIos…`
+            // tasks are what stop that being a comment. `HouseAds`' runtime
+            // `BuildInfo.isDebug` check stays: it is now the third layer here
+            // rather than the only one.
+            if (iosLinksHouseAds) {
+                implementation(projects.libraries.ads.fake)
+            }
 
             // Same gap, and here it is load-bearing rather than merely
             // tolerated: a TestFlight build *is* a release binary, so holding
@@ -218,8 +354,6 @@ kotlin {
 
             implementation(projects.features.achievements)
             implementation(projects.features.achievements.impl)
-            implementation(projects.features.daily)
-            implementation(projects.features.daily.impl)
             implementation(projects.features.debug)
             implementation(projects.features.debug.impl)
             implementation(projects.features.game)

@@ -7,7 +7,6 @@ import com.dangerfield.drop2048.libraries.achievements.Stat
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementDao
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementFactEntity
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementUnlockEntity
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -84,7 +83,6 @@ class AchievementsRepositoryImplTest {
         highestTier: Int = 32,
         endedAt: Long = 1,
     ): RunOutcome = RunOutcome(
-        mode = GameMode.ENDLESS,
         score = 0,
         level = 1,
         blocksPlaced = 0,
@@ -100,7 +98,6 @@ class AchievementsRepositoryImplTest {
     private fun factOf(outcome: RunOutcome) = AchievementFactEntity(
         id = 1,
         key = outcome.key,
-        mode = outcome.mode.name,
         score = outcome.score,
         level = outcome.level,
         blocksPlaced = outcome.blocksPlaced,
@@ -113,7 +110,6 @@ class AchievementsRepositoryImplTest {
         stoneBursts = 0,
         wildcardBursts = 0,
         longestDangerRun = 0,
-        dailyStreakDays = outcome.dailyStreakDays,
         endedAt = outcome.endedAt,
     )
 }

@@ -153,6 +153,10 @@ class AdMobAdNetwork(
             when (format) {
                 AdFormat.Rewarded -> showRewarded(activity)
                 AdFormat.Interstitial -> showInterstitial(activity)
+                // A banner is a view in the game's own layout, served by
+                // `AdMobBannerSurface`. There is nothing here to show and
+                // nothing to suspend on.
+                AdFormat.Banner -> AdShowOutcome(AdShowResult.NotShown, "banner_is_not_shown")
             }
         }
             .logOnFailure { "AdMob show threw for $format" }
@@ -167,6 +171,7 @@ class AdMobAdNetwork(
     override fun isReady(format: AdFormat): Boolean = when (format) {
         AdFormat.Rewarded -> rewarded != null
         AdFormat.Interstitial -> interstitial != null
+        AdFormat.Banner -> false
     }
 
     override fun preload(format: AdFormat) {
@@ -178,6 +183,7 @@ class AdMobAdNetwork(
                     AdFormat.Rewarded -> if (rewarded == null) rewarded = loadRewarded().getOrNull()
                     AdFormat.Interstitial ->
                         if (interstitial == null) interstitial = loadInterstitial().getOrNull()
+                    AdFormat.Banner -> Unit
                 }
             }.logOnFailure { "AdMob preload failed for $format" }
         }

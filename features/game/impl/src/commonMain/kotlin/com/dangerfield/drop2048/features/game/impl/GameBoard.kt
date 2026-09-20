@@ -43,10 +43,12 @@ import com.dangerfield.drop2048.libraries.ui.components.game.GameToast
 import com.dangerfield.drop2048.libraries.ui.components.game.LandingGhost
 import com.dangerfield.drop2048.libraries.ui.components.game.LocalBoardScale
 import com.dangerfield.drop2048.libraries.ui.components.game.SpecialTile
+import com.dangerfield.drop2048.libraries.ui.components.game.TargetCell
 import com.dangerfield.drop2048.libraries.ui.components.game.Tile
 import com.dangerfield.drop2048.libraries.ui.components.game.TileSlot
 import com.dangerfield.drop2048.libraries.ui.components.game.rememberTilePop
 import com.dangerfield.drop2048.libraries.ui.system.Motion
+import com.dangerfield.drop2048.libraries.ui.system.focusTarget
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockSpecial
 import com.dangerfield.drop2048.system.thenIfNotNull
 import kotlin.math.abs
@@ -73,12 +75,29 @@ import kotlin.math.roundToInt
  * handoff writes every board dimension in `em` precisely so the whole thing
  * scales from one number, and pinning that number to a dp constant would give a
  * small phone small cells with a full-size gutter.
+ *
+ * ### The danger treatment stops at the end of the run
+ *
+ * `inDanger` is a warning, and a warning about a run that is over is the red
+ * corners the owner reported seeing behind the stacked-out sheet (2026-09-20).
+ * It was a real leak rather than a design choice. [BoardWell] draws the ring and
+ * its glow **outside** its own bounds so the warning reaches peripheral vision,
+ * and every overlay is clipped to the board's 24dp corner, so the one part of
+ * the board treatment no scrim can ever cover is the alarm. It stayed at full
+ * saturation around a dimmed, blurred board on the one screen where there is
+ * nothing left to warn anybody about.
+ *
+ * `ContinueOffer` keeps it, and that is the distinction rather than an
+ * exception: the run is still alive there, the board is deliberately left sharp
+ * (SPEC 12.2) because it is the whole argument for taking the offer, and the
+ * argument is precisely how close to the top the stack is.
  */
 @Composable
 fun GameBoard(
     state: GameUiState,
     boardDescription: String,
     fallingDescription: String?,
+    targetDescription: String?,
     calloutText: String?,
     onSteerTo: (Int) -> Unit,
     onFlickDown: () -> Unit,
@@ -89,7 +108,7 @@ fun GameBoard(
 
     BoardWell(
         modifier = modifier,
-        danger = state.inDanger,
+        danger = state.inDanger && state.phase != GamePhase.StackedOut,
         contentDescription = boardDescription,
     ) {
         BoxWithConstraints(contentAlignment = Alignment.TopStart) {
@@ -138,6 +157,24 @@ fun GameBoard(
                                 pitch = pitch,
                             )
                         }
+                    }
+
+                    // Under the ghost and under the blocks. It is the quiet half
+                    // of the pair — the ghost is what moves with the finger, and
+                    // the moment the two coincide is the beat's own answer.
+                    state.tutorial?.target?.let { target ->
+                        TargetCell(
+                            scale = scale,
+                            modifier = Modifier
+                                .offset(
+                                    x = pitch * target.col + scale.gutter,
+                                    y = pitch * target.row + scale.gutter,
+                                )
+                                .focusTarget(TargetFocusKey)
+                                .thenIfNotNull(targetDescription) { label ->
+                                    semantics { contentDescription = label }
+                                },
+                        )
                     }
 
                     state.ghost?.let { landing ->
@@ -205,6 +242,23 @@ fun GameBoard(
  * every time the block moved a column, which is once per drag step: the pointer
  * would be dropped mid-drag and the next move would be measured from a grab point
  * that no longer exists.
+ *
+ * ### The flick is measured from the turn, not from the touch
+ *
+ * The thresholds are the handoff's (`dy > 30px`, released within 450ms) and they
+ * are defensible as a description of a flick. What was not defensible was
+ * measuring them from the moment the finger landed, because it made the flick
+ * conditional on everything the finger did *before* it: steer for a second and
+ * the 450ms window had closed, steer three columns and `dy > abs(dx)` was
+ * arithmetically unreachable. So the one gesture the game is built on — slide
+ * it over, then send it down, without lifting — could not be performed at all,
+ * and the tutorial's first drop is exactly that gesture.
+ *
+ * The origin is therefore the highest point the finger has reached, with the
+ * time it got there, reset every time it climbs. For a straight downward flick
+ * that is the touch itself and the numbers are unchanged; for a drag followed by
+ * a flick it is the turn, which is the only place the two numbers were ever
+ * describing. Nothing was loosened: 30dp in 450ms still has to happen.
  */
 @Composable
 private fun Modifier.steering(
@@ -226,20 +280,26 @@ private fun Modifier.steering(
             val grabbedAt = down.position
             val grabbedCol = column.value
             var last = down.position
-            var elapsed = 0L
+            var lastAt = down.uptimeMillis
+            var turn = down.position
+            var turnAt = down.uptimeMillis
 
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pointer = event.changes.firstOrNull { it.id == down.id } ?: break
                 last = pointer.position
-                elapsed = pointer.uptimeMillis - down.uptimeMillis
+                lastAt = pointer.uptimeMillis
+                if (last.y <= turn.y) {
+                    turn = last
+                    turnAt = lastAt
+                }
                 if (!pointer.pressed) break
                 steer.value(grabbedCol + ((last.x - grabbedAt.x) / cellWidthPx).roundToInt())
             }
 
-            val dx = last.x - grabbedAt.x
-            val dy = last.y - grabbedAt.y
-            if (dy > flickDistance && dy > abs(dx) && elapsed < FlickWindowMillis) flick.value()
+            val dx = last.x - turn.x
+            val dy = last.y - turn.y
+            if (dy > flickDistance && dy > abs(dx) && lastAt - turnAt < FlickWindowMillis) flick.value()
         }
     }
 }
@@ -459,8 +519,23 @@ private const val EmPerCell = 0.24f
 /** The handoff puts the toast at 40% of the board's height rather than at its centre. */
 private const val ToastRise = 0.10f
 
-/** The design's `dy > 30px` flick threshold, in dp because 30 CSS pixels is 30dp. */
+/**
+ * The design's `dy > 30px` flick threshold, in dp because 30 CSS pixels is 30dp.
+ *
+ * Kept as it is. On the 360dp frame the goldens use, a cell is 70dp, so 30dp is
+ * a little under half a cell — far enough that a thumb rolling on the glass
+ * during a sideways drag does not clear it, short enough that the gesture is one
+ * decisive motion rather than a stroke. It is an unvalidated guess, but it is a
+ * guess in the right band and there is nothing yet to correct it with.
+ */
 private val FlickDistance: Dp = 30.dp
 
-/** `released within 450ms`. */
+/**
+ * `released within 450ms`, now measured across the downward stroke rather than
+ * the whole gesture (see [steering]).
+ *
+ * Also kept: it is roughly the slowest motion that still reads as a flick rather
+ * than as a drag, and the window is what stops a player who has parked their
+ * finger low on the board from dropping the block when they lift it.
+ */
 private const val FlickWindowMillis = 450L

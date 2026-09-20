@@ -137,7 +137,7 @@ class ScoringTest {
 
     @Test
     fun levellingUpIsWorthOneHundredTimesTheNewLevel() {
-        val state = stateOf(flatBottom, blocksDropped = 19, level = 1)
+        val state = stateOf(flatBottom, blocksDropped = EngineConfig.DEFAULT_BLOCKS_PER_LEVEL - 1, level = 1)
         val transition = drop(state, value(2), col = 0)
 
         val levelUp = transition.transcript.steps.filterIsInstance<ResolutionStep.LevelUp>().single()

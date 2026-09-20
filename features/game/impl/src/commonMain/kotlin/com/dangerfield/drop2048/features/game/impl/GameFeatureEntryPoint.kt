@@ -10,15 +10,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
-import com.dangerfield.drop2048.features.daily.DailyRoute
 import com.dangerfield.drop2048.features.debug.Diagnostics
 import com.dangerfield.drop2048.features.debug.DiagnosticsSettings
 import com.dangerfield.drop2048.features.debug.describe
 import com.dangerfield.drop2048.features.game.GameRoute
-import com.dangerfield.drop2048.features.game.GameRouteTypeMap
 import com.dangerfield.drop2048.features.settings.SettingsRoute
 import com.dangerfield.drop2048.features.stats.StatsRoute
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.flowroutines.ObserveEvents
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
 import com.dangerfield.drop2048.libraries.navigation.Router
@@ -33,7 +30,6 @@ import com.dangerfield.drop2048.libraries.ui.debug.LocalBoardDiagnostics
 import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import drop2048.libraries.resources.generated.resources.Res
 import drop2048.libraries.resources.generated.resources.share_footer
-import drop2048.libraries.resources.generated.resources.share_title_daily
 import drop2048.libraries.resources.generated.resources.share_title_endless
 import org.jetbrains.compose.resources.stringResource
 import me.tatarka.inject.annotations.Inject
@@ -49,8 +45,8 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  *
  * **The share is assembled here too**, for the same reason and one more: the
  * words come from `:libraries:resources` and need a composition, and `ShareText`
- * deliberately cannot see one. `GameViewModel` sends numbers and a UTC day; this
- * is where they become a string and reach the platform's share sheet. Wiring the
+ * deliberately cannot see one. `GameViewModel` sends the numbers; this is where
+ * they become a string and reach the platform's share sheet. Wiring the
  * call site in the same chunk as the module is the whole point — a launcher with
  * no caller looks exactly like coverage.
  */
@@ -64,23 +60,17 @@ class GameFeatureEntryPoint(
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
-        screen<GameRoute>(typeMap = GameRouteTypeMap) { backStackEntry ->
+        screen<GameRoute> { backStackEntry ->
             val viewModel: GameViewModel = viewModel { gameViewModelFactory() }
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
             val cues = LocalCues.current
             val route = backStackEntry.toRouteOrNull<GameRoute>()
             val replay = route?.replayTutorial == true
-            val daily = route?.mode == GameMode.DAILY
             val endlessTitle = stringResource(Res.string.share_title_endless)
-            val dailyTitle = stringResource(Res.string.share_title_daily)
             val footer = stringResource(Res.string.share_footer)
 
             LaunchedEffect(replay) {
                 if (replay) viewModel.takeAction(GameAction.ReplayTutorial)
-            }
-
-            LaunchedEffect(daily) {
-                if (daily) viewModel.takeAction(GameAction.StartDaily)
             }
 
             viewModel.ObserveEvents { effect ->
@@ -88,16 +78,11 @@ class GameFeatureEntryPoint(
                     is GameEffect.Play -> cues.play(effect.cue)
                     GameEffect.Leave -> router.goBack()
                     GameEffect.OpenStats -> router.navigate(StatsRoute())
-                    GameEffect.OpenDaily -> router.navigate(DailyRoute())
                     GameEffect.OpenSettings -> router.navigate(SettingsRoute())
                     is GameEffect.Share -> shareLauncher.share(
                         ShareText.format(
                             result = effect.result,
-                            labels = ShareLabels(
-                                title = effect.day?.let { "$dailyTitle$TitleSeparator$it" }
-                                    ?: endlessTitle,
-                                footer = footer,
-                            ),
+                            labels = ShareLabels(title = endlessTitle, footer = footer),
                         )
                     )
                 }
@@ -135,10 +120,10 @@ class GameFeatureEntryPoint(
      * it covered SCORE and LEVEL — which is the wrong half to lose, because "what
      * did that cascade pay" is most of what somebody reading a transcript wants
      * to know, and it is only on screen while the run is alive. At the bottom it
-     * covers the three control buttons instead, and the board's own drag control
-     * (`ControlScheme.Both` is the default) still steers and still flicks, so the
-     * run stays playable with the overlay up. Found by turning it on and looking
-     * at it.
+     * covers the three control buttons instead — which since drag became the
+     * default are not usually on screen at all — and the board's own drag control
+     * still steers and still flicks, so the run stays playable with the overlay
+     * up. Found by turning it on and looking at it.
      *
      * Composed unconditionally and drawn only when something is switched on, so
      * the state collection lives for the life of the screen rather than being

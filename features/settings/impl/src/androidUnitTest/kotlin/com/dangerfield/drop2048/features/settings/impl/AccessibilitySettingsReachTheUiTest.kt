@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.features.settings.impl
 
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.dangerfield.drop2048.features.settings.PlayerSettings
@@ -14,6 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
@@ -39,6 +41,12 @@ import kotlin.test.assertTrue
  * It also asserts the **live** case, which the screenshot goldens cannot: a
  * setting changed while the app is running has to reach the composition without
  * a relaunch, because the settings screen opens over a live board.
+ *
+ * Reduce motion is here on different terms since the owner ruling of
+ * 2026-09-20. There is no in-app toggle to reach the UI any more, so what is
+ * tested is the half that survived: the phone's own setting, read through
+ * `isOsReduceMotionEnabled` and driven here by writing the Android global the
+ * Android actual reads.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -82,17 +90,58 @@ class AccessibilitySettingsReachTheUiTest {
     }
 
     @Test
-    fun `reduce motion and larger numbers reach the composition`() {
-        val store = FakeSettingsStore(
-            PlayerSettings(reduceMotion = true, largeNumbers = true),
-        )
+    fun `larger numbers reach the composition`() {
+        val store = FakeSettingsStore(PlayerSettings(largeNumbers = true))
         val seen = Observed()
 
         compose.setContent { PlayerThemeProvider(store) { seen.Record() } }
         compose.waitForIdle()
 
-        assertTrue(seen.reduceMotion)
         assertTrue(seen.largeNumbers)
+    }
+
+    /**
+     * **Reduce motion has no in-app switch any more** (owner ruling,
+     * 2026-09-20), and the OS path it now depends on entirely is the one thing
+     * that could have gone with it. Android maps "Remove animations" onto
+     * `TRANSITION_ANIMATION_SCALE`, so a zero scale is a phone asking for less
+     * motion, and this composes the production wire over it.
+     *
+     * Paired with its negative below (L35): without the second half this would
+     * pass against a `LocalReduceMotion` wired to a constant `true`.
+     */
+    @Test
+    fun `the os reduce-motion setting still reaches the composition`() {
+        setOsAnimationScale(0f)
+        val seen = Observed()
+
+        compose.setContent { PlayerThemeProvider(FakeSettingsStore()) { seen.Record() } }
+        compose.waitForIdle()
+
+        assertTrue(
+            seen.reduceMotion,
+            "a phone with animations removed must still get the shortened transcript. " +
+                "isOsReduceMotionEnabled is the only source left.",
+        )
+    }
+
+    @Test
+    fun `a phone that wants animation gets it`() {
+        setOsAnimationScale(1f)
+        val seen = Observed()
+
+        compose.setContent { PlayerThemeProvider(FakeSettingsStore()) { seen.Record() } }
+        compose.waitForIdle()
+
+        assertFalse(seen.reduceMotion)
+    }
+
+    private fun setOsAnimationScale(scale: Float) {
+        Settings.Global.putFloat(
+            RuntimeEnvironment.getApplication().contentResolver,
+            Settings.Global.TRANSITION_ANIMATION_SCALE,
+            scale,
+        )
     }
 
     /**
@@ -114,7 +163,6 @@ class AccessibilitySettingsReachTheUiTest {
             store.update {
                 it.copy(
                     palette = BlockPaletteChoice.Deuteranopia,
-                    reduceMotion = true,
                     largeNumbers = true,
                     haptics = HapticsSetting.Strong,
                 )
@@ -123,7 +171,6 @@ class AccessibilitySettingsReachTheUiTest {
         compose.waitForIdle()
 
         assertEquals(BlockPalettes[BlockPaletteChoice.Deuteranopia], seen.palette)
-        assertTrue(seen.reduceMotion)
         assertTrue(seen.largeNumbers)
     }
 

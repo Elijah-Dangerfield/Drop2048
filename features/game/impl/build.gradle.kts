@@ -45,7 +45,6 @@ kotlin {
             implementation(projects.features.debug)
             implementation(projects.features.settings)
             implementation(projects.features.stats)
-            implementation(projects.features.daily)
             // The badge copy for the unlock toast. A feature impl may depend on
             // another feature's api, which is why AchievementCopy lives there.
             implementation(projects.features.achievements)

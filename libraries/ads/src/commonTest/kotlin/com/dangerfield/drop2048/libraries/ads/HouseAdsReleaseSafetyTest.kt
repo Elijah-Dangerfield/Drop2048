@@ -25,11 +25,14 @@ import kotlin.test.assertSame
  * So the guarantee has three legs and this file is one of them:
  *
  * 1. `:apps:compose:verifyNoHouseAdsInRelease` fails the build if the module
- *    reaches the release runtime classpath at all.
+ *    reaches the release runtime classpath at all. iOS has no build-type source
+ *    sets to hang that on, so it gets the same leg from Xcode's `CONFIGURATION`
+ *    instead, checked by `verifyNoHouseAdsInIosRelease` on the graph and by
+ *    `verifyNoHouseAdsInIosSimulatorArm64ReleaseFramework` on the linked binary.
  * 2. This test: the class a release build binds has no network and cannot be
  *    made to have one.
- * 3. `HouseAdNetwork.select` ands with `BuildInfo.isDebug`, which is the only
- *    leg iOS has — it has no build-type source sets for leg 1 to hang on.
+ * 3. `HouseAdNetwork.select` ands with `BuildInfo.isDebug`, which covers a
+ *    binary that contains the class when it should not.
  */
 class HouseAdsReleaseSafetyTest {
 

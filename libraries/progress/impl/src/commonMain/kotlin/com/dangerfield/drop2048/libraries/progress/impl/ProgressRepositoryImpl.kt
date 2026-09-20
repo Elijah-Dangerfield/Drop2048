@@ -1,6 +1,5 @@
 package com.dangerfield.drop2048.libraries.progress.impl
 
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
 import com.dangerfield.drop2048.libraries.progress.RunStats
@@ -56,16 +55,9 @@ private fun RunRecord.toEntity() = RunRecordEntity(
     longestCascade = longestCascade,
     bursts = bursts,
     merges = merges,
-    mode = mode.name,
     seed = seed,
 )
 
-/**
- * A row whose [RunRecordEntity.mode] no longer names a [GameMode] reads as
- * [GameMode.ENDLESS] rather than throwing. The stats page is a lifetime summary;
- * losing every number on it because one old row names a mode this build dropped
- * is a worse outcome than one row being counted in the wrong bucket.
- */
 private fun RunRecordEntity.toDomain() = RunRecord(
     id = id,
     endedAt = endedAt,
@@ -78,6 +70,5 @@ private fun RunRecordEntity.toDomain() = RunRecord(
     longestCascade = longestCascade,
     bursts = bursts,
     merges = merges,
-    mode = GameMode.entries.firstOrNull { it.name == mode } ?: GameMode.ENDLESS,
     seed = seed,
 )

@@ -90,7 +90,6 @@ class DebugScreenshotTest {
                     showTranscript = true,
                 ),
                 proGranted = true,
-                dailyStreak = 7,
                 soak = SoakSummary(
                     policy = "greedy",
                     cheats = false,

@@ -10,18 +10,27 @@ import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
 
 /**
- * The two SDK formats the app serves.
+ * The three SDK formats the app serves.
  *
- * There is no `Banner` and there will not be one. SPEC 12.4 is explicit and the
- * reasoning is load-bearing: the board is tall and narrow, the vertical space is
- * what makes the danger row readable, and a banner that shifts layout mid-run
- * reads as the game cheating. Adding one would be an entry here — which is the
- * point of an enum with two cases.
+ * [Banner] arrived on 2026-09-20 and overturned SPEC 12.4's "Banners: none",
+ * which this enum used to state in prose. The reasoning that rule was built on
+ * has not been thrown away, it has been answered: the banner is drawn **only
+ * where the arrow row would have been**, so it never takes vertical space the
+ * board was using, and it occupies no space at all until an ad is really on
+ * screen, so a build with no fill is a build with no strip. D28 has the full
+ * trade, including the principle that was spent to get it.
+ *
+ * [Banner] is also the odd one out mechanically: [AdNetwork.show] cannot serve
+ * it, because a banner is a view that lives in the layout rather than a
+ * full-screen thing that is shown and dismissed. It is served by
+ * [BannerSurface], and the entry here exists so [AdUnits] has somewhere to keep
+ * the unit id and so a future network cannot forget the format exists.
  */
 @ObjCName("AdFormat", exact = true)
 enum class AdFormat {
     Rewarded,
     Interstitial,
+    Banner,
 }
 
 /**
@@ -95,6 +104,11 @@ interface AdNetwork {
      * Shows an already-loaded ad, or loads one first. Suspends until it closes.
      * The implementation resolves the ad unit itself from [AdUnits], so there is
      * exactly one file to edit when the real ids arrive.
+     *
+     * [AdFormat.Banner] has no answer here and must return
+     * [AdShowResult.NotShown]. A banner is a view in a layout, not something
+     * that is shown over the app and dismissed, so there is nothing for this
+     * call to suspend on. [BannerSurface] serves it.
      */
     suspend fun show(format: AdFormat): AdShowOutcome
 

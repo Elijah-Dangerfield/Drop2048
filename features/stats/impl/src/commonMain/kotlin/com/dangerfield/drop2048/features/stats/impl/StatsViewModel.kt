@@ -6,8 +6,6 @@ import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunStats
-import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
-import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Inject
@@ -23,7 +21,6 @@ import me.tatarka.inject.annotations.Inject
 @Inject
 class StatsViewModel(
     private val progress: ProgressRepository,
-    private val daily: DailyRepository,
 ) : SEAViewModel<StatsState, StatsEvent, StatsAction>(initialStateArg = StatsState()) {
 
     init {
@@ -48,25 +45,11 @@ class StatsViewModel(
                 .catch { Catching<Unit> { throw it }.logOnFailure { "Could not read stats" } }
                 .collect { stats -> updateState { it.copy(stats = stats, loading = false) } }
         }
-        viewModelScope.launch {
-            daily.observe()
-                .catch { Catching<Unit> { throw it }.logOnFailure { "Could not read the daily streak" } }
-                .collect { status -> updateState { it.copy(streak = status.streak) } }
-        }
     }
 }
 
 data class StatsState(
     val stats: RunStats = RunStats.Empty,
-    /**
-     * SPEC 15's "Daily streak current and best".
-     *
-     * Its own field rather than a pair of numbers inside [RunStats], because
-     * `RunStats` is defined as the fold over `run_record` and this is folded out
-     * of `daily_result`. Folding one table into the other's value class would
-     * make `statsFrom` a function that cannot compute its own result.
-     */
-    val streak: DailyStreak = DailyStreak.Empty,
     val loading: Boolean = true,
 )
 

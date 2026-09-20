@@ -63,9 +63,9 @@ class LeaderboardTest {
     private companion object {
         /**
          * All-time high score and weekly high score. SPEC 15 asked for a third,
-         * the Daily Challenge, and D24 dropped it — a board over one seed with a
-         * capped attempt count ranks the luck of the drops rather than the
-         * player.
+         * over the Daily Challenge, and D24 dropped it before it shipped — a
+         * board over one seed with a capped attempt count ranks the luck of the
+         * drops rather than the player. D27 then removed the mode.
          */
         const val BoardCount = 2
     }

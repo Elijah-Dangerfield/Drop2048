@@ -9,15 +9,17 @@ Ordered by when it starts blocking. Last pruned 2026-09-09 after C7.
 
 ## Blocking now
 
-### The Sentry DSN is now the single blocker on the directive channel
+### File one directive from a real build, so the channel gets proved end to end
 
-The whole thing is built, tested and verified on a device: the button drags and stays put across a
+The DSN landed in `5558f70` and is committed in `telemetry.properties`, so the blocker is gone. The
+channel is built and device-verified up to the send: the button drags and stays put across a
 force-stop, the panel captures the frame underneath, a typed directive reaches
-`captureUserFeedback` with `feedback_kind=owner_directive`. Then the log says
-`Sentry disabled, feedback dropped` and nothing leaves the phone.
+`captureUserFeedback` with `feedback_kind=owner_directive`. What has never been observed is a report
+arriving in Sentry, because `docs/feedback-log.md` records that nothing has left a device yet.
 
-One DSN turns it on. After that, `/feedback-triage` reads your directives out of Sentry and files
-them into `docs/todos.md`, with `docs/feedback-log.md` as the ledger that keeps it idempotent.
+What is left is one real directive filed from your own build. After that, `/feedback-triage` reads
+your directives out of Sentry and files them into `docs/todos.md`, with `docs/feedback-log.md` as
+the ledger that keeps it idempotent.
 
 **Expect the first triage run to need you beside it.** Sodogku's found the feedback twin was not
 reachable from the Sentry MCP and had to fall back to the carrier's extra and attachment — the
@@ -67,19 +69,34 @@ is a policy problem, not a bug. **Cheaper to answer now than at C10.**
 
 ### The digest freeze — the window is closing
 
-`PINNED_DIGEST` has now moved **three** times (the merge-position ruling, cutting hard drop, and
-reinstating it), and every one was free because **no Daily score has ever been recorded.** Daily
-Challenge is built and shipped; the moment a real score exists, changing the digest silently
-invalidates every posted score, because those players competed on a different block sequence.
+`PINNED_DIGEST` has now moved **four** times: the merge-position ruling, cutting hard drop,
+reinstating it, and the 2026-09-20 difficulty ruling (random spawn column plus `blocksPerLevel`
+20 → 15, shipped together so the pin moved once). Every one was free because **nothing has ever been
+banked**: no store accounts, no live leaderboard, no shipped build.
 
-Frozen at that same moment:
-- **`EngineConfig.Default`** — D18 pins the Daily to it for comparability, so any release that moves
-  a field of it splits that day's board between app versions.
-- **`level.blocksPerLevel`** — remote-configurable and digest-moving. The console warns loudly and
-  requires a typed confirmation in prod, but **nothing enforces it server-side.**
-- **`dailySeedFor`'s stride and salt** — moving either re-rolls every past and future day.
+**The Daily Challenge was removed on 2026-09-20 (D27), which changes what this section is about.**
+The old argument was seed comparability: everyone played one shared board, so moving the digest
+split that board between app versions. That reason is gone with the feature. What remains is the
+weaker but still real one, SPEC 3's: a score is only comparable to another score played under the
+same rules. The all-time and weekly boards survive, so the moment a real score is posted to either,
+a digest move silently makes the table a mix of two different games.
+
+Frozen at that moment:
+- **`EngineConfig.Default`** — any release that moves a field of it changes what a given score was
+  worth. D18's Daily-specific pinning is moot; the comparability argument is not.
+- **`level.blocksPerLevel`** — remote-configurable and digest-moving, and it *just moved* (20 → 15).
+  The console warns loudly and requires a typed confirmation in prod, but **nothing enforces it
+  server-side.**
+- **`dailySeedFor`'s stride and salt** — no longer relevant, removed with the feature.
 
 Measured safe to keep tuning live: the speed curve, the spawn table.
+
+**`special.stone.firstLevel` is the difficulty knob you have left, and it is remote.** The harness
+priced it on 2026-09-20: moving the Stone from level 12 to 10 roughly halves the 2048 rate (1.79% →
+0.84%) and pushes runs ending at 256 from 20% to 36%, while buying zero seconds off time to level 4.
+It was not shipped because it is aimed at the end of a run rather than the start, which is not what
+"does not get hard quick enough" describes. If the build still feels slow after playing it, that is
+a console push, not a release, and not a permanent digest cost.
 
 **Decide the rule now.** The obvious one is that the digest is versioned alongside the leaderboard
 and changing it retires the old board.
@@ -131,10 +148,10 @@ platform icon set if it reads better natively.
 | **Grafana / OTel endpoint + token** | C8 | The two dashboards that matter: median level reached, and highest-tier-reached distribution. |
 | **App Store Connect + Play Console apps** | C9, C10 | Bundle IDs and signing. Leaderboards are configured store-side before any code can submit. |
 | **Game Center leaderboard IDs** | C9 | **Exact ids, already in code:** `com.dangerfield.drop2048.leaderboard.score_alltime` (classic, all-time) and `com.dangerfield.drop2048.leaderboard.score_weekly` (**recurring, weekly**). The Daily board was cut (D24), so do not create a third. Until these exist every submission fails silently, exactly like a signed-out player's. The Game Center capability is already enabled on the iOS target (`iosApp.entitlements`). |
-| **Game Center achievement IDs** | C9 | All 24, derived from `AchievementId` and typed by hand into App Store Connect. Each is one-step (100% in a single report) and hidden = no. **Changing an id after a player has earned it orphans that badge on their profile**, which is why `PlatformAchievementIdTest` pins the format. The full list: `com.dangerfield.drop2048.achievement.FirstMerge`<br>`com.dangerfield.drop2048.achievement.SixtyFour`<br>`com.dangerfield.drop2048.achievement.FirstBurst`<br>`com.dangerfield.drop2048.achievement.ChainOfFive`<br>`com.dangerfield.drop2048.achievement.ChainOfTen`<br>`com.dangerfield.drop2048.achievement.DoubleBurst`<br>`com.dangerfield.drop2048.achievement.LevelTwenty`<br>`com.dangerfield.drop2048.achievement.FiveHundredBlocks`<br>`com.dangerfield.drop2048.achievement.OnTheBrink`<br>`com.dangerfield.drop2048.achievement.CleanSweep`<br>`com.dangerfield.drop2048.achievement.StoneCold`<br>`com.dangerfield.drop2048.achievement.WildFinish`<br>`com.dangerfield.drop2048.achievement.FirstFigures`<br>`com.dangerfield.drop2048.achievement.SolidRun`<br>`com.dangerfield.drop2048.achievement.SharpRun`<br>`com.dangerfield.drop2048.achievement.BigRun`<br>`com.dangerfield.drop2048.achievement.MonsterRun`<br>`com.dangerfield.drop2048.achievement.SevenDays`<br>`com.dangerfield.drop2048.achievement.ThirtyDays`<br>`com.dangerfield.drop2048.achievement.OneHour`<br>`com.dangerfield.drop2048.achievement.FiveHours`<br>`com.dangerfield.drop2048.achievement.TenHours`<br>`com.dangerfield.drop2048.achievement.TwentyFiveHours`<br>`com.dangerfield.drop2048.achievement.FiftyHours` |
+| **Game Center achievement IDs** | C9 | All 22, derived from `AchievementId` and typed by hand into App Store Connect. Each is one-step (100% in a single report) and hidden = no. **Changing an id after a player has earned it orphans that badge on their profile**, which is why `PlatformAchievementIdTest` pins the format. The full list: `com.dangerfield.drop2048.achievement.FirstMerge`<br>`com.dangerfield.drop2048.achievement.SixtyFour`<br>`com.dangerfield.drop2048.achievement.FirstBurst`<br>`com.dangerfield.drop2048.achievement.ChainOfFive`<br>`com.dangerfield.drop2048.achievement.ChainOfTen`<br>`com.dangerfield.drop2048.achievement.DoubleBurst`<br>`com.dangerfield.drop2048.achievement.LevelTwenty`<br>`com.dangerfield.drop2048.achievement.FiveHundredBlocks`<br>`com.dangerfield.drop2048.achievement.OnTheBrink`<br>`com.dangerfield.drop2048.achievement.CleanSweep`<br>`com.dangerfield.drop2048.achievement.StoneCold`<br>`com.dangerfield.drop2048.achievement.WildFinish`<br>`com.dangerfield.drop2048.achievement.FirstFigures`<br>`com.dangerfield.drop2048.achievement.SolidRun`<br>`com.dangerfield.drop2048.achievement.SharpRun`<br>`com.dangerfield.drop2048.achievement.BigRun`<br>`com.dangerfield.drop2048.achievement.MonsterRun`<br>`com.dangerfield.drop2048.achievement.OneHour`<br>`com.dangerfield.drop2048.achievement.FiveHours`<br>`com.dangerfield.drop2048.achievement.TenHours`<br>`com.dangerfield.drop2048.achievement.TwentyFiveHours`<br>`com.dangerfield.drop2048.achievement.FiftyHours` |
 | **Decide whether Play Games is in v1** | C9 | SPEC 15 names it; C9 shipped an inert Android seam. Yes means a Play Games Services project, a second id per board, and replacing `NoGameServices`. |
 | **Badge art** | C9 | The 24 achievement glyphs are placeholder emoji, and the locked treatment (35% alpha) reads weakly on colour emoji. |
-| **Confirm `drop2048.app`** | C9 | It is in the share footer and in the default privacy/terms URLs. If the domain is not yours, change `share_footer` and the `legal.*` config defaults. |
+| **Confirm `drop2048.app`** | C9 | Now only in the share footer (`share_footer`). The `legal.*` defaults moved to the live Pages URLs on 2026-09-16. If the domain is not yours, change `share_footer`; if it is, pointing the legal keys at it is a config push, not a release. |
 | **AdMob account, app + unit IDs** | C10 | Test IDs work until then. |
 | **Pro IAP product** | C10 | Non-consumable, $2.99 at current scope (SPEC 2 — thinner than the original $3.99 because coins, powerups and Zen are cut). |
 | **Privacy policy + terms, hosted** | C11 | The gate does legal re-accept, so the version matters, not just the text. |
@@ -161,13 +178,20 @@ The longest lead time in the project.
 ### Author the sample bank — this is now the only thing between you and a game with sound
 
 The playback path is **built and live on both platforms** (Android `SoundPool`, iOS pooled
-`AVAudioPlayer`), wired to the sound setting, with per-cascade-step pitch. Verified on an emulator,
-which logged all sixteen samples missing by name.
+`AVAudioPlayer`), wired to the sound setting, with per-cascade-step pitch.
 
-**16 files, one `.ogg` per sound, mono, short, named by its key** (`merge.ogg`, `merge_big.ogg`,
-`burst.ogg`, `spawn.ogg`, `move.ogg`, `nudge.ogg`, `lock.ogg`, `bomb.ogg`, `board_cleared.ogg`,
-`danger_enter.ogg`, `danger_exit.ogg`, `stacked_out.ogg`, `level_up.ogg`, `ui_tap.ogg`,
-`ui_back.ogg`, plus the remaining one listed in `SoundBank`'s KDoc).
+This list was wrong until 2026-09-20 and is now derived from the `Sound` enum rather than from
+memory. It said sixteen files, listed a `nudge.ogg` that D21 retired, and omitted `hard_drop.ogg`.
+Anyone who had followed it would have authored the wrong set.
+
+**15 files, one `.ogg` per sound, mono, short, named by its key:** `spawn.ogg`, `move.ogg`,
+`hard_drop.ogg`, `lock.ogg`, `merge.ogg`, `merge_big.ogg`, `burst.ogg`, `bomb.ogg`,
+`board_cleared.ogg`, `danger_enter.ogg`, `danger_exit.ogg`, `level_up.ogg`, `stacked_out.ogg`,
+`ui_tap.ogg`, `ui_back.ogg`.
+
+Two of those fifteen are declared but **never fired by any code**: `spawn` and `ui_back`. So the
+set that actually makes noise is thirteen. Author them last, or not at all until something plays
+them.
 
 Drop them in `libraries/ui/src/androidMain/assets/audio/` and the Xcode project's resources. **No
 code changes.** A missing sample logs its name and leaves that one effect silent.

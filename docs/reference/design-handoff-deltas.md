@@ -33,7 +33,9 @@ Take these exactly, not approximately. The numbers in its README are final.
 - Layout: the header, the flex spacer that pushes controls into thumb reach, the control row.
 - The overlays: start, paused, game over.
 - **The control scheme** (D11), *except* for what ▼ does: drag-anywhere as primary, arrows
-  secondary, no preview, no hold.
+  secondary, no preview, no hold. An owner ruling on 2026-09-20 went further than the handoff and
+  took the arrow row off the default screen entirely; it is a "Show arrow buttons" switch in
+  Settings now. The handoff's arrow art is still what that row looks like when it is on.
 
 ## Where the handoff is stale, and what wins instead
 
@@ -47,7 +49,7 @@ Take these exactly, not approximately. The numbers in its README are final.
 | Row burst adds each tile's face value | **`5000 + 250 x blocksCleared`** (SPEC 7) | The burst is the game's release valve and has to dwarf flat play. |
 | 5x7 board, "the intended shipping default" | **5x8** (SPEC 3) | Settled on a device in C3, measured. At five columns the cell size is set by the phone's *width*, so 7 rows drew a cell 3% larger and turned the rest into gutter, while costing a full row of danger-state warning (L25). |
 | Game over when the spawn cell is occupied | **Row 0 occupied after a resolution completes** (SPEC 3.1) | Checking mid-resolution is the most common way this genre gets it wrong. |
-| "No backend, no accounts, no network. Everything is local and synchronous." Best score only. | **Room stats, Daily Challenge, achievements, leaderboards, remote config, ads, Pro IAP** | Owner ruling. That line scopes the prototype, not the product. |
+| "No backend, no accounts, no network. Everything is local and synchronous." Best score only. | **Room stats, achievements, Game Center leaderboards, remote config, ads, Pro IAP** | Owner ruling. That line scopes the prototype, not the product. There is still no account (SPEC 20), and a Daily Challenge was on this list until D27 removed the mode on 2026-09-20. |
 | Score `+= newValue × chainDepth` | SPEC 7's table | Broadly agrees on merges; the handoff omits burst, bomb, level-up and survival. |
 
 ## Things the handoff explicitly leaves open

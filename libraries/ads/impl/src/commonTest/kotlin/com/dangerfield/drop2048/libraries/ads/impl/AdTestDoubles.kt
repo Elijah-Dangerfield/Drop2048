@@ -63,6 +63,9 @@ class FakeAdNetwork(
             when (format) {
                 AdFormat.Rewarded -> rewardedResult
                 AdFormat.Interstitial -> interstitialResult
+                // Nothing asks this network for a banner: `BannerSurface`
+                // serves that format and never goes through `show`.
+                AdFormat.Banner -> AdShowResult.NotShown
             }
         )
     }

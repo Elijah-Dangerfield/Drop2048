@@ -90,19 +90,9 @@ class SettingsViewModel(
             is SettingsAction.SetPalette -> persist { it.copy(palette = action.palette) }
             is SettingsAction.SetHaptics -> persist { it.copy(haptics = action.setting) }
             is SettingsAction.SetControlScheme -> persist { it.copy(controlScheme = action.scheme) }
-            SettingsAction.ToggleReduceMotion -> persist { it.copy(reduceMotion = !it.reduceMotion) }
             SettingsAction.ToggleLargeNumbers -> persist { it.copy(largeNumbers = !it.largeNumbers) }
             SettingsAction.ToggleSound -> persist { it.copy(soundEnabled = !it.soundEnabled) }
-            SettingsAction.ToggleMusic -> persist { it.copy(musicEnabled = !it.musicEnabled) }
-            SettingsAction.ToggleLeftHanded -> persist { it.copy(leftHanded = !it.leftHanded) }
             SettingsAction.ToggleGhost -> persist { it.copy(ghostEnabled = !it.ghostEnabled) }
-            SettingsAction.ToggleConfirmQuit -> persist {
-                it.copy(confirmBeforeQuit = !it.confirmBeforeQuit)
-            }
-
-            SettingsAction.ToggleDiagnostics -> persist {
-                it.copy(diagnosticsOptIn = !it.diagnosticsOptIn)
-            }
 
             // SPEC 12's persistent Settings entry. It goes through the
             // coordinator rather than straight to a route so the one refusal
@@ -282,14 +272,9 @@ sealed interface SettingsAction {
     data class SetPalette(val palette: BlockPaletteChoice) : SettingsAction
     data class SetHaptics(val setting: HapticsSetting) : SettingsAction
     data class SetControlScheme(val scheme: ControlScheme) : SettingsAction
-    data object ToggleReduceMotion : SettingsAction
     data object ToggleLargeNumbers : SettingsAction
     data object ToggleSound : SettingsAction
-    data object ToggleMusic : SettingsAction
-    data object ToggleLeftHanded : SettingsAction
     data object ToggleGhost : SettingsAction
-    data object ToggleConfirmQuit : SettingsAction
-    data object ToggleDiagnostics : SettingsAction
 
     /** SPEC 15's badge grid. Settings is its only entry point. */
     /** SPEC 12's "small persistent entry in Settings". */

@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 class LicenceListTest {
 
     @Test
-    fun `groups by licence, biggest first, modules sorted inside`() {
+    fun `groups by licence with the biggest group first and modules sorted inside`() {
         val groups = parseLicences(
             """
             androidx.activity:activity	1.12.0	Apache-2.0	https://apache.org

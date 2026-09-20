@@ -6,6 +6,558 @@ the decision, alternatives considered, and *why*. Newest first.
 
 ---
 
+## 2026-09-20 · D29 — Five settings removed, and the behaviour each one guarded is fixed in place
+
+**Owner ruling.** Five rows leave the settings screen. Four of them were real
+preferences and one was never a preference at all. Open source licences were
+asked about in the same pass and explicitly **stay**: the app ships Apache-2.0,
+MIT, BSD, MPL and EPL dependencies, and MIT and BSD both require the notice to
+travel with the binary, so that row is an obligation rather than a courtesy.
+
+### The removal that is a behaviour change, not a deletion
+
+"Ask before quitting" defaulted **on**, and `GameViewModel.quit()` read it:
+`if (!confirmBeforeQuit) leaveRun()`. Deleting a field a branch reads has two
+outcomes and only one of them is the ruling — the branch body is `leaveRun()`,
+so the careless removal is the one where Quit silently ends a run with no
+question. The surviving behaviour is that quitting **always** confirms, and
+`QuitConfirmTest` is what makes that deliberate rather than whichever half of an
+`if` the delete happened to leave standing. This is the general shape of the
+whole chunk: a removed setting leaves a default behind, and the default that
+survives has to be chosen rather than inherited.
+
+### Reduce motion becomes the phone's setting, not the game's
+
+The in-app toggle is gone; `isOsReduceMotionEnabled` stays and is now the whole
+of what `LocalReduceMotion` carries. The two were ORed, which is a defensible
+design and a worse one than this: a player who has told their phone once should
+not have to tell the game again, and two sources for one boolean is two things
+to keep in step. The `reduceMotion` parameter survives on `AppThemeProvider` and
+`PreviewContent` for previews and screenshot goldens, which have no OS setting
+to read — it is documented there as a rendering override rather than a
+preference, and production passes it nowhere. `AccessibilitySettingsReachTheUiTest`
+drives the Android global the actual reads, in both directions.
+
+### The music switch was a switch that did nothing
+
+`PlayerSettings.musicEnabled` was persisted, rendered, and read by no audio code
+anywhere, because there is no music system (SPEC 9 says the track is not built).
+That is worse than an absent feature: a player who turns it off believes they
+have changed something. Removed rather than disabled, and SPEC 9 now says the
+switch comes back with the track and not before.
+
+### Diagnostics moves rather than disappearing
+
+"Send diagnostics with feedback" was offered twice, in Settings and on the
+feedback form, over one stored field. The settings row went and the feedback
+one stayed, because the form is the screen a player is on when the question is
+live. **The C13a distinction underneath it is untouched**: a player's report
+attaches a session log only on `diagnosticsOptIn` and has its breadcrumbs
+cleared (L74), and `FeedbackKind.OwnerDirective` takes both unconditionally
+because it is decided by the kind and not by an argument. Flattening those into
+one rule while removing a duplicate switch was the available mistake;
+`TelemetryOwnerDirectiveReporterTest` pins the negative half — the owner's
+reporter never passes `attachSessionLog` at all.
+
+### The left-handed mirror goes down to the design system
+
+It was `PlayerSettings.leftHanded`, `AppData.leftHandedControls`, a row that
+appeared only while the arrow switch was on, a field on `GameUiState`, and a
+`mirrored` flag on `GameControlRow` that swapped the two arrows and their
+handlers. All of it is gone, including the flag: a parameter with no caller is
+a second layout waiting to drift from the first.
+
+### Stats: a rename and one new fold
+
+The owner asked for "their high score and highest level reached". The high score
+was already the page's headline under the label "Best endless run" — wording
+that existed to distinguish it from a Daily score, which D27 removed — so it was
+relabelled rather than duplicated as a second stat. `RunStats.highestLevel` is
+new, folded as `max(level)` over `run_record` beside the existing `max(score)`,
+and it sits in **Bests** next to the highest tier deliberately: levels advance on
+blocks dropped, so a level is a survival record and a tier is an achievement
+one, and a run sets either without setting the other. Nothing is stored — the
+rule in `RunStats`' KDoc holds, and a fold stays retroactively fixable.
+
+### Goldens
+
+`settings-default`, `settings-full`, `settings-accessible` and the three settings
+dialog frames all move, and `stats-populated` and `stats-first-run` with them.
+`game-left-handed.png` is deleted with the test that drew it. `stats-full` is
+new, on the tall inventory frame `SettingsScreenshotTest` already uses: the
+stats page is longer than the 360x640 frame it is judged on, so before it the
+whole of Bests and Lifetime was never in a golden at all — a row could be added
+below the fold and move no pixels.
+
+---
+
+## 2026-09-20 · D28 — A banner under the board, and the principle it cost
+
+**Owner ruling, and it overturns the hardest rule in SPEC 12.** That section read
+"Banners: none", and `AdFormat` said in prose that there is no `Banner` and there
+will not be one. Both are now wrong on purpose. This entry exists so the next
+person to read the new rule can see what was traded for it rather than assuming
+nobody had thought about it.
+
+### What the old rule was protecting, and what is left of it
+
+Three arguments, and they are not equally good.
+
+**"The board is tall and narrow and vertical space is what makes the danger row
+readable."** This one was measured and it is the reason the banner is *conditional*.
+A 5x8 board is 0.625 wide per tall; a phone is nearer 0.45. The board is width-bound
+on every phone, so vertical space is exactly what the board does **not** convert into
+cells: on a 412x915 frame it used 598dp of the 738dp it was given. The banner takes
+the strip the arrow row uses, which is height the board has never been able to spend.
+Measured on that frame: the board is 380dp wide with or without a banner, and the cell
+pitch is 72.8dp in both. **No player loses a pixel of board to the banner that they
+were not already losing to the arrow row.**
+
+**"A banner that shifts layout mid-run reads as the game cheating."** Survives
+intact, and is why `bannerAllowed` is resolved at a run boundary rather than on every
+publish. Nothing about the strip changes while a block is falling.
+
+**"If one is ever added, its space is reserved from app launch so nothing moves."**
+Explicitly reversed, and this is the ruling's sharpest part. Reserving the space is
+what makes a missing ad permanent: on a no-fill the player gets a 50dp band of
+backdrop instead of an ad, forever, and the board never gets it back. The rule is now
+the opposite and it is enforced by shape rather than by a branch. `BannerSurface`
+emits **nothing at all** until an ad is on screen, the board above it has
+`weight(1f)`, so every reason the banner can be absent (no fill, network error, either
+remote key off, Pro, a platform with no SDK) produces the identical layout without any
+of them being enumerated anywhere. `BoardTakesTheStripTest` asserts they produce the
+same rectangle rather than six expected numbers, because a regression that reserved
+the strip would move all six together.
+
+### The principle that was spent
+
+SPEC 12's governing principle is *the player never sees an ad they did not choose
+while a run is alive*, and it says everything else is negotiable and that is not. A
+banner under a live board is the first thing in this app that has to be argued against
+it rather than derived from it.
+
+The argument, stated plainly so it can be disagreed with later: the banner is chosen
+in the only sense the principle was protecting. It stands in the space the player told
+the game they were not using, it is absent for anybody who turned the arrow row on, it
+cannot appear or vanish during a drop, and it never covers, interrupts or delays
+anything. What the principle was built to forbid is an ad that takes the game away
+from somebody in the middle of it, and every mechanism that could do that (the
+interstitial's one call site, `RunActivity.isRunAlive`, `InterstitialPolicy`) is
+untouched.
+
+That is a real cost and it should be read as one. The honest version is that the
+principle is now "the player never sees an ad they did not choose **take the game
+away from them** while a run is alive", and the second clause is doing work it did not
+have to do before.
+
+### `PaywallTrigger.Continue`, wired at last
+
+Declared in C10 with a written rationale and **zero call sites anywhere, including
+tests**, which is exactly the failure `feature.leaderboards` was (D25): a documented
+surface that did not exist. It is now a quiet "Or see Pro" under "No thanks" on the
+continue offer, which is where its own rationale always said it belonged: the player
+is already deciding whether an advertisement is worth their time.
+
+`PaywallCoordinator` grew `mayOffer(trigger)` for it. The coordinator refuses every
+trigger but `Direct` when `pro.upsell.enabled` is off, and all of them for a Pro
+player, and a caller cannot know those two rules without copying them. Asking first is
+how the control is *absent* rather than dead.
+
+### "Tired of the ads?" is no longer allowed to be a lie
+
+The card is claimed once per session on the stacked-out screen. SPEC 12.3 suppresses
+interstitials for three days after install and until the fourth run of a session, so
+the first time a new player saw that card, they had reliably been shown nothing at
+all. It was selling the removal of an experience they had not had.
+
+`claimStackedOutCard` is now gated on `AdImpressions.anyAdShown()` and is suspending,
+because the answer is the same on-disk `AdState` the frequency gates read. Three
+consequences worth naming:
+
+- **The gate is checked before the session cap is spent.** Claiming and discarding
+  would burn the session's one card on a sheet that drew nothing, so the first
+  stacked-out screen *after* the first interstitial would have none left.
+- **A filled banner counts.** A banner under the board for a whole run is the
+  most-seen advertising the app has, and Pro removes it, so it is squarely what the
+  card is about.
+- **A rewarded ad does not count.** The player asked for it, watched it on purpose and
+  was paid for it, and SPEC 12 keeps rewarded video available to Pro holders. Counting
+  it would let the card promise to remove an ad the purchase keeps.
+- **iOS draws no card at all**, because `NoAdImpressions` is the binding that survives
+  where no ad network is wired. That is correct rather than a gap: iOS serves no ads,
+  so there is no honest version of this card there. Pro is still sold from Settings and
+  from the continue offer, both of which are controls the player reached for.
+
+### Two defects on the stacked-out screen, fixed in the same pass
+
+**The red corners were a leak, not a design.** `BoardWell` draws the danger ring and
+its glow *outside* its own bounds so the warning reaches peripheral vision, and every
+overlay is clipped to the board's 24dp corner. The blur clips to the board's
+**rectangle** while the ring follows a **rounded** one, so the only part of the alarm
+that survived was where the corner arc bulges inside the rectangle: four red corners
+around a dimmed, blurred board on the one screen where there is nothing left to warn
+anybody about. The danger treatment now stops at `GamePhase.StackedOut`. It stays on
+`ContinueOffer`, which is the distinction rather than an exception: the run is alive,
+the board is deliberately unblurred (SPEC 12.2) because it is the argument for taking
+the offer, and how close to the top the stack is *is* the argument.
+
+Nobody had seen it because `game-stacked-out` did not set `inDanger`, and a run cannot
+end without the stack reaching the danger row. The golden was the only stacked-out
+screen in existence that was not in danger. It sets it now.
+
+**"Watch and continue" meant nothing on a results sheet.** On the offer it is
+surrounded by a countdown, a headline and the terms; on the sheet it sat under a final
+score and read as an advertisement for an advertisement. The sheet's option now says
+`Not too late: watch an ad, keep going`, which is the fact the screen was failing to
+carry: the run is not actually over. The terms are deliberately not repeated there,
+because the option can only be drawn on a sheet the player reached through the offer,
+which has just spent four lines on them.
+
+**`continue_unavailable` is deleted.** "No ad to show right now, so this one is on us"
+was written and never shown, because `continueAccept` grants on every outcome except a
+deliberate dismissal. Shown, it would advertise the failure and teach that the reward
+is free, which is the lesson `UnservedAdGate` and `NotWiredAdNetwork` are both written
+to avoid. The grant is silent by design, so the string was documenting a behaviour the
+app does not have.
+
+### The board reclaims the space, and the 370dp number is gone
+
+The owner's words were *"it should have a GONE behaviour, not INVISIBLE"*, and the
+measurement says that is exactly right. On a 412x915 frame, before this change, hiding
+the arrow row moved the board by **zero pixels**: `BoardMaxWidth` was the handoff's
+`max-width: 370px`, a CSS number for a 5x7 board, and it bound at 370dp while the
+usable width was 380dp and 100dp of height sat unused underneath. Every pixel the row
+freed became a `Spacer` under a top-aligned board.
+
+Two changes, one rule. The cap goes to 480dp, which is wider than the usable width of
+any phone, so on a phone the board is bounded by the screen and by its own height and
+never by a number from a stylesheet; what the cap is still for is a tablet, where both
+of those bounds are enormous. And the board is **centred** in whatever space is left,
+because leftover height is structural (0.625 against 0.45) and the only question was
+ever where to put it.
+
+Measured, same 412x915 frame, `ControlScheme.Drag`:
+
+| | before | after |
+|---|---|---|
+| board width | 370dp | 380dp |
+| cell pitch | 70.8dp | 72.8dp |
+| board bottom edge | 675.5dp | 770dp |
+| identical to the arrows-on layout | **yes** | no |
+
+The last row is the ruling. `theBoardIsCentredInTheSpaceItIsGiven` states the fix as
+an identity rather than a number: give the frame 80dp more height and a centred board
+moves down by 40, a top-aligned one does not move at all.
+
+---
+
+## 2026-09-20 · D27 — The Daily Challenge is removed
+
+**Owner ruling.** "remove the daly challenge thing thats kinda dumb." SPEC 14 is
+struck, `:features:daily` and `:features:daily:impl` are deleted, and every seam
+the mode reached into goes with it. This is a scope cut, not a deprecation:
+nothing is left behind a flag and nothing is left dark.
+
+**Why it is worth writing down anyway.** The Daily was the most cross-cutting
+feature in the app for its size. It owned a screen, a table, a run mode, a
+rewarded ad placement, two remote config keys, two achievements, a stats
+section, a paywall perk and a save slot — and the mode discriminator it
+introduced, `GameMode`, had reached twenty-seven files. A feature that costs one
+module to build and eleven to remove is worth noticing, and the note for next
+time is that the discriminator is what spreads: `mode` travelled into
+`run_record`, into `achievement_fact`, into the saved-run blob, into a route
+argument and into every telemetry event, because each of those places had a
+reason to care which kind of run it was looking at.
+
+### `GameMode` goes too, rather than shrinking to one value
+
+The narrow change was to delete `GameMode.DAILY` and leave the enum with
+`ENDLESS`. It was rejected. A discriminator with one value cannot be read wrong
+and cannot be read right either: `bestScore()`'s `WHERE mode = 'ENDLESS'`, the
+exhaustive `when` in `postToLeaderboards` that D24 argued for, the two save
+slots, the `newBest` carve-out — all of those are rules *about the difference*
+between two modes, and with one mode they are ceremony that reads like a rule.
+The alternative cost is that a second mode, if one ever arrives, reintroduces
+the column. That is the right way round: the column is cheap to add back and the
+dead ceremony is expensive to keep, because it keeps being maintained.
+
+### Schema 9 deletes rows, which is why it is hand-written
+
+`daily_result` is dropped, and `run_record.mode`, `achievement_fact.mode` and
+`achievement_fact.dailyStreakDays` go with it. Room can generate `@DeleteTable`
+and `@DeleteColumn` on its own; what it cannot express is *delete the rows that
+column identified, before the column goes*. Dropping `mode` first would leave
+every Daily run behind as an ordinary one, silently folded into lifetime totals
+and into `MAX(score)` — and a Daily score was set on a shared seed and a pinned
+`EngineConfig`, so it is not the quantity a best score measures. The column is
+the only witness to which rows those are, so the deletion has to happen while it
+still exists. `MIGRATE_AWAY_FROM_THE_DAILY` is therefore a hand-written
+`Migration(8, 9)` added to the builder, and `AppDatabase`'s `autoMigrations`
+list carries a paragraph saying so, because a migration that is not on that list
+is one nobody will look for.
+
+`AppDatabaseMigrationTest` walks a real version 8 file through it, seeded with an
+Endless row and a Daily row in each of the two tables that carried a mode. It
+asserts the Endless rows survive and are still readable through the DAOs, the
+Daily rows are gone rather than relabelled, `daily_result` is not on disk, and
+the achievement `key` has been rewritten from `ENDLESS:2000` to `2000`. The
+positive control the file's own KDoc asks for is already there: a version 4
+database is still emptied and a version 10 one still refuses to open.
+
+**Alternative considered:** a destructive fallback from 8. Rejected on the
+standing rule `docs/todos.md`'s Watch list states — progress is device-local,
+there is no server copy, and an unrecoverable wipe to save a dozen lines of SQL
+is not a trade this app gets to make.
+
+### Two achievements become unearnable, and are deleted rather than left
+
+`SevenDays` and `ThirtyDays` were `Stat.BestDailyStreak` at 7 and 30. With the
+Daily gone nothing in the game can move that counter, so both would have shipped
+as tiles with a progress bar frozen at zero — which is exactly the failure
+`AchievementReachabilityTest` exists to catch, and it would not have caught it:
+`BestDailyStreak` was `Reach.OffTheBoard`, the arm that says "a calendar decides
+this, the engine has no opinion". A badge nobody can earn looks exactly like a
+working one.
+
+So `AchievementId` loses two entries, `AchievementGroup.Daily` goes with them,
+and the catalog is twenty-two. Deleting an entry contradicts that enum's own
+KDoc — ids are persisted by name, so removing one throws away everybody who
+earned it — and it is safe here for a reason that will not be true again: there
+are no store accounts, no release and no player who has earned either. The two
+Game Center ids are listed in `OWNER-TODO.md` as still to be typed into App
+Store Connect, so the cost is that the list is now two lines too long.
+
+**Alternative considered:** repurposing them as a play-day streak — "open the
+game on seven separate days" — folded from `run_record.endedAt`. It keeps the
+two ids, keeps the catalog at twenty-four and is a reasonable retention badge on
+its own merits. Rejected as scope: it is a new feature with a new date-aware
+branch in `AchievementCounters.fold`, invented in the same change that was asked
+to remove one. It is worth offering to the owner as its own decision rather than
+smuggling it in as a migration.
+
+### The Pro offer is three things now, and every string that sold four changed
+
+Pro was "no ads, every palette, two Daily attempts, two continues". The third
+perk no longer exists. `paywall_perk_daily` and `paywall_perk_daily_detail` are
+deleted along with the `Perk` row that drew them, and `settings_pro_hint` now
+reads "No ads, every palette, two continues instead of one." SPEC 2's
+monetization paragraph and SPEC 12's Pro table say the same three things. The
+price is not revisited here — $2.99 was already argued from a thinner Pro than
+the original spec's, and a perk fewer is a reason to look at it, not a number to
+change in passing. Flagged for the owner rather than decided.
+
+### Both config keys are deleted on both sides, in the same change
+
+`feature.dailyChallenge` and `ads.rewarded.dailyRetriesPerDay` are gone from
+`MonetizationConfigValues`, from the server's `ConfigCatalog`, and from the two
+tests that pin the catalog's contents. That order matters because of D25:
+`ConfigValuesHaveReadersTest` fails the build on a key with no production reader,
+so removing the readers without removing the keys would have broken the build —
+which is the guard working. Removing the key without the catalog entry would
+have left the admin console offering a switch over nothing, which is the failure
+D25 is a post-mortem of, pointing the other way.
+
+### What was kept, and why
+
+- **`StreakTrack` in `:libraries:ui`.** The milestone track the Daily's stats
+  section drew. It has no consumer now, and it is a design-system primitive with
+  no Daily in its name or its API — a generic "N stops, some reached" row. The
+  standing rule is that a primitive belongs in `:libraries:ui` even when one
+  screen uses it; nothing says it has to be deleted when that screen goes.
+  Flagged rather than removed.
+- **`RunRecordDaoTest`.** It existed for `bestScore()`'s mode filter, which is
+  gone. It stays because the rest of the SQL it covers — the ordering, the
+  generated key, the wipe — has no other coverage anywhere.
+- **The two historical save blobs in `SavedRunStoreTest`.** They still carry
+  `"mode":"ENDLESS"` in their bytes, because they are bytes a shipped build
+  actually wrote and the test is about refusing them.
+
+### The save format is version 8
+
+`SavedRun` loses `mode` and `dailyDate`, and `AppData` loses `savedDailyRun` —
+one run can be in flight, so one slot holds it. A version 7 blob would decode
+(both fields are gone rather than retyped, and `ignoreUnknownKeys` would drop
+them), and it is refused anyway. Here the strict rule earns its keep rather than
+merely being checkable: a version 7 blob *can be a Daily run*, and resuming one
+would put the player on a board whose mode no longer exists, on a seed nobody
+chose, ending in a write to a table that has been dropped.
+
+---
+
+## 2026-09-20 — Drag is the default, and the tutorial that taught the button now teaches the gesture
+
+**Owner ruling, two parts, one job.** `PlayerSettings.controlScheme` defaults to
+`ControlScheme.Drag`. The settings screen offers one switch, "Show arrow
+buttons", rather than a three-way choice between "Buttons", "Drag the board" and
+"Both".
+
+**Why a switch and not a fourth state.** The enum already said everything the
+ruling asks for: `Drag` is no arrows, `Both` is the arrows back. What a player is
+deciding is whether a row of buttons is on their screen, which is a yes-or-no
+question, and answering it with three nouns — two of which are "drag the board"
+and "both" — asks them to learn the vocabulary first. `Buttons` (drag switched
+off as well) is now unreachable from the UI and still honoured when stored: the
+switch reads *on* for it and leaves it alone. Taking a scheme away from the
+handful of players who chose it deliberately is a worse trade than leaving a
+value nothing writes. The left-handed mirror moved under the same switch — it
+mirrors the arrow row and nothing else, so it is offered only when there is a row
+to mirror.
+
+**The tutorial adapts to the scheme rather than being rewritten for drag.** The
+script is one script: the same six drops, the same boards, the same order,
+because what SPEC 13 teaches is the habit of putting the block down yourself.
+Three beats name a control and those three have two versions. Writing it once
+for drag was the tempting answer and it is wrong under `Buttons`, where the board
+refuses drags outright — "drag anywhere on the board" there is an instruction to
+do something the game ignores, on the one beat that cannot be finished any other
+way.
+
+**`TutorialFocus` names a role, not a widget, and that was a live bug.**
+`TutorialFocus.Drop` resolved to the ▼ button's focus key unconditionally, and
+that key is registered by `GameControlRow` alone. Under `Drag` there is no
+control row: nothing registered the key, `FocusScrim` found no rectangle to punch
+a hole for, and `CoachMark` was handed `Rect.Zero`. Three beats of the guided run
+pointed at the top-left corner of a uniformly dimmed screen. Nothing failed,
+because the flick still works and the run still completes, which is how it
+survived from C5 — and it was reachable the whole time by switching the scheme
+and replaying the tutorial. The focus now resolves against the controls the
+player has, and `TutorialFocusKeysTest` renders the real screen under every
+scheme and asserts every key the script asks for is one the screen registered.
+That is the general form: any future focus that resolves to a key some scheme
+never draws fails it.
+
+**The opening beat is pinned to one cell, and that is a deliberate exception to
+`allowedColumns`.** "Slide it over" was said to a block that spawned in the
+column it was being asked to reach, on a drop where every allowed column
+resolved identically — so the first instruction the game ever gives could be
+satisfied by doing nothing, and what the player learned on beat one was that the
+card can be ignored. Drop 1 now spawns at the far edge, the board outlines the
+cell the block has to reach, and the hard drop is refused until the block is
+there. The restriction is a property of the drop rather than of the beat: one
+that lapsed when the steer beat ended would be undone by the very next input.
+Every other drop is unchanged — they still resolve the same way from any allowed
+column, and they still finish for a player who only ever drops.
+
+Considered and rejected: leaving the beat as a suggestion and letting a hurried
+player skip it (that is the status quo, and it is what produced a first beat
+nobody reads); and ending the beat on *any* movement (under the arrows that is
+one tap of three, so the card would have said "now drop it" while the drop was
+still being refused — a worse dead end than the one it replaced).
+
+**The flick thresholds were kept and their origin was moved.** 30dp in 450ms is
+a reasonable description of a flick and there is nothing yet to correct it with.
+Measuring them from the moment the finger *landed* was not reasonable: it made
+the flick conditional on everything the finger did first, so steering for a
+second closed the window and steering three columns made `dy > abs(dx)`
+arithmetically unreachable. The one gesture the game is built on — slide it
+over, then send it down, without lifting — could not be performed at all, and the
+tutorial's first drop is exactly that gesture. The origin is now the highest
+point the finger has reached. A straight downward flick is unaffected.
+
+---
+
+## 2026-09-16 — The R8 smoke test now walks the other eight surfaces, and the keep rules turn out to be inert
+
+**What happened:** `MinifiedReleaseSurfacesTest` joins `MinifiedReleaseSmokeTest`
+in `:apps:baselineprofile`. Four tests, all green on the minified
+`benchmarkRelease` variant, zero skipped, 3m47s on the `pixel6Api34` managed
+device. It covers the paywall sheet and a real Play Billing round trip, the
+achievements grid, the ad gate readout, the QA config overrides screen, and the
+launch gates.
+
+**The assertion worth copying** is the third one. It types a string that exists
+nowhere in the APK into `upgrade.maintenanceMessage`, force stops the app,
+launches it cold, and asserts that string is on the first screen. Passing it
+requires a write through `ConfigCacheSnapshot`'s generated serializer, a process
+boundary, a read back through the same serializer, a decode through
+`ConfigJsonConverter`, a resolve through a `StringConfigValue`, a trip through
+`resolveLaunchGates` and a draw by the gate host. A screen opening proves a route
+survived; a value the binary has never seen appearing on one proves the
+serializer did.
+
+**Three keep-rule removals were tried and none of them broke anything.** The
+whole kotlinx-serialization block deleted: green. The navigation route keeps
+deleted with it: green. The Room `@ProvidedTypeConverter` keeps, which this very
+file documents as a *previously observed* crash in `Application.onCreate`:
+green. C13a's "zero keep rules added" is stronger than it read. On this app's
+shapes the hand-written rules in `apps/compose/proguard-rules.pro` are inert,
+because every serializer here is resolved at compile time and the libraries ship
+consumer rules that cover the rest. **Do not read that as permission to delete
+the file.** A rule that does nothing today is the one that matters the day
+somebody writes `Json.decodeFromString<T>(raw)` against a type parameter.
+
+**So the suite was proved against the failure it exists to catch, not against a
+rule.** Wiping the app's persisted state between the write and the cold launch
+is what a serializer that cannot read its own output produces, and inserting one
+`pm clear` there turned the test red on exactly the assertion it should, with
+the other two still passing. That is the evidence that the green is real.
+
+**What is still uncovered, and why.** Buying anything needs a licensed tester
+account and a published product. A filled ad needs AdMob to have inventory for
+an emulator, and a release build has no house network by design. Leaderboards do
+not draw their row at all without a signed-in Play Games account, so
+`AchievementPlatformSync` has no coverage. Sharing launches the system chooser,
+and `:libraries:sharing` carries no `@Serializable` model, so the hazard does not
+apply to it in the first place.
+
+**Four UiAutomator findings came out of five emulator runs**, all of them the
+same symptom C13a described as "the tap reported success and the screen never
+changed":
+
+1. A row scrolled under the translucent `TopBar` is still `hasObject`, and the
+   click lands on the bar.
+2. `waitForIdle` returns while a Compose list is still flinging, because a fling
+   is an animation and animations emit no accessibility events. Polling the
+   target's rectangle until it stops moving is the fix.
+3. Seven `UiObject2.click()` calls silently drop one if the node goes stale
+   between two of them. Tap a coordinate, and count the taps by their effect.
+4. The snackbar that says **"Debug menu unlocked."** is a prefix of the **"Debug
+   menu"** row it is announcing, and it covers the bottom of the list where that
+   row is drawn. L75 again, in a new place.
+
+## 2026-09-16 — The 15 metadata warnings were 93, they were all lambdas, and R8 is pinned two patches forward
+
+**Decision:** `settings.gradle.kts` pins `com.android.tools:r8:8.13.19` on the
+`pluginManagement` buildscript classpath.
+
+AGP 8.13.1 shades **R8 8.13.17** into `com.android.tools.build:builder`, and that
+build links a kotlin-metadata-jvm that reads metadata up to **2.2.0**. Kotlin
+2.3.21 emits **2.3.0**. Android's own table puts the floor for Kotlin 2.3 at R8
+**8.13.19**, two patch releases above what ships. `./gradlew
+:apps:compose:assembleRelease` printed **93** of the warning, not the 15 that had
+been quoted; the count grew with the codebase and nobody had recounted.
+
+**Which classes**, which needed `--info` to find out, because the `WARNING` line
+names nothing and the `INFO` line beside it names everything:
+
+```
+INFO: R8: Class com.dangerfield.drop2048.features.paywall.impl.PaywallNavigator$1$1
+has malformed kotlin.Metadata: Provided Metadata instance has version 2.3.0,
+while maximum supported version is 2.2.0.
+```
+
+94 classes, and **every single one is synthetic**: 84 in this app plus 10 in Ktor
+and kotlinx-serialization, all of them lambdas, inlined flow operators,
+`$$inlined$compareByDescending$1` comparators or SAM conversions. Reading the
+`kotlin.Metadata` annotation off all 84 compiled class files gives `mv=[2,3,0]`
+and `k=3` for all 84, and `k=3` is `SyntheticClass` — metadata that carries a
+lambda's signature and nothing else. Not one named class, `@Serializable` model,
+enum or interface is in the list.
+
+**So it was cosmetic, and here is the argument rather than the assertion.**
+Synthetic-class metadata is read by `kotlin-reflect`, which is not a dependency
+anywhere in this repo, and by the Kotlin compiler reading a library, which an APK
+is not. kotlinx-serialization resolves through generated `$serializer` classes and
+`Companion.serializer()`, never through `kotlin.Metadata`. Coroutines read
+`@DebugMetadata`, a different annotation. The only consequence of R8 failing to
+parse is that R8 cannot rewrite that class's metadata after renaming, and nothing
+at runtime reads it.
+
+It is fixed anyway, because the fix is two patch versions and it makes the next
+release log readable: **93 warnings to 0**, `mapping.txt` reports
+`compiler_version: 8.13.19`, and the four R8 smoke tests pass against a binary
+built with it.
+
 ## 2026-09-16 · D25 — A config key with no reader fails the build, and `pro.price.tier` is deleted
 
 **What happened:** D24 found that `feature.leaderboards` had been declared,
@@ -2445,3 +2997,190 @@ move past touch slop and `waitForUpOrCancellation` re-checks consumption on the
 its ripple; take the ordering for granted and a button that was only moved also
 files a directive. Verified on a device: a 600ms drag across the board moved it
 and opened nothing.
+
+## 2026-09-16 · D30 — One vibrator, so the cues are ranked rather than queued
+
+Numbered D25 when it was written, which collided with the config-key ruling above. Renumbered on
+2026-09-20. Nothing outside this file ever cited it, so the collision cost nothing beyond the audit
+that found it.
+
+Filed 2026-09-16, and it reverses the diagnosis that prompted it.
+
+`dumpsys vibrator_manager` caught a `Cue.Move` coming back `cancelled_superseded` a millisecond
+after the `Cue.Merge` behind it. That was read as the bug. It is not: the merge is the board
+answering the steer, one millisecond into a 12ms tap is not something a hand feels, and giving the
+move up is the outcome you would choose if you were choosing. The move is still given up, and
+`aMoveIsGivenUpToTheMergeBehindIt` says so by name so nobody re-files it.
+
+The defect is the same collision resolved the same way in the other direction. Mapping every seam
+that issues two cues within a few milliseconds, under reduce motion where the holds are scaled to
+0.4, turned up two that cost something. A steer replayed out of the input buffer could cut a
+`LEVEL UP` at 24ms of its 40. Worse, the merge after a row burst could cut the burst's decaying
+390ms roll at 168ms, and SPEC 21 names that burst as one of the two effects worth keeping when
+everything else goes.
+
+**Ranked, not queued.** A haptic is the felt half of a drawn frame, so one played late is one played
+over the wrong frame. A cascade is a run of steps, so a queue falls further behind on each of them
+and ends up describing a cascade that has already finished; waiting out a burst is 390ms, which is a
+different drop. `HapticBus` refuses a request of lower or equal rank while the incumbent is still
+being felt, and hands the vibrator over to a higher one. Equal rank leaves the incumbent alone,
+because cancelling to re-fire the same weight is strictly worse than letting the first finish.
+
+The rank is written out rather than read off `ordinal`, so reordering the enum for readability
+cannot silently reorder the game's priorities.
+
+**Only the haptic half is arbitrated.** Two samples mix and two vibrations do not, so every merge of
+a cascade is still heard even where its buzz is refused. The known cost is a `LEVEL UP` inside a row
+burst's window losing its buzz while keeping its sound and its callout. That is the trade, taken
+deliberately: the alternative is halving the burst.
+
+`feltFor` is a floor, not a measurement. Neither platform reports what its vibrator is doing, so the
+numbers come from `HapticEngine.android.kt`, the longer of the two, with the error one-sided: too
+long costs a haptic that could have been felt, too short puts the cancellation back.
+
+What CI can prove is that `Cues` never *asks* for the overlap, and `noHapticIsEverCutShortByALesserOne`
+replays a whole reduce-motion drop to prove it. Whether a real vibrator still reports
+`cancelled_superseded` needs a device, and if it does, it means a cue pair nobody mapped.
+
+## D26 · The spawn column is random, level 1 is shorter, and the specials stay where they are
+
+Filed 2026-09-20, from the owner's ruling that "the game doesnt get hard quick enough" and three
+candidate levers: spawn the block from random places, shorten level 1, introduce the harder blocks
+sooner. The first was a decision. The other two were questions, and `tools/balance` answered them.
+
+Two of the three are adopted and they ship together, because both move `PINNED_DIGEST` and the pin
+should move once.
+
+### Lever 1 · A block enters in a uniform random column
+
+`EngineConfig.spawnColumn` was `cols / 2` and every block in the game's history entered there. The
+column is now a uniform draw taken in `Spawn.draw` off the run's own RNG, appended after the value
+roll so a stream diff reads as one extra roll per draw rather than a re-alignment.
+
+It has to come off the state's RNG and not from anywhere else: SPEC 4.1's whole architecture is that
+a seed plus a list of inputs reproduces a run byte for byte, and Daily Challenge, undo, save/resume,
+replay and every bug report are downstream of that one property.
+
+**Nothing constrains the draw against the board, and nothing needs to.** A run ends when row 0 is
+occupied after a resolution completes, so by the time anything spawns, row 0 is empty in every
+column. `spawnNext`'s `SPAWN_BLOCKED` fault is kept as the guard on that reasoning. Re-drawing
+against the board was the tempting alternative and was rejected for making the fault unreachable by
+construction, which throws away the only thing that would tell us the stacked-out check had broken.
+
+Measured, 10,000 clocked runs per policy at the `average` profile:
+
+| | greedy before | greedy after | lookahead1 before | lookahead1 after |
+|---|---|---|---|---|
+| median level | 19 | 18 | 21 | 20 |
+| drops (median) | 372 | 355 | 419 | 391 |
+| 1024 or better | 24.2% | 20.1% | 43.4% | 37.9% |
+| 2048 | 2.31% | 1.79% | 9.68% | 6.71% |
+| off preferred column | 2.36% | **4.49%** | 2.69% | **4.72%** |
+
+The last row is the one that matters. SPEC 4.4 calls it the only one of the clocked numbers that
+means pressure rather than theatre, and it nearly doubled. SPEC 5.5 used to justify the speed curve
+with "on five columns with a centre spawn, a block is at most two columns from anywhere"; that
+sentence is now false by design — the worst case is four columns, and at 120ms a tap plus 250ms to
+decide that is 730ms against a fall budget that reaches 720ms at the speed floor. Time becomes a
+real pressure late, which is what it was never allowed to be before.
+
+### Lever 2 · `blocksPerLevel` 20 → 15, and the speed curve left alone
+
+The two halves of "should level 1 be shorter" came apart, and only one of them does anything.
+
+**The speed curve is inert, again.** `--curve fast400` against the shipped curve: every outcome
+column identical to the digit, on both a hard-dropping player and a patient one — median level 18,
+p90 22, 355 drops, 512 at 58.4%, 1024 at 19.7%, 2048 at 2.02%. All it moves is the wall clock of a
+player who never presses ▼, from 223s to 186s to reach level 4. C1c and C1e each measured this and
+each left the curve alone; this is the third time, and the answer has not changed. What is left of
+the opening's dead time belongs to a player the tutorial's frozen clock (L49) is designed to stop
+existing.
+
+**`blocksPerLevel` is the lever, exactly as C1c said it was.** Swept clocked, greedy:
+
+| `blocksPerLevel` | time to level 4 | drops | 1024 or better | 2048 | random policy median |
+|---|---|---|---|---|---|
+| 20 | 36.1s | 355 | 20.1% | 1.79% | 4 |
+| **15** | **27.1s** | **317** | **19.0%** | **1.29%** | **5** |
+| 12 | 21.6s | 292 | 16.9% | 1.02% | 6 |
+
+15 rather than 12 because 12 takes the Random policy's median to level 6, and SPEC 4.4 reads
+"Random reaches level 6" as the game being too easy. It would be reading an inflated number — a
+cheaper level is not a lower difficulty, and this is the trap in every row of that table — but a
+tripwire that has to be explained away every time it fires stops being read. 15 leaves Random where
+20 had it.
+
+C1c measured this same change and declined it, and the reason it is taken now is not that the
+numbers moved. They reproduced to the digit. What changed is that the owner has ruled the game too
+easy, which is the judgement C1c declined to make on its own authority, and that lever 1 is moving
+the digest anyway — so the cost C1c was weighing against is already being paid.
+
+**The five achievement score rungs move with it and that is by construction.** `ScoreLadder` derives
+each from `floorScore(level)`, which reads `blocksPerLevel`, so a 15-block level makes every rung
+25% cheaper on its survival term while also making every level 25% cheaper to reach. C9 built it
+that way precisely so this change needs no edit; `AchievementReachabilityTest` plays the shipped
+engine and still passes. Sodogku stranded three badges behind exactly this and it is the reason the
+numbers are not written down.
+
+### Lever 3 · Rejected. The specials stay at 5 / 8 / 12
+
+The question was whether Wildcard, Bomb and Stone arrive too late against runs that reach level
+18-20. Swept clocked, greedy, and it decomposes cleanly: **the Stone is the entire effect and the
+other two are not a difficulty lever at all.**
+
+| first levels (W/B/S) | drops | 512 | 1024 | 2048 |
+|---|---|---|---|---|
+| 5 / 8 / 12 (shipped) | 355 | 57.8% | 20.1% | 1.79% |
+| 3 / 5 / 12 | 359 | 56.7% | 18.7% | 1.51% |
+| 5 / 8 / 10 | 327 | 50.9% | 11.2% | 0.84% |
+| 5 / 8 / 9 | 313 | 44.2% | 8.1% | 0.63% |
+| 3 / 5 / 8 | 303 | 34.3% | 5.6% | 0.30% |
+
+Moving the Wildcard and the Bomb earlier changes nothing outside noise, which is the right answer
+for two blocks that are gifts: a Wildcard beside a 1024 is the screenshot SPEC 5.2 is written
+around, and a Bomb pays 50 a block.
+
+Moving the Stone earlier is a very sharp instrument pointed at the wrong target. Two levels of it
+halves the 2048 rate and pushes the share of runs that end at 256 from 20% to 36%, and it buys
+**zero** seconds off time to level 4 — it makes the late game harder, and the complaint was that the
+early game is not. SPEC 21 names 2048-inside-one-run as one of the two things to keep if everything
+else is cut.
+
+**And it does not need a release.** `special.stone.firstLevel` is already a live SPEC 10 remote key
+with a compiled-in fallback, so this is a console push whenever the owner wants to try it, priced at
+roughly half the 2048 rate per two levels. Moving the compiled default instead would move
+`EngineConfig.Default`, which D18 pins the Daily to, and the digest with it — a permanent cost for a
+dial that already turns.
+
+### What this costs, and why now is the only time it is cheap
+
+- **`PINNED_DIGEST` moves a fourth time**, to `7004126634716158444`, with `772 / 22 drops / level 2`
+  becoming `7166 / 87 drops / level 6`. Re-derived by running the engine, with the arithmetic closed
+  on all four scoring channels; the reasoning is in `DeterminismTest`'s KDoc.
+- **`EngineConfig.Default` moves**, so D18's Daily pin moves with it. No Daily result has ever been
+  recorded — no store accounts, no live boards, no shipped build (SPEC 0) — which is the only reason
+  any of this is affordable. `OWNER-TODO.md` has been saying the window is closing since D21. It is
+  still open and this is the fourth and last time that sentence gets written.
+- **`SAVE_FORMAT_VERSION` goes to 7**, and it is the first bump where nothing about the shape
+  changed. A version 6 blob decodes perfectly; what it decodes into is a run that would resume under
+  a spawn rule the half already played never saw. That is the failure version 5 exists to refuse, so
+  it is refused the same way. The rule in `SavedRun`'s KDoc is widened to cover it.
+- **An in-flight Daily run is lost with its attempt.** SPEC 14 spends the attempt when the run
+  starts, so a player who updates mid-Daily pays for a board they do not get to finish. Accepted
+  rather than worked around: resuming would put two spawn rules inside one Daily board, which breaks
+  the comparability D18 pins the whole mode on, and migrating is impossible because the spawns
+  already made are in the board and not recoverable from the seed.
+- **Nothing on the leaderboards moves**, because D24 cut the Daily board and a Daily score now posts
+  nowhere. The all-time and weekly boards are Endless, which has never been comparable across a
+  config change and has no recorded scores either.
+
+### The tutorial does not inherit any of this
+
+`TutorialDrop.spawnColumn` was nullable and meant "null spawns wherever the engine would have". It
+is now required and every one of the six drops states its own: drop 1 at the far edge as before,
+drops 2-6 in the middle beside their partner. Left as it was, a random entry column would have
+handed drops 2-6 a block one steer away from a partner the player has not been taught to reach —
+a scripted merge that silently does not happen, on a beat with no card in front of it, which is the
+exact thing the "every partner sits beside the spawn column" note was written to prevent. Stating it
+per drop also means the next change to the engine's spawn rule cannot reach the tutorial without
+editing the script.

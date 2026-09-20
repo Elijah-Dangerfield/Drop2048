@@ -6,9 +6,10 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 
 /**
- * Every rewarded slot the app has. SPEC 12 names two and there are two.
+ * Every rewarded slot the app has. SPEC 12 named two; D27 removed the Daily and
+ * its retry with it, so there is one.
  *
- * Both are **player-initiated**, which is not a coincidence to be tidied away
+ * It is **player-initiated**, which is not a coincidence to be tidied away
  * later: the enum exists so that adding a slot is a visible edit here rather than
  * a new string threaded through a call. Sodogku shipped a `LevelComplete`
  * interstitial placement in the same enum, gave it three remote keys, and never
@@ -19,9 +20,6 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 enum class AdPlacement(val id: String) {
     /** SPEC 12: continue after stacked out. 1 free per run, a 2nd at higher friction, hard cap 2. */
     ContinueRun("continue_run"),
-
-    /** SPEC 14: one extra Daily attempt, once a day. */
-    DailyRetry("daily_retry"),
 }
 
 /**

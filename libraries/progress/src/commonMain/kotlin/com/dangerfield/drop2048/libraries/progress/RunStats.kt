@@ -13,19 +13,27 @@ package com.dangerfield.drop2048.libraries.progress
  * already been got wrong here: it is `max(score)` over these rows and lives
  * nowhere else. `AppData` held a copy through C3 and C4 deleted it.
  *
- * It is also the one number on the page that does **not** count every row.
- * Decision D19 rules that a Daily score cannot own the all-time best, so
- * [bestScore] folds Endless rows only while everything beside it stays a
- * lifetime total. The screen has to say so, or the page contradicts itself: a
- * player can see fourteen runs played and a best lower than a Daily they
- * remember.
- *
- * Daily streak is deliberately absent. It needs `daily_result`, which is C6's.
+ * [bestScore] was the one number here that did not count every row: D19 kept
+ * Daily scores out of it, because a score set on a shared seed is not the same
+ * quantity. D27 removed the mode, so every row counts and the page no longer has
+ * to explain an exception to itself.
  */
 data class RunStats(
     val runsPlayed: Int = 0,
     val bestScore: Long = 0,
     val averageScore: Long = 0,
+
+    /**
+     * The furthest level any run ever reached, asked for by the owner on
+     * 2026-09-20.
+     *
+     * Not the same quantity as [highestTier] and worth saying so, because the
+     * page shows both. A tier is the biggest block the player ever made; a level
+     * is how long they survived, since levels advance on blocks dropped. A run
+     * can reach level 9 without ever merging past 128, and a lucky cascade can
+     * make a 1024 on level 3.
+     */
+    val highestLevel: Int = 0,
     val highestTier: Int = 0,
     val totalMerges: Long = 0,
     val totalBlocksPlaced: Long = 0,
@@ -59,8 +67,9 @@ fun statsFrom(records: List<RunRecord>): RunStats {
     val totalScore = records.sumOf { it.score }
     return RunStats(
         runsPlayed = records.size,
-        bestScore = records.filter { it.mode == GameMode.ENDLESS }.maxOfOrNull { it.score } ?: 0,
+        bestScore = records.maxOf { it.score },
         averageScore = totalScore / records.size,
+        highestLevel = records.maxOf { it.level },
         highestTier = records.maxOf { it.highestTier },
         totalMerges = records.sumOf { it.merges.toLong() },
         totalBlocksPlaced = records.sumOf { it.blocksPlaced.toLong() },

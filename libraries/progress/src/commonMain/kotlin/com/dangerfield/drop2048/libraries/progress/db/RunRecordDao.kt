@@ -17,8 +17,13 @@ import kotlinx.coroutines.flow.Flow
  * another. `:libraries:storage:impl` provides the DAO; this is where it is
  * declared.
  *
- * [mode] and [cause] are stored by **name**, not ordinal. An ordinal is a
- * position in a source file, so reordering an enum silently rewrites history.
+ * [cause] is stored by **name**, not ordinal. An ordinal is a position in a
+ * source file, so reordering an enum silently rewrites history.
+ *
+ * Schema version 9 dropped the `mode` column with the Daily Challenge (D27), and
+ * dropped the rows that carried `'DAILY'` with it: a Daily score was set on a
+ * pinned config and a shared seed, so folding one into a lifetime total or a
+ * best score would be counting a different quantity.
  */
 @Entity(tableName = "run_record")
 data class RunRecordEntity(
@@ -33,7 +38,6 @@ data class RunRecordEntity(
     val longestCascade: Int,
     val bursts: Int,
     val merges: Int,
-    val mode: String,
     val seed: Long,
 )
 
@@ -50,17 +54,14 @@ interface RunRecordDao : ClearableDao {
     suspend fun all(): List<RunRecordEntity>
 
     /**
-     * The headline best, and it counts **Endless runs only** (decision D19).
+     * The headline best: `MAX(score)` over every row, null before the first run.
      *
-     * A Daily row is still written and still feeds every lifetime total, but a
-     * score set on a seed everybody else also played is not comparable to an
-     * Endless one, and one number meaning two things is worse than two numbers.
-     *
-     * Null before the first Endless run, which is why the return type is
-     * nullable — and note that is not the same as "before the first run": a
-     * player whose only runs are Dailies has no best score, correctly.
+     * It was filtered to `mode = 'ENDLESS'` while the Daily existed (D19),
+     * because a score set on a seed everybody else also played is not the same
+     * quantity. D27 removed the mode and the rows it excluded, so the filter has
+     * nothing left to exclude.
      */
-    @Query("SELECT MAX(score) FROM run_record WHERE mode = 'ENDLESS'")
+    @Query("SELECT MAX(score) FROM run_record")
     suspend fun bestScore(): Long?
 
     @Query("DELETE FROM run_record")

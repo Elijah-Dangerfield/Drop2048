@@ -18,17 +18,18 @@ import kotlinx.coroutines.flow.StateFlow
  * Read from one [PlayerSettingsStore] at the root of the composition, so a
  * component still reads what it needs from a CompositionLocal and takes no
  * accessibility parameters of its own (decision D4).
+ *
+ * **There is no `reduceMotion` here, and that is deliberate (owner ruling,
+ * 2026-09-20).** Reduce motion is the OS setting and nothing else:
+ * `isOsReduceMotionEnabled` is read inside `AppThemeProvider` and published on
+ * `LocalReduceMotion`, so a player who told their phone once is honoured without
+ * a second switch in this app that could disagree with it. Adding a field back
+ * here is how the two sources start diverging again.
  */
 @Immutable
 data class PlayerSettings(
     /** SPEC 16's five ramps. `HighContrast` is one of them, not a sixth switch. */
     val palette: BlockPaletteChoice = BlockPaletteChoice.Default,
-
-    /**
-     * SPEC 16's reduce motion. ORed with the OS setting inside
-     * `AppThemeProvider`, so `false` here does not mean animations run.
-     */
-    val reduceMotion: Boolean = false,
 
     /** SPEC 16's larger block numerals. A scale on the face, not a font size. */
     val largeNumbers: Boolean = false,
@@ -39,33 +40,19 @@ data class PlayerSettings(
     /** SPEC 9's effects. The sample bank is C3a; the switch is honoured now. */
     val soundEnabled: Boolean = true,
 
-    /** SPEC 9's one music track and its three intensity layers. */
-    val musicEnabled: Boolean = true,
-
-    /** SPEC 6. Buttons ship first and are the default; drag lands beside them. */
-    val controlScheme: ControlScheme = ControlScheme.Both,
-
-    /** SPEC 6's mirror. Moved here from the pause overlay's placeholder. */
-    val leftHanded: Boolean = false,
+    /**
+     * SPEC 6, and an owner ruling on 2026-09-20: the game ships on drag, with no
+     * arrow row, and the settings switch is how a player gets one back.
+     *
+     * Buttons shipped first because they were the easiest thing to drive from a
+     * test while the loop was being tuned, and SPEC 6 always said drag takes the
+     * default once the loop is proven. It is. Nothing should be built that
+     * assumes the button row is on screen.
+     */
+    val controlScheme: ControlScheme = ControlScheme.Drag,
 
     /** SPEC 6's landing outline. On by default. */
     val ghostEnabled: Boolean = true,
-
-    /**
-     * Whether Quit from the pause overlay asks first.
-     *
-     * On by default: quitting ends the run and there is no undo for it, and the
-     * control sits one thumb-width from Restart.
-     */
-    val confirmBeforeQuit: Boolean = true,
-
-    /**
-     * Whether a feedback report may carry the device and build details with it.
-     *
-     * Off by default and opt-in per SPEC 17 — diagnostics are useful to us and
-     * are nobody's default expectation.
-     */
-    val diagnosticsOptIn: Boolean = false,
 
     /** Seven taps on the version number (C12). Persisted, so it survives a launch. */
     val debugMenuUnlocked: Boolean = false,
@@ -86,7 +73,17 @@ data class PlayerSettings(
 inline fun <reified T : Enum<T>> String?.asEnumOr(fallback: T): T =
     this?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: fallback
 
-/** SPEC 6's schemes. Buttons is the shipping default; drag is additive, not exclusive. */
+/**
+ * SPEC 6's schemes. [Drag] is the shipping default since 2026-09-20; the arrows
+ * are additive, not exclusive.
+ *
+ * Three values, and the settings screen offers one switch. That is deliberate:
+ * what a player is choosing is whether the arrow row is on their screen, and the
+ * two answers to that are [Drag] and [Both]. [Buttons] is the same answer with
+ * dragging switched off as well — nothing sets it any more, and a stored one is
+ * still honoured, because taking a scheme away from somebody who chose it is a
+ * worse trade than leaving a value nothing writes.
+ */
 enum class ControlScheme {
     /** The three bottom buttons only. Drag on the board does nothing. */
     Buttons,
@@ -94,7 +91,7 @@ enum class ControlScheme {
     /** Drag anywhere on the board, absolute from the grab point. Buttons hidden. */
     Drag,
 
-    /** Both at once, which is what the game has shipped with since C3. */
+    /** Both at once, which is what the game shipped with from C3 until the ruling. */
     Both,
 }
 

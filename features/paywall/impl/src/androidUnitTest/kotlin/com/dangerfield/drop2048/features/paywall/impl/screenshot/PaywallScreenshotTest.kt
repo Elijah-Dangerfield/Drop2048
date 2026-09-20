@@ -30,7 +30,9 @@ import java.io.File
  * The captured composable is [PaywallSheetContent] rather than the sheet itself:
  * Material's modal sheet draws into its own window, which a harness capturing a
  * tagged node in this composition cannot see. What the goldens pin is every pixel
- * of the sheet except the scrim and the drag handle.
+ * of the sheet except the scrim and the drag handle. Those two now have a golden
+ * of their own in `PaywallSheetWindowScreenshotTest`, which composites every
+ * window instead of one node and so has to open the real destination to get one.
  *
  * The set is chosen so each image is the only one that would move for its own
  * concern. The priced frame catches the layout and the four perks; the unpriced

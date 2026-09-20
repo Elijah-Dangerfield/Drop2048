@@ -4,6 +4,7 @@ import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -81,9 +82,8 @@ class PlayerDataEraserTest : CoroutineTest() {
                 acceptedTermsVersion = 3,
                 legalAcceptedAt = 42L,
                 blockPalette = "Deuteranopia",
-                reduceMotion = true,
                 largeBlockNumbers = true,
-                leftHandedControls = true,
+                soundEnabled = false,
             ),
         )
         val dao = RecordingDao()
@@ -99,8 +99,7 @@ class PlayerDataEraserTest : CoroutineTest() {
         // Resetting the palette out from under somebody mid-tap on "Delete"
         // would read as a bug rather than as a deletion.
         assertEquals("Deuteranopia", cache.snapshot.blockPalette)
-        assertTrue(cache.snapshot.reduceMotion)
         assertTrue(cache.snapshot.largeBlockNumbers)
-        assertTrue(cache.snapshot.leftHandedControls)
+        assertFalse(cache.snapshot.soundEnabled)
     }
 }

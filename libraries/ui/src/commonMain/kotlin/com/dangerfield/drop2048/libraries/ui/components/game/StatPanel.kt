@@ -69,9 +69,9 @@ fun GamePanel(
  *
  * The heading sits outside the panel rather than inside it so the panels read as
  * a stack of objects on the backdrop rather than as one long card with rules
- * across it. Grouping is the whole point of the page — lifetime totals, bests and
- * Daily are three different questions — and a heading that is part of the surface
- * it labels groups nothing.
+ * across it. Grouping is the whole point of the page — lifetime totals and bests
+ * are different questions — and a heading that is part of the surface it labels
+ * groups nothing.
  */
 @Composable
 fun GameSection(

@@ -11,7 +11,6 @@ import com.dangerfield.drop2048.libraries.achievements.RunOutcome
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementDao
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementFactEntity
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementUnlockEntity
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -104,17 +103,7 @@ class AchievementsRepositoryImpl(
 private fun String.toAchievementId(): AchievementId? =
     AchievementId.entries.firstOrNull { it.name == this }
 
-/**
- * An unreadable mode falls back to Endless, matching how `ProgressRepositoryImpl`
- * reads a strange `run_record` row. It is not the conservative choice here —
- * Endless is the mode whose scores climb the score ladder — but the two tables
- * disagreeing about what a row was would be worse than either answer.
- */
-private fun String.toGameMode(): GameMode =
-    GameMode.entries.firstOrNull { it.name == this } ?: GameMode.ENDLESS
-
 private fun AchievementFactEntity.toOutcome(): RunOutcome = RunOutcome(
-    mode = mode.toGameMode(),
     score = score,
     level = level,
     blocksPlaced = blocksPlaced,
@@ -129,13 +118,11 @@ private fun AchievementFactEntity.toOutcome(): RunOutcome = RunOutcome(
         wildcardBursts = wildcardBursts,
         longestDangerRun = longestDangerRun,
     ),
-    dailyStreakDays = dailyStreakDays,
     endedAt = endedAt,
 )
 
 private fun RunOutcome.toEntity(): AchievementFactEntity = AchievementFactEntity(
     key = key,
-    mode = mode.name,
     score = score,
     level = level,
     blocksPlaced = blocksPlaced,
@@ -148,6 +135,5 @@ private fun RunOutcome.toEntity(): AchievementFactEntity = AchievementFactEntity
     stoneBursts = facts.stoneBursts,
     wildcardBursts = facts.wildcardBursts,
     longestDangerRun = facts.longestDangerRun,
-    dailyStreakDays = dailyStreakDays,
     endedAt = endedAt,
 )

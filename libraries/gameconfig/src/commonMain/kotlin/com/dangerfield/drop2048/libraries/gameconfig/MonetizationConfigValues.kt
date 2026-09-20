@@ -18,10 +18,10 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * ## Declaring a key ahead of its reader is over
  *
  * This file used to open by saying these keys had no consumer yet and that this
- * was the point: `:libraries:ads`, `:libraries:billing`, the Daily Challenge and
- * the leaderboards all landed after C7, and declaring the paths early meant each
- * chunk read a value that already existed rather than inventing one under
- * deadline. Every one of those chunks has now landed.
+ * was the point: `:libraries:ads`, `:libraries:billing` and the leaderboards all
+ * landed after C7, and declaring the paths early meant each chunk read a value
+ * that already existed rather than inventing one under deadline. Every one of
+ * those chunks has now landed.
  *
  * What the practice cost is recorded in D25. Two keys stayed unread after their
  * feature shipped, and neither could be seen: a `ConfiguredValue` with no
@@ -90,6 +90,29 @@ class InterstitialSuppressDaysSinceInstall(appConfigMap: AppConfigMap) : IntConf
     override val default = 3
 }
 
+/**
+ * The banner under the board, and the reason it has its own switch.
+ *
+ * It is the newest and least proven surface in the app, it overturns a rule SPEC
+ * 12.4 called load-bearing (D28), and it is the only advertising a player meets
+ * without having finished anything. `ads.enabled` would take the rewarded
+ * continue down with it, which is a thing players *want*, so killing the banner
+ * needs a key that kills only the banner.
+ *
+ * Defaults on, because the compiled-in behaviour has to be the behaviour the
+ * owner asked for with the server unreachable. Off leaves no gap: the strip is
+ * the board's again, which is what it is when a banner fails to fill.
+ */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
+class BannerEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+    override val name = "Banner enabled"
+    override val description = "The banner below the board, shown only when the arrow row is not (D28)."
+    override val path = "ads.banner.enabled"
+    override val default = true
+}
+
 /** SPEC 12's Continue placement: 1 free per run, a 2nd at higher friction, hard cap 2. */
 @Inject
 @SingleIn(AppScope::class)
@@ -99,17 +122,6 @@ class RewardedContinuesPerRun(appConfigMap: AppConfigMap) : IntConfigValue(appCo
     override val description = "Hard cap on rewarded continues in one run. SPEC 12: 2."
     override val path = "ads.rewarded.continuesPerRun"
     override val default = 2
-}
-
-/** SPEC 12's Daily retry placement: one extra attempt, once a day. */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class RewardedDailyRetriesPerDay(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
-    override val name = "Rewarded cap: Daily retries per day"
-    override val description = "Rewarded Daily Challenge retries per UTC day. SPEC 12: 1."
-    override val path = "ads.rewarded.dailyRetriesPerDay"
-    override val default = 1
 }
 
 @Inject
@@ -123,23 +135,16 @@ class ProUpsellEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMa
 }
 
 /**
- * SPEC 10's kill switches for anything with a server or platform dependency.
+ * SPEC 10's kill switch for the one feature with a platform dependency.
  *
  * Off means the entry point is not offered, not that a broken screen is shown.
- * Both default **on**: an unreachable server must leave the game exactly as the
+ * It defaults **on**: an unreachable server must leave the game exactly as the
  * binary ships it, and a fallback that silently disabled features would make the
  * offline path a different product.
+ *
+ * `feature.dailyChallenge` sat beside it until D27 deleted the feature, and the
+ * key went with it rather than staying as a switch over nothing.
  */
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
-class DailyChallengeEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
-    override val name = "Daily Challenge enabled"
-    override val description = "Kill switch for SPEC 14. Off hides the entry point."
-    override val path = "feature.dailyChallenge"
-    override val default = true
-}
-
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)

@@ -55,6 +55,19 @@ data class AdState(
      * seconds of advertising.
      */
     val lastRewardedAtMs: Long = 0L,
+
+    /**
+     * Epoch-ms of the last banner that reported a fill and was therefore on the
+     * player's screen. 0 = never.
+     *
+     * Here rather than in memory because it answers [AdImpressions], which is
+     * what the Pro upsell card is gated on since D28, and "tired of the ads" is
+     * a thing a player stays after a restart. It is **not** a frequency gate:
+     * nothing reads the value, only whether it is zero. It is a timestamp anyway
+     * so it matches its three neighbours and so a future question about recency
+     * has an answer rather than a migration.
+     */
+    val lastBannerAtMs: Long = 0L,
 )
 
 interface AdStateCache : Cache<AdState>

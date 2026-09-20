@@ -48,7 +48,7 @@ people, no narrative and no text the player did not type themselves.
 
 ### The glyph note, worth putting in the free-text field if there is one
 
-Twenty-four achievements are drawn with emoji glyphs (`AchievementCopy.glyph`). Three of them will
+Twenty-two achievements are drawn with emoji glyphs (`AchievementCopy.glyph`). Three of them will
 look like a wrong answer to somebody reading a screenshot rather than the questionnaire:
 
 - **🩸 (`OnTheBrink`)** is a blood drop, used for surviving ten drops in the danger state. It is
@@ -120,8 +120,9 @@ in the app; 13+ describes who it is aimed at and therefore which ad rules apply.
 **What this branch costs, in engineering, before it can ship:**
 
 1. `:libraries:telemetry` and the Sentry tree compiled out or no-op'd on iOS.
-2. The rewarded-ad economy rewritten: SPEC 12's continue and Daily retry both hang off a rewarded
-   video, and non-personalised Families inventory changes the revenue those assume.
+2. The rewarded-ad economy rewritten: SPEC 12's continue hangs off a rewarded video, and
+   non-personalised Families inventory changes the revenue it assumes. The Daily retry was the
+   second placement and D27 removed it with the mode, so there is one left to rewrite.
 3. An answer to whether Game Center survives the Kids Category at all. I could not settle that from
    Apple's published wording. **Not determined.**
 

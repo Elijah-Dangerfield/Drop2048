@@ -76,7 +76,7 @@ sealed interface Policy {
             allowed: (Int) -> Boolean,
         ): Int {
             val columns = (0 until config.cols).filter(allowed)
-            if (columns.isEmpty()) return state.falling?.cell?.col ?: config.spawnColumn
+            if (columns.isEmpty()) return state.falling?.cell?.col ?: config.centreColumn
             return columns[random.nextInt(columns.size)]
         }
     }
@@ -158,7 +158,7 @@ private inline fun pick(
 ): Int {
     var bestMerges = -1
     var bestRoom = -1
-    var chosen = state.falling?.cell?.col ?: config.spawnColumn
+    var chosen = state.falling?.cell?.col ?: config.centreColumn
     var ties = 0
     for (col in 0 until config.cols) {
         if (!allowed(col)) continue

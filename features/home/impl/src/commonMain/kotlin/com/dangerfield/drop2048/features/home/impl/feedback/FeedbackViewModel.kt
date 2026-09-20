@@ -45,8 +45,14 @@ class FeedbackViewModel(
     }
 
     /**
-     * SPEC 17's opt-in, written through to the same field the settings row
-     * writes. One preference, two places it can be set, and no third copy of it.
+     * SPEC 17's opt-in, and since the owner ruling of 2026-09-20 **the only
+     * control for it**. There was a second switch in Settings over the same
+     * stored field; it went, and this stayed, because this is the screen a
+     * player is on when the question is live.
+     *
+     * Written through on the tap rather than at submit: a player who turns it on
+     * and backs out without sending has still answered the question, and the bug
+     * report form reads the same field.
      */
     private suspend fun FeedbackAction.toggleDiagnostics() {
         val next = !state.diagnosticsOptIn

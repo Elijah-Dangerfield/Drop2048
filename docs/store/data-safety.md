@@ -132,9 +132,8 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
   | Area | Events seen in the tree | Fire site |
   |---|---|---|
   | Session | `app.launched`, `app.foregrounded`, `app.backgrounded`, `app.startup` | `AppLaunchedEmitter`, `LifecycleAppEventLogger.kt:37,45`, `StartupReporter.kt:83` |
-  | Gameplay | `run.start`, `run.resume`, `run.end` (`score`, `level`, `blocks`, `highest_tier`, `cause`, `debug_session`), `engine.fault` | `GameViewModel.kt:346,577,1062,1628` |
-  | Daily | `daily.start`, `daily.end`, `daily.refused`, `daily.retry` | `GameViewModel.kt:868,872,1404`, `DailyViewModel.kt:91` |
-  | Tutorial | `tutorial.started`, `tutorial.skipped`, `tutorial.completed` | `GameViewModel.kt:393,413,454` |
+  | Gameplay | `run.start`, `run.resume`, `run.end` (`score`, `level`, `blocks`, `highest_tier`, `cause`, `debug_session`), `engine.fault` | `GameViewModel.kt:339,580,1065,1704` |
+  | Tutorial | `tutorial.started`, `tutorial.step_reached`, `tutorial.skipped`, `tutorial.completed` | `GameViewModel.kt:382,387,407,448` |
   | Ads | `ads.rewarded_requested`, `ads.rewarded_result`, `ads.continue_offered`, `ads.continue_result`, `ads.continue_declined`, `ads.interstitial_blocked` | `RealAdGate.kt:106-133`, `RealInterstitialGate.kt:134,146`, `GameViewModel.kt:1173,1227,1277` |
   | Monetization | `iap.paywall_shown`, `iap.purchase_result` (`outcome`, `error_kind`, `trigger`), `iap.restore_result` | `RealPaywallCoordinator.kt:65`, `RealEntitlements.kt:133,164` |
   | Leaderboards | `leaderboard.submitted` (`board`, `value`), `leaderboard.achievement_reported` (`achievement`) | `RealLeaderboards.kt` |
@@ -143,6 +142,12 @@ Collected by the Google Mobile Ads SDK, not by our code. We never read it direct
 
   All of it is gameplay and funnel measurement. **None of it introduces a data type beyond the ones
   declared in §4 and §5.**
+- **There was a Daily row here.** It listed `daily.start`, `daily.end`, `daily.refused` and
+  `daily.retry`, fired from `GameViewModel` and from `DailyViewModel`, which no longer exists. D27
+  deleted the mode on 2026-09-20 and nothing emits those names now. Removing them takes no declaration with them,
+  because every one was App activity and the other events still cover that box. The reason to record
+  it is the opposite direction: a form that still lists them is declaring collection the app does not
+  do, and that is the kind of wrong a store holds you to.
 - **A second mode forwards plain Warn-and-above log lines**, not just events. Those carry the log
   body, the logger `tag`, and `exception_type` / `exception_message`. The body is whatever our own
   code passed to `KLog`.
@@ -159,10 +164,10 @@ Re-read against the diff `75cb605..5244bbe` and `docs/practices/app-events.md` a
 
 | C8 added | Carries | Declaration effect |
 |---|---|---|
-| `run.sample`, every 10th drop | `mode`, `drop`, `level`, `tick_ms`, `fill_pct`, `highest_tier`, `clutter`, `steer_ms`, `tap_gap_ms`, `steps` | None. More volume, same type. SPEC 17 asked for exactly this and `clutter` is deliberately the same property `tools/balance` prints |
+| `run.sample`, every 10th drop | `drop`, `level`, `tick_ms`, `fill_pct`, `highest_tier`, `clutter`, `steer_ms`, `tap_gap_ms`, `steps` | None. More volume, same type. SPEC 17 asked for exactly this and `clutter` is deliberately the same property `tools/balance` prints |
 | **The decision-time instruments** `steer_ms`, `tap_gap_ms`, and the `run.end` percentiles `steer_ms_p50` / `_p90`, `tap_gap_ms_p50`, `drops_steered`, `drops_unsteered` | Millisecond timings of the player's own taps | None. This is the one worth pausing on, because "how fast does this person react" sounds like biometric or sensitive data and is not: it is interaction timing inside one game screen, it is bucketed into 50ms histograms before it leaves, and it is **App activity → App interactions** on Play and **Usage Data → Product Interaction** on Apple. Neither store has a narrower box for it |
-| `run.end` grown to carry `duration_ms`, `bursts`, `merges`, `longest_cascade`, `cascades_1`…`_4plus`, `seed`, `daily_date`, `recorded` | Gameplay outcomes | None |
-| `funnel.first_run_completed`, `funnel.return_day` | `score`, `level`, `mode`; `day`, `days_since_install` | None. Retention is App activity. `days_since_install` is derived from `AppData.firstLaunchAt`, a local timestamp, not from anything about the person |
+| `run.end` grown to carry `duration_ms`, `bursts`, `merges`, `longest_cascade`, `cascades_1`…`_4plus`, `seed`, `recorded` | Gameplay outcomes | None. `mode` and `daily_date` were on this list and went with D27 |
+| `funnel.first_run_completed`, `funnel.return_day` | `score`, `level`; `day`, `days_since_install` | None. Retention is App activity. `days_since_install` is derived from `AppData.firstLaunchAt`, a local timestamp, not from anything about the person |
 | `tutorial.step_reached`, `iap.upsell_tapped`, `iap.purchase_started`, `ads.interstitial_result`, `ads.rewarded_result` latency | Funnel positions | None |
 | **`debug_session` on every OTLP record** | A boolean | None, and it is an improvement: stamped once in `GrafanaLogTree` from `DebugSessionFlag` rather than at forty call sites, and every dashboard filters it false |
 | Three new `AppData` fields: `firstLaunchAt`, `returnDaysReported`, `hasCompletedARun` | Local only | None. §2.7, device-local, and cleared by "Delete local data" like everything else in `AppData` |
@@ -235,11 +240,13 @@ Product Interaction row now cover a good deal more, which is what those rows are
 
 ### 2.7 Device-local, and it genuinely does not leave (subject to §7.3)
 
-- Room, at database version 8 (`libraries/storage/impl/.../db/AppDatabase.kt`): `run_record`,
-  `daily_result`, `achievement_fact`, `achievement_unlock`, and the template's leftover
-  `example_user_data`.
-- `AppData`: settings, the in-progress run snapshots (`savedRun`, `savedDailyRun`), the Pro
-  boolean, legal acceptance versions, the install id.
+- Room, at database version 9 (`libraries/storage/impl/.../db/AppDatabase.kt`): `run_record`,
+  `achievement_fact`, `achievement_unlock`, and the template's leftover `example_user_data`.
+  Version 9 is D27's hand-written `MIGRATE_AWAY_FROM_THE_DAILY`, which drops `daily_result`
+  outright and deletes the Daily rows from the other two tables. An installed app that had one
+  loses it on the next launch rather than carrying it forward.
+- `AppData`: settings, the in-progress run snapshot (`savedRun`, one slot since D27 deleted the
+  second one, `savedDailyRun`), the Pro boolean, legal acceptance versions, the install id.
 - There is no sync, no account of ours and no server-side copy (SPEC 20). Settings says as much on
   screen, "There is no backup and no way to undo this" (`strings.xml:210`), and since C13a set
   `android:allowBackup="false"` that sentence is true on both platforms (§7.3).
@@ -279,7 +286,8 @@ Product Interaction row now cover a good deal more, which is what those rows are
   `GKLocalPlayer.local.authenticateHandler`, submits through `GKLeaderboard.submitScore`, and
   reports badges through `GKAchievement.reportAchievements`.
 - Two boards (`Leaderboard.kt`): `…leaderboard.score_alltime` and `…score_weekly`. The Daily board
-  was cut by D24. The value submitted is a score and nothing else. It goes to Apple, under the
+  was cut by D24 and the mode it would have ranked by D27, so do not go looking for a third. The
+  value submitted is a score and nothing else. It goes to Apple, under the
   player's Game Center identity; we receive nothing back and store nothing.
 - **Achievements are also sent** (D24), as an id and a completion of 100%, nothing more. The ids
   are the badge names already in the app's own catalog, which describe the badge and not the player.
@@ -328,7 +336,7 @@ defensible **Yes** here, unlike in the sibling project.
 |---|---|---|---|---|---|---|
 | **Device or other IDs**, install id | Yes | No | No | Required | App functionality, Analytics | Random UUID from `CachedInstallIdProvider`, sent as `X-Install-Id`, as the `install_id` OTLP attribute and as a Sentry tag. Required because there is no in-app switch that turns it off; the only control is "Delete local data", which rotates it rather than disabling it. |
 | **Device or other IDs**, advertising id | Yes | **Yes** | No | Required | Advertising or marketing, Analytics | Collected by `play-services-ads`, not by our code (`AdMobAdNetwork.kt`). Shared because AdMob is a third party, not a processor acting on our behalf. |
-| **App activity → App interactions** | Yes | No | No | Required | Analytics, App functionality | The events in §2.3: run starts and ends, Daily attempts, tutorial steps, ad and paywall funnels, launch gates. |
+| **App activity → App interactions** | Yes | No | No | Required | Analytics, App functionality | The events in §2.3: run starts and ends, per-drop samples, tutorial steps, ad and paywall funnels, launch gates. |
 | **App info and performance → Crash logs** | Yes | No | No | Required | Analytics (Crash reporting) | Sentry, `attachStacktrace = true`. True of any build with a DSN. |
 | **App info and performance → Diagnostics** | Yes | No | No | Required | Analytics | Sentry performance traces at 0.15, the jank monitor and startup reporter in `:libraries:telemetry:impl`, and the Warn+ log forwarding in `GrafanaLogTree`. |
 | **App info and performance → Other app performance data** | Yes | No | No | Required | Analytics | `app.launched` carries `previous_exit` (crash / anr / oom), from `AndroidPreviousExitProvider`. |
@@ -469,8 +477,8 @@ brief: the art should read "bright", not "preschool".
   no-op'd on iOS, and the crash pipeline replaced with something first-party.
 - Whether Game Center survives the Kids Category, and what a Kids app may do with a leaderboard, I
   could not settle from Apple's published wording. **Not determined.**
-- SPEC 12's rewarded model would need rewriting: no rewarded ads means no continue and no Daily
-  retry.
+- SPEC 12's rewarded model would need rewriting: no rewarded ads means no continue, which is the
+  whole of that model since D27 took the Daily retry with the mode.
 
 **Branch B is not a settings change; it is a different app.** Decide before the ad units go live.
 
@@ -703,7 +711,8 @@ literal template phrase "(unless your project adds one)", says the only permissi
 notifications, and does not mention the install id, the session-log attachment, Game Center or
 purchases.
 
-The URL is already wired: `legal.privacyUrl` defaults to `https://drop2048.app/privacy`
+The URL is already wired: `legal.privacyUrl` defaults to the live
+`https://elijah-dangerfield.github.io/Drop2048/privacy.html`
 (`LaunchGateConfigValues.kt`), the launch gate links it, and the gate does legal re-accept, so the
 version matters and not only the text. **A live privacy policy that denies serving ads while the
 app serves them is both a store problem and a trust problem**, and it is exactly the failure this

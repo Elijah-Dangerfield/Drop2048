@@ -26,7 +26,7 @@ fun DebugOverrides.applyTo(state: GameState, forcedBlock: Block? = null): GameSt
         board = board.withAll(placements.filter { board.contains(it.cell) }.associate { it.cell to it.block })
     }
 
-    val spawn = Cell(config.spawnColumn, 0)
+    val spawn = Cell(config.centreColumn, 0)
     val falling = when {
         board[spawn] != null -> null
         forcedBlock != null -> FallingBlock(forcedBlock, spawn)

@@ -20,7 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.assertNull
 
 /**
  * The only thing that checks the promise in L33.
@@ -42,6 +41,11 @@ import kotlin.test.assertNull
  * the game: `AutoMigration(5, 6)` exists and Room prefers a migration to a drop.
  * Only 1 through 4 have no path and are actually dropped, and there is no
  * exported schema for them under this database's name to build one from.
+ *
+ * 8 to 9 is the one hand-written step ([MIGRATE_AWAY_FROM_THE_DAILY]) and gets
+ * its own case, because it is the first migration that *deletes* rather than
+ * adds — and a deletion that half-ran is the failure Room's identity check
+ * cannot see.
  */
 @RunWith(RobolectricTestRunner::class)
 class AppDatabaseMigrationTest {
@@ -53,7 +57,7 @@ class AppDatabaseMigrationTest {
 
     /**
      * A version 6 database — the first schema that held anything a player would
-     * miss — carrying one finished run, walked up the `AutoMigration` chain to 8.
+     * miss — carrying one finished run, walked up the whole chain to 9.
      */
     @Test
     fun `a version 6 database keeps its run history`() = runTest {
@@ -79,8 +83,9 @@ class AppDatabaseMigrationTest {
 
     /**
      * The tables versions 7 and 8 added have to exist afterwards, not just be
-     * declared. A migration that ran but left `daily_result` behind fails here on
-     * the query rather than three chunks later on a player's phone.
+     * declared. Version 7's `daily_result` is checked by its own test below,
+     * which asserts it is *gone* by 9; these two are what a fresh chain leaves
+     * behind.
      */
     @Test
     fun `the tables added after version 6 exist once the chain has run`() = runTest {
@@ -90,10 +95,84 @@ class AppDatabaseMigrationTest {
 
         val database = open(path)
 
-        assertNull(database.dailyResultDao().forDate("2026-09-09"))
         assertEquals(emptyList(), database.achievementDao().facts())
         assertEquals(emptyList(), database.achievementDao().unlocks())
         database.close()
+    }
+
+    /**
+     * Schema 9, and the three things it has to do at once (D27).
+     *
+     * A version 8 database is seeded with one Endless run and one Daily run in
+     * each of the two tables that carried a mode, plus a row in `daily_result`.
+     * After the migration: the Endless rows are intact and re-readable through
+     * the DAOs, the Daily rows are gone rather than relabelled, `daily_result`
+     * does not exist, and the achievement key has been rewritten from
+     * `ENDLESS:2000` to `2000`.
+     *
+     * The Daily deletion is the half that cannot be done after the fact. Dropping
+     * `mode` first would leave those rows behind as ordinary ones, folded into
+     * every lifetime total and into `MAX(score)` — and nothing afterwards could
+     * tell which they were.
+     */
+    @Test
+    fun `version 9 drops the daily table, the mode column and the daily rows`() = runTest {
+        val path = folder.newFile("player.db")
+        path.delete()
+        ExportedSchema.createDatabaseAt(version = 8, path = path, driver = driver)
+        driver.open(path.absolutePath).use { connection ->
+            connection.execSQL(
+                "INSERT INTO run_record " +
+                    "(endedAt, score, level, blocksPlaced, durationMs, highestTier, cause, " +
+                    "longestCascade, bursts, merges, mode, seed) " +
+                    "VALUES (2000, 4242, 7, 140, 90000, 512, 'ROW_ZERO_OCCUPIED', 4, 1, 60, " +
+                    "'ENDLESS', 99)"
+            )
+            connection.execSQL(
+                "INSERT INTO run_record " +
+                    "(endedAt, score, level, blocksPlaced, durationMs, highestTier, cause, " +
+                    "longestCascade, bursts, merges, mode, seed) " +
+                    "VALUES (3000, 999999, 9, 200, 90000, 1024, 'ROW_ZERO_OCCUPIED', 5, 2, 80, " +
+                    "'DAILY', 7)"
+            )
+            connection.execSQL(
+                "INSERT INTO daily_result (date, seed, score, attemptsUsed, completed, retriesUsed) " +
+                    "VALUES ('2026-09-09', 7, 999999, 1, 1, 0)"
+            )
+            connection.execSQL(
+                "INSERT INTO achievement_fact " +
+                    "(`key`, mode, score, level, blocksPlaced, durationMs, highestTier, " +
+                    "longestCascade, bursts, merges, boardsCleared, stoneBursts, wildcardBursts, " +
+                    "longestDangerRun, dailyStreakDays, endedAt) " +
+                    "VALUES ('ENDLESS:2000', 'ENDLESS', 4242, 7, 140, 90000, 512, 4, 1, 60, " +
+                    "0, 0, 0, 0, 0, 2000)"
+            )
+            connection.execSQL(
+                "INSERT INTO achievement_fact " +
+                    "(`key`, mode, score, level, blocksPlaced, durationMs, highestTier, " +
+                    "longestCascade, bursts, merges, boardsCleared, stoneBursts, wildcardBursts, " +
+                    "longestDangerRun, dailyStreakDays, endedAt) " +
+                    "VALUES ('DAILY:3000', 'DAILY', 999999, 9, 200, 90000, 1024, 5, 2, 80, " +
+                    "0, 0, 0, 0, 12, 3000)"
+            )
+        }
+
+        val database = open(path)
+
+        val runs = database.runRecordDao().all()
+        assertEquals(1, runs.size, "the Daily run survived the migration: $runs")
+        assertEquals(99, runs.single().seed)
+        assertEquals(4242, database.runRecordDao().bestScore(), "a Daily score became the best")
+
+        val facts = database.achievementDao().facts()
+        assertEquals(1, facts.size, "the Daily fact survived the migration: $facts")
+        assertEquals("2000", facts.single().key, "the fact key was not rewritten")
+        database.close()
+
+        assertFalse(
+            ExportedSchema.tableExists(path, "daily_result", driver),
+            "daily_result is still on disk",
+        )
     }
 
     /**
@@ -123,7 +202,7 @@ class AppDatabaseMigrationTest {
      * has no path to and that is **not** on the list refuses to open, and leaves
      * every row where it was.
      *
-     * Version 9 is a player who installed a newer build and rolled back — the
+     * Version 10 is a player who installed a newer build and rolled back — the
      * shape a blanket `fallbackToDestructiveMigration` (or a
      * `fallbackToDestructiveMigrationOnDowngrade` nobody thought twice about)
      * turns into a silent, unrecoverable wipe of a run history that exists in
@@ -134,7 +213,7 @@ class AppDatabaseMigrationTest {
     fun `a version with no path and no fallback refuses to open rather than wiping`() = runTest {
         val path = folder.newFile("player.db")
         path.delete()
-        ExportedSchema.createUnknownDatabaseAt(version = 9, path = path, driver = driver)
+        ExportedSchema.createUnknownDatabaseAt(version = 10, path = path, driver = driver)
 
         assertFails { open(path).runRecordDao().all() }
 

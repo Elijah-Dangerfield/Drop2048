@@ -21,11 +21,14 @@ import kotlin.native.ObjCName
  * usually unnecessary. iOS has no equivalent — `.onOpenURL` must forward
  * here.
  *
- * Per-route registration uses the `deepLinks` parameter on `screen<Route>`:
+ * Per-route registration uses the `deepLinks` parameter on `screen<Route>`,
+ * built with [routeDeepLink] and never with a bare `navDeepLink`, which omits
+ * the [AnimationType] NavTypes every [Route] needs and crashes graph build on
+ * iOS:
  *
  * ```
  * screen<ProfileRoute>(
- *     deepLinks = listOf(navDeepLink<ProfileRoute>(basePath = "https://example.com/profile"))
+ *     deepLinks = listOf(routeDeepLink<ProfileRoute>(basePath = "https://example.com/profile"))
  * ) { ... }
  * ```
  */

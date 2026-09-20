@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.libraries.billing.impl
 
+import com.dangerfield.drop2048.libraries.ads.AdImpressions
 import com.dangerfield.drop2048.libraries.billing.Entitlements
 import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
 import com.dangerfield.drop2048.libraries.billing.PaywallRequest
@@ -36,6 +37,7 @@ class RealPaywallCoordinator(
     private val entitlements: Entitlements,
     private val sessionTracker: SessionTracker,
     private val upsellEnabled: ProUpsellEnabled,
+    private val impressions: AdImpressions,
 ) : PaywallCoordinator {
 
     private val logger = KLog.withTag("Paywall")
@@ -54,21 +56,32 @@ class RealPaywallCoordinator(
     override val requests: Flow<PaywallRequest> = bus.asSharedFlow()
 
     override fun requestOffer(trigger: PaywallTrigger): Boolean {
-        if (entitlements.isPro.value) return false
-
-        // The player opened it themselves. Gating the shop on a live-ops flag
-        // would make "Drop 2048 Pro" in Settings do nothing, which reads as a
-        // bug rather than as a decision — and `pro.upsell.enabled` is about
-        // whether the app *offers*, not about whether it will take money.
-        if (trigger != PaywallTrigger.Direct && !upsellEnabled()) return false
+        if (!mayOffer(trigger)) return false
 
         logger.logEvent("iap.paywall_shown", "trigger" to trigger.id)
         return bus.tryEmit(PaywallRequest.Offer(trigger))
     }
 
-    override fun claimStackedOutCard(): Boolean {
+    override fun mayOffer(trigger: PaywallTrigger): Boolean {
+        if (entitlements.isPro.value) return false
+
+        // The player opened it themselves. Gating the shop on a live-ops flag
+        // would make "Drop 2048 Pro" in Settings do nothing, which reads as a
+        // bug rather than as a decision, and `pro.upsell.enabled` is about
+        // whether the app *offers*, not about whether it will take money.
+        return trigger == PaywallTrigger.Direct || upsellEnabled()
+    }
+
+    /**
+     * The ads-seen gate is checked **before** the session cap is spent, and the
+     * order is the whole point. Claiming and then discarding would burn the
+     * session's one card on a run that drew nothing, so the first stacked-out
+     * screen after the first interstitial would have no card left to show.
+     */
+    override suspend fun claimStackedOutCard(): Boolean {
         if (entitlements.isPro.value) return false
         if (!upsellEnabled()) return false
+        if (!impressions.anyAdShown()) return false
         rollIfNeeded()
         if (cardClaimed) return false
         cardClaimed = true

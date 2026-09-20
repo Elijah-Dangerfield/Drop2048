@@ -9,22 +9,22 @@ package com.dangerfield.drop2048.libraries.leaderboards
  * "could this be a leaderboard" but "would a stranger's name be next to yours on
  * it in week one".
  *
- * - **[AllTimeScore]** is the headline and the board that matters. It is
- *   **Endless only** (decision D19): a Daily score is set on a seed everybody
- *   else also played, so it is not the same quantity and must not land here.
+ * - **[AllTimeScore]** is the headline and the board that matters. It was
+ *   Endless-only while a second mode existed (D19), because a Daily score was
+ *   set on a seed everybody else also played and is not the same quantity. D27
+ *   removed the mode; every finished run lands here now.
  * - **[WeeklyScore]** is the same number in a rolling window. An all-time board
  *   is unwinnable for a newcomer and the standard answer is a window everybody
  *   starts level in. Game Center supports exactly that natively as a recurring
  *   leaderboard, so this is the same submitted value on a board the platform
  *   resets — nothing here computes a week.
  *
- * **There is no Daily board** (D24). SPEC 15 asked for one and it was dropped:
- * the Daily Challenge is a single seed with a capped number of attempts, so its
- * ceiling is a property of the seed rather than of the player, and a board of it
- * ranks who got the luckiest drops on one board rather than who plays well. The
- * Daily's own streak badges are what reward playing it. Nothing else about SPEC
- * 14 changes, and a Daily run now posts to no board at all — `GameViewModel`
- * owns that rule, because nothing below it knows what mode a value came from.
+ * **There was almost a third** (D24). SPEC 15 asked for a board over the Daily
+ * Challenge and it was dropped before it shipped: a single seed with a capped
+ * number of attempts has a ceiling that is a property of the seed rather than of
+ * the player, so the table would rank who got the luckiest drops rather than who
+ * plays well. That argument is the one to reach for the next time a shared-board
+ * mode is proposed; the mode itself went in D27.
  *
  * ## Recurring boards are not deduplicated
  *

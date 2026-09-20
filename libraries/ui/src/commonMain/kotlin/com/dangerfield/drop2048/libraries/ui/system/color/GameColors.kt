@@ -92,6 +92,35 @@ object GameColors {
      */
     val ControlRaised = Color(0xFF3B3450)
 
+    /**
+     * A control that has to read as a control while sitting **on** a [Control]
+     * card, rather than on the backdrop.
+     *
+     * The handoff never drew this case, and the gap shipped as a bug: a dialog's
+     * Cancel button resolved to the same role token as the dialog's own surface,
+     * so the two painted in [Control] and the button was a rectangle of card with
+     * a word on it. Measured at 1.00:1 and ΔE 0 — literally the same colour.
+     *
+     * [ControlRaised] is not the answer even though it is the right *direction*,
+     * because it is what a **disabled** filled button paints in. Sharing one value
+     * would have put an enabled Cancel and a disabled Erase in the same fill on
+     * the same dialog, told apart only by their ink.
+     *
+     * So this is two steps up rather than one, in the handoff's own OKLCH terms:
+     * [Control]'s hue and chroma at `L 0.46`. That lands ΔE 21.1 and 2.05:1 from
+     * the card, ΔE 13.4 from [ControlRaised], and leaves the ink on it at 6.35:1.
+     *
+     * **It deliberately stops short of the 3:1 WCAG 1.4.11 wants for a component
+     * boundary, because on this surface a fill cannot have both.** The card's
+     * relative luminance is 0.0206, so 3:1 demands a fill at 0.162 or above —
+     * around `L 0.56` — and by then the light ink on it has fallen to 4.1:1,
+     * under WCAG AA for a 14sp label. Nothing darker than the card can reach 3:1
+     * at all: pure black against it is 1.41:1. Reaching 3:1 means adding a
+     * boundary *stroke* rather than raising the face, which is a larger change to
+     * the button system than this bug justified.
+     */
+    val ControlElevated = oklch(0.46f, 0.053f, 294f)
+
     /** The brand yellow: the wordmark chip, the primary button, "new best!". */
     val AccentYellow = oklch(0.85f, 0.17f, 90f)
     val AccentYellowShadow = oklch(0.62f, 0.15f, 85f)

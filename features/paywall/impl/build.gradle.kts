@@ -72,6 +72,15 @@ kotlin {
             implementation(projects.libraries.core)
             implementation(projects.libraries.flowroutines.testing)
             implementation(projects.libraries.ui)
+
+            // Repeated from commonMain rather than inherited. The Android unit
+            // test compilation is AGP's, not the Kotlin plugin's, and it does not
+            // see `implementation` dependencies of the main source set the way
+            // the Apple test compilations do. `PaywallGraphTest` compiles for
+            // iOS and fails to resolve `Route` for Android without these.
+            implementation(projects.features.paywall)
+            implementation(projects.libraries.navigation)
+            implementation(projects.libraries.resources)
         }
     }
 }

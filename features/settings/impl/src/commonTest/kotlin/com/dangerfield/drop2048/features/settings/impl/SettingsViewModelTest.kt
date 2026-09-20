@@ -54,13 +54,11 @@ class SettingsViewModelTest : CoroutineTest() {
         val scenario = scenario()
         val vm = scenario.viewModel
 
-        vm.takeAction(SettingsAction.ToggleReduceMotion)
         vm.takeAction(SettingsAction.ToggleLargeNumbers)
         vm.takeAction(SettingsAction.SetHaptics(HapticsSetting.Strong))
         runCurrent()
 
         val settings = scenario.store.settings.value
-        assertTrue(settings.reduceMotion)
         assertTrue(settings.largeNumbers)
         assertEquals(HapticsSetting.Strong, settings.haptics)
     }
@@ -71,10 +69,10 @@ class SettingsViewModelTest : CoroutineTest() {
 
         // The pause overlay, a gate, a reset — anything that writes settings
         // without going through this screen.
-        scenario.store.update { it.copy(leftHanded = true) }
+        scenario.store.update { it.copy(ghostEnabled = false) }
         runCurrent()
 
-        assertTrue(scenario.viewModel.state.settings.leftHanded)
+        assertFalse(scenario.viewModel.state.settings.ghostEnabled)
     }
 
     @Test
@@ -139,7 +137,7 @@ class SettingsViewModelTest : CoroutineTest() {
     }
 
     @Test
-    fun `replaying the tutorial is an event, not a write`() = runUnitTest {
+    fun `replaying the tutorial is an event rather than a write`() = runUnitTest {
         val scenario = scenario()
         val events = mutableListOf<SettingsEvent>()
         val collector = launch { scenario.viewModel.eventFlow.toList(events) }
@@ -216,5 +214,7 @@ private class RecordingPaywall : PaywallCoordinator {
         return true
     }
 
-    override fun claimStackedOutCard(): Boolean = false
+    override fun mayOffer(trigger: PaywallTrigger): Boolean = true
+
+    override suspend fun claimStackedOutCard(): Boolean = false
 }

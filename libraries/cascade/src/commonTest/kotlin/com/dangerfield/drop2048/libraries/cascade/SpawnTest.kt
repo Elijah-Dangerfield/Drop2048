@@ -12,6 +12,12 @@ import kotlin.test.assertTrue
  * band is respected, the cap clamps down rather than rerolling, specials
  * unlock by level and never come back to back — rather than pinning the exact
  * percentages, which SPEC 5.3 explicitly expects to be wrong on launch day.
+ *
+ * The entry column (the owner's 2026-09-20 ruling) is tested the same way: in
+ * bounds always, roughly uniform over many draws, never the same column every
+ * time. A tolerance rather than an exact histogram, because the assertion worth
+ * having is "this is a fair draw over the columns" and a pinned count would fail
+ * the next time anything upstream of it takes one more roll.
  */
 class SpawnTest {
 
@@ -151,6 +157,82 @@ class SpawnTest {
             }
         }
         assertEquals(setOf(Special.WILDCARD, Special.BOMB, Special.STONE), seen.keys)
+    }
+
+    @Test
+    fun theEntryColumnIsUniformOverTheBoardsColumns() {
+        val counts = IntArray(config.cols)
+        drawManyColumns(count = 50_000).forEach { counts[it]++ }
+
+        val expected = 50_000.0 / config.cols
+        counts.forEachIndexed { col, count ->
+            assertTrue(
+                count > expected * 0.9 && count < expected * 1.1,
+                "column $col drew $count of 50000, expected about ${expected.toInt()}: ${counts.toList()}",
+            )
+        }
+    }
+
+    /**
+     * The bound is the *config's* column count, not the default's, because
+     * `board.cols` travels inside the state and a run played on a remote board
+     * width would otherwise spawn off the edge of it.
+     */
+    @Test
+    fun theEntryColumnIsNeverOutOfBoundsAtAnyBoardWidth() {
+        listOf(1, 2, 3, 5, 9).forEach { cols ->
+            val narrow = config.copy(cols = cols)
+            val board = Board.empty(cols, narrow.rows)
+            var rng = Rng(cols * 104_729L)
+            repeat(2_000) { index ->
+                val draw = Spawn.draw(rng, level = 1, board, index + 3, false, narrow)
+                assertTrue(
+                    draw.column in 0 until cols,
+                    "a $cols-column board spawned in column ${draw.column}",
+                )
+                rng = draw.rng
+            }
+        }
+    }
+
+    /**
+     * The one thing a uniform draw and a centre spawn cannot both satisfy, and
+     * the whole point of the ruling.
+     */
+    @Test
+    fun consecutiveRunsDoNotAllOpenInTheSameColumn() {
+        val opened = (0 until 200).map { seed ->
+            Cascade.newGame(seed.toLong()).falling?.cell?.col
+        }.toSet()
+
+        assertEquals((0 until config.cols).toSet(), opened, "every column has to be an opening")
+    }
+
+    @Test
+    fun aBlockAlwaysEntersAtRowZero() {
+        var state = Cascade.newGame(seed = 77)
+        repeat(60) {
+            assertEquals(0, state.falling?.cell?.row, "a block entered below the top row")
+            state = Cascade.apply(state, Input.Lock).state
+            if (state.isOver) return
+        }
+    }
+
+    private fun drawManyColumns(count: Int): List<Int> {
+        val board = boardOf("2048 . . . .")
+        var rng = Rng(982_451_653L)
+        return (0 until count).map { index ->
+            val draw = Spawn.draw(
+                rng = rng,
+                level = 1,
+                board = board,
+                drawIndex = index + config.specialSuppressedDraws,
+                lastWasSpecial = false,
+                config = config.copy(specialRates = emptyList()),
+            )
+            rng = draw.rng
+            draw.column
+        }
     }
 
     private fun alwaysSpecial() = SpecialRate.Default.map { it.copy(perMille = 1000 / 3) }

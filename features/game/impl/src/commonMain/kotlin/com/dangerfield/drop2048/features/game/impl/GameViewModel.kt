@@ -19,6 +19,7 @@ import com.dangerfield.drop2048.libraries.achievements.AchievementsRepository
 import com.dangerfield.drop2048.libraries.achievements.outcomeWith
 import com.dangerfield.drop2048.libraries.ads.AdGate
 import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.BannerAds
 import com.dangerfield.drop2048.libraries.ads.InterstitialGate
 import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.ads.RunActivity
@@ -37,11 +38,8 @@ import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.flowroutines.collectIn
 import com.dangerfield.drop2048.libraries.gameconfig.RewardedContinuesPerRun
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
-import com.dangerfield.drop2048.libraries.progress.daily.DailyAttempt
-import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
 import com.dangerfield.drop2048.libraries.sharing.ShareResult
@@ -111,7 +109,6 @@ class GameViewModel(
     private val appCache: AppCache,
     private val savedRunStore: SavedRunStore,
     private val progress: ProgressRepository,
-    private val daily: DailyRepository,
     private val achievements: AchievementsRepository,
     private val leaderboards: Leaderboards,
     private val clock: Clock,
@@ -122,6 +119,7 @@ class GameViewModel(
     private val interstitials: InterstitialGate,
     private val runActivity: RunActivity,
     private val paywall: PaywallCoordinator,
+    private val banners: BannerAds,
     private val continuesPerRun: RewardedContinuesPerRun,
 ) : SEAViewModel<GameUiState, GameEffect, GameAction>(initialStateArg = GameUiState()) {
 
@@ -141,16 +139,6 @@ class GameViewModel(
      * shape the game no longer has.
      */
     private val tutorial = TutorialRunner(started.state.config)
-
-    /**
-     * The UTC day the Daily run in flight belongs to (SPEC 14), ISO-formatted,
-     * null in Endless.
-     *
-     * Read at the end of the run rather than re-derived from the clock, because
-     * an attempt started at 23:58 UTC and finished after midnight belongs to the
-     * board it began on. It survives a force-quit through [SavedRun.dailyDate].
-     */
-    private var dailyDate: String? = null
 
     /** Epoch millis the current stretch of play began, null while not playing. */
     private var playingSince: Long? = null
@@ -205,9 +193,6 @@ class GameViewModel(
 
     private var reduceMotion = false
 
-    /** SPEC 11's confirm-before-quit, kept current by `settingsChanged`. */
-    private var confirmBeforeQuit = true
-
     /**
      * The one sideways nudge the player made while a cascade was on screen.
      *
@@ -245,8 +230,8 @@ class GameViewModel(
         appLifecycle.addObserver(lifecycleObserver)
         takeAction(GameAction.Enter)
         // The settings screen opens *over* a live board, so this ViewModel is
-        // still alive when the player flips left-handed or the landing outline.
-        // Reading them once in `enter` would leave the board disagreeing with
+        // still alive when the player flips the landing outline or the arrow
+        // row. Reading them once in `enter` would leave the board disagreeing with
         // the switch until the run ended, which is the inert-setting failure
         // C11 exists to remove. Palette, reduce motion and large numbers do not
         // need this: they come down a CompositionLocal from the theme.
@@ -268,14 +253,12 @@ class GameViewModel(
             GameAction.Pause -> action.pause()
             GameAction.Resume -> action.resume()
             GameAction.Restart -> action.restart()
-            GameAction.StartDaily -> action.startDaily()
             GameAction.TutorialAdvance -> action.tutorialAdvance()
             GameAction.TutorialSkip -> action.tutorialSkip()
             GameAction.ReplayTutorial -> action.replayTutorial()
             GameAction.Quit -> action.quit()
             GameAction.Share -> action.share()
             GameAction.ShowStats -> sendEvent(GameEffect.OpenStats)
-            GameAction.ShowDaily -> sendEvent(GameEffect.OpenDaily)
             is GameAction.SettingsChanged -> action.settingsChanged(action.data)
             GameAction.OpenSettings -> sendEvent(GameEffect.OpenSettings)
             GameAction.ConfirmQuit -> action.leaveRun()
@@ -289,6 +272,8 @@ class GameViewModel(
             GameAction.ContinueAgain -> action.continueAgain()
             is GameAction.ContinueTick -> action.continueTick(action.secondsLeft)
             GameAction.OpenPro -> action.openPro()
+            GameAction.OpenProFromContinue -> action.openProFromContinue()
+            is GameAction.BannerFilled -> action.bannerFilled(action.filled)
         }
     }
 
@@ -304,7 +289,7 @@ class GameViewModel(
         val cached = Catching { appCache.get() }.logOnFailure { "Could not read app data" }.getOrNull()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }.getOrNull()
         val teach = cached?.hasUserOnboarded != true
-        val saved = if (teach) null else loadSaved(GameMode.ENDLESS)
+        val saved = if (teach) null else loadSaved()
         bestBeforeRun = best ?: 0
 
         if (teach) {
@@ -318,9 +303,9 @@ class GameViewModel(
         updateState {
             it.published(
                 best = best ?: 0,
-                leftHanded = cached?.leftHandedControls ?: false,
                 ghostEnabled = cached?.ghostEnabled ?: true,
-                controlScheme = cached?.controlScheme.asEnumOr(ControlScheme.Both),
+                controlScheme = cached?.controlScheme.asEnumOr(ControlScheme.Drag),
+                bannerAllowed = bannerAllowance(),
             )
         }
 
@@ -337,29 +322,22 @@ class GameViewModel(
     }
 
     /**
-     * The saved run in [mode]'s slot, unless the engine that wrote it already
-     * reports `isOver`.
+     * The saved run, unless the engine that wrote it already reports `isOver`.
      *
      * A dead board is dropped rather than restored: the run that wrote it was
      * killed after its last resolution and before the stacked-out sheet, and
      * reopening onto it with no record of the run behind it is worse than
      * starting a new one.
      */
-    private suspend fun loadSaved(mode: GameMode): SavedRun? =
-        savedRunStore.load(mode)?.takeUnless { it.state.isOver }
+    private suspend fun loadSaved(): SavedRun? =
+        savedRunStore.load()?.takeUnless { it.state.isOver }
 
     /** A [SavedRun] becoming the run this ViewModel is playing. */
     private fun adoptSaved(saved: SavedRun) {
-        started = StartedRun(state = saved.state, seed = saved.seed, mode = saved.mode)
+        started = StartedRun(state = saved.state, seed = saved.seed)
         engine = saved.state
         tally = saved.tally
-        dailyDate = saved.dailyDate
-        logger.logEvent(
-            "run.resume",
-            "mode" to saved.mode.name,
-            "level" to engine.level,
-            "score" to engine.score,
-        )
+        logger.logEvent("run.resume", "level" to engine.level, "score" to engine.score)
     }
 
     /**
@@ -390,9 +368,9 @@ class GameViewModel(
         tickerJob?.cancel()
         lockJob?.cancel()
         playbackJob?.cancel()
-        savedRunStore.clearAll()
+        savedRunStore.clear()
         engine = tutorial.begin()
-        started = StartedRun(state = engine, seed = started.seed, mode = started.mode)
+        started = StartedRun(state = engine, seed = started.seed)
         tally = RunTally()
         frames = emptyList()
         frameIndex = 0
@@ -500,10 +478,17 @@ class GameViewModel(
         updateState { it.copy(phase = GamePhase.Playing, tutorial = tutorial.frame).published() }
     }
 
-    /** Tells the current beat what the player just did, and republishes if it moved. */
+    /**
+     * Tells the current beat what the player just did, and republishes if it
+     * moved.
+     *
+     * The column goes with the signal because a steer is judged by where the
+     * block ended up, not by the fact that it moved — see
+     * [TutorialRunner.observe].
+     */
     private suspend fun GameAction.noteTutorial(signal: TutorialAwait) {
         if (!tutorial.isRunning) return
-        if (!tutorial.observe(signal)) return
+        if (!tutorial.observe(signal, engine.falling?.cell?.col)) return
         tutorial.stateForCurrentLesson(engine.score)?.let { engine = it }
         updateState { it.copy(tutorial = tutorial.frame).published() }
     }
@@ -558,7 +543,7 @@ class GameViewModel(
         drivePlayback()
     }
 
-    private fun beginRun() = adopt(runFactory.newRun(), day = null)
+    private fun beginRun() = adopt(runFactory.newRun())
 
     /**
      * Every timer cancelled and every per-drop scrap of playback state dropped.
@@ -581,9 +566,8 @@ class GameViewModel(
         decisions.suspend()
     }
 
-    private fun adopt(run: StartedRun, day: String?) {
+    private fun adopt(run: StartedRun) {
         started = run
-        dailyDate = day
         engine = run.state
         tally = RunTally(highestTier = engine.board.highestValue()?.points ?: 0)
         decisions = DecisionTimer()
@@ -594,7 +578,7 @@ class GameViewModel(
         runActivity.runStarted()
         interstitials.preload()
         adGate.preload(AdPlacement.ContinueRun)
-        logger.logEvent("run.start", "level" to engine.level, "mode" to run.mode.name)
+        logger.logEvent("run.start", "level" to engine.level, "seed" to run.seed)
     }
 
     /** Starts the drop timer and the stretch of play the duration is made of. */
@@ -732,6 +716,20 @@ class GameViewModel(
     private fun tutorialAllows(col: Int): Boolean = tutorial.allowedColumns?.contains(col) ?: true
 
     /**
+     * Whether the guided run will let the block be dropped where it is standing.
+     *
+     * True for every real run and for every scripted drop but the first. The
+     * first is the one that teaches steering, and a lesson that can be finished
+     * by dropping the block where it spawned teaches nothing — so the drop waits
+     * until the block is over the cell the board is outlining. See
+     * [TutorialRunner.requiredColumn].
+     */
+    private fun tutorialAllowsDrop(): Boolean {
+        val required = tutorial.requiredColumn ?: return true
+        return engine.falling?.cell?.col == required
+    }
+
+    /**
      * Drag steering (decision D11): put the block in column [col] if it can get
      * there.
      *
@@ -801,6 +799,7 @@ class GameViewModel(
     private suspend fun GameAction.hardDrop() {
         if (state.phase != GamePhase.Playing) return
         if (tutorialIsAsking) return
+        if (!tutorialAllowsDrop()) return
         val falling = engine.falling ?: return
         val landing = engine.landingCell ?: return
         sendEvent(GameEffect.Play(Cue.HardDrop))
@@ -875,66 +874,21 @@ class GameViewModel(
         // reset below happens after the ad closes — a run started behind a
         // full-screen ad is a run the player is losing while they cannot see it.
         dismissResults()
-        if (started.mode == GameMode.DAILY) {
-            sendEvent(GameEffect.Leave)
-            return
-        }
         resetToNewRun()
     }
 
-    /**
-     * SPEC 14, entered from `GameRoute(mode = DAILY)`.
-     *
-     * Two paths, and the fork is the one-attempt rule.
-     *
-     * A Daily run already in flight — resumed a moment ago by [enter] from the
-     * saved run store — is *continued*, not restarted. The attempt was spent when
-     * it began, so charging for it again would make backgrounding the app during
-     * the Daily cost the player their day.
-     *
-     * Otherwise the attempt is requested, and a refusal leaves rather than
-     * starting anything. The Daily screen is the gate and will not normally offer
-     * a run there are no attempts for, but the gate has to hold here too: this is
-     * a route, and a route can be reached from a deep link, a restored back stack
-     * or a stale screen.
-     */
-    private suspend fun GameAction.startDaily() {
-        if (started.mode == GameMode.DAILY && !engine.isOver) {
-            updateState { it.published() }
-            return
-        }
-        val saved = loadSaved(GameMode.DAILY)
-        if (saved != null) {
-            stopEverything()
-            adoptSaved(saved)
-            updateState { it.copy(callout = null, newBest = false, tutorial = null).published() }
-            resumeInto(saved)
-            return
-        }
-        val attempt = Catching { daily.startAttempt() }
-            .logOnFailure { "Could not start a Daily attempt" }
-            .getOrDefault(DailyAttempt.NoAttemptsLeft)
-        if (attempt !is DailyAttempt.Granted) {
-            logger.logEvent("daily.refused", "reason" to attempt::class.simpleName.orEmpty())
-            sendEvent(GameEffect.Leave)
-            return
-        }
-        logger.logEvent("daily.start", "date" to attempt.date.toString(), "attempt" to attempt.attemptNumber)
-        resetToRun(runFactory.dailyRun(attempt.seed), day = attempt.date.toString())
-    }
-
-    private suspend fun GameAction.resetToNewRun() = resetToRun(runFactory.newRun(), day = null)
+    private suspend fun GameAction.resetToNewRun() = resetToRun(runFactory.newRun())
 
     /**
      * Everything a fresh run has to forget, and the one place it is written down.
      *
-     * Shared by "Drop again", the pause menu's Restart, the end of the tutorial
-     * and the start of a Daily attempt, because all four are the same event:
-     * throw away what is on screen and start [run] at level 1.
+     * Shared by "Drop again", the pause menu's Restart and the end of the
+     * tutorial, because all three are the same event: throw away what is on
+     * screen and start [run] at level 1.
      */
-    private suspend fun GameAction.resetToRun(run: StartedRun, day: String?) {
+    private suspend fun GameAction.resetToRun(run: StartedRun) {
         stopEverything()
-        adopt(run, day)
+        adopt(run)
         updateState {
             it.copy(
                 phase = GamePhase.Playing,
@@ -943,7 +897,7 @@ class GameViewModel(
                 chainStep = 0,
                 chainCell = null,
                 tutorial = null,
-            ).published()
+            ).published(bannerAllowed = bannerAllowance())
         }
         saveRun()
         beginPlaying()
@@ -958,12 +912,10 @@ class GameViewModel(
      * into this state would be a second source for one setting.
      */
     private suspend fun GameAction.settingsChanged(data: AppData) {
-        confirmBeforeQuit = data.confirmBeforeQuit
         updateState {
             it.copy(
-                leftHanded = data.leftHandedControls,
                 ghostEnabled = data.ghostEnabled,
-                controlScheme = data.controlScheme.asEnumOr(ControlScheme.Both),
+                controlScheme = data.controlScheme.asEnumOr(ControlScheme.Drag),
                 ghost = if (data.ghostEnabled) engine.landingCell else null,
             )
         }
@@ -972,26 +924,24 @@ class GameViewModel(
     /**
      * Quit, which puts the board away without ending the run.
      *
-     * It sits a thumb-width from Restart on the pause overlay, so it asks first
-     * unless the player has turned that off in settings.
+     * It **always** asks first (owner ruling, 2026-09-20). It sits a
+     * thumb-width from Restart on the pause overlay, and the setting that used
+     * to let a player skip the question is gone: there is one behaviour here
+     * now, not a branch.
      */
     private suspend fun GameAction.quit() {
-        if (!confirmBeforeQuit) {
-            leaveRun()
-            return
-        }
         updateState { it.copy(confirmingQuit = true) }
     }
 
     /**
      * Where Quit goes, and it is not out of the app.
      *
-     * A Daily was navigated to, so it pops back to the Daily screen. Endless is
-     * the **start destination** (C5 deleted the home screen), so popping it took
-     * the player to their launcher — which reads as a crash rather than as a
-     * decision, on a button whose dialog they had just confirmed.
+     * The board is the **start destination** (C5 deleted the home screen), so
+     * popping it took the player to their launcher — which reads as a crash
+     * rather than as a decision, on a button whose dialog they had just
+     * confirmed.
      *
-     * Endless therefore quits to the start overlay, which since C3c is the app's
+     * It therefore quits to the start overlay, which since C3c is the app's
      * menu. Decision D12 already says the run survives a Quit rather than dying,
      * so there is a run behind that overlay and Play picks it back up.
      */
@@ -999,10 +949,6 @@ class GameViewModel(
         // The other dismissal. Quitting from the pause overlay is not one — the
         // run is still alive there, and the gate refuses it anyway.
         dismissResults()
-        if (started.mode == GameMode.DAILY) {
-            sendEvent(GameEffect.Leave)
-            return
-        }
         tickerJob?.cancel()
         lockJob?.cancel()
         playbackJob?.cancel()
@@ -1067,12 +1013,11 @@ class GameViewModel(
      * ### A debug run is played and then thrown away
      *
      * [StartedRun.debug] is true for every run started in a session that has
-     * opened the debug menu (SPEC 19), and it gates all four writes at once:
-     * `run_record`, `daily_result`, `Leaderboards.submit` and the achievement
-     * fact log. The gate is here rather than inside each repository because
-     * these are the only four things in the app that claim a player did
-     * something, and one guard over the four of them is one place to be wrong
-     * instead of four.
+     * opened the debug menu (SPEC 19), and it gates all three writes at once:
+     * `run_record`, `Leaderboards.submit` and the achievement fact log. The gate
+     * is here rather than inside each repository because these are the only
+     * three things in the app that claim a player did something, and one guard
+     * over the three of them is one place to be wrong instead of three.
      *
      * The stacked-out sheet is still drawn, with its score and its share — the
      * run happened, it just does not count. The badge announcement is suppressed
@@ -1101,23 +1046,20 @@ class GameViewModel(
             longestCascade = tally.longestCascade,
             bursts = tally.bursts,
             merges = tally.merges,
-            mode = started.mode,
             seed = started.seed,
         )
         val recordable = !started.debug
         if (recordable) {
             Catching { progress.record(record) }.logOnFailure { "Could not record the run" }
         }
-        val streak = if (recordable) bankDailyResult(score) else 0
         if (recordable) postToLeaderboards(score)
-        savedRunStore.clear(started.mode)
-        val unlocked = if (recordable) recordAchievements(record, streak) else emptyList()
+        savedRunStore.clear()
+        val unlocked = if (recordable) recordAchievements(record) else emptyList()
         val best = Catching { progress.bestScore() }.logOnFailure { "Could not read best score" }
             .getOrNull() ?: maxOf(state.best, score)
         val decided = decisions.summary()
         logger.logEvent(
             "run.end",
-            "mode" to started.mode.name,
             "score" to score,
             "level" to engine.level,
             "blocks" to engine.blocksDropped,
@@ -1131,15 +1073,10 @@ class GameViewModel(
             "cascades_2" to tally.cascadesByDepth.getOrElse(2) { 0 },
             "cascades_3" to tally.cascadesByDepth.getOrElse(3) { 0 },
             "cascades_4plus" to tally.cascadesByDepth.drop(DeepCascade).sum(),
-            // SPEC 17 asks for the seed and SPEC 14 says a Daily seed is the
-            // whole world's board for that day. Endless seeds are a private
-            // number that makes a reported run replayable; a Daily seed on a
-            // record that can ship the moment the attempt starts is a board
-            // leaked before its day. So Endless carries it and Daily carries
-            // the day instead — which is the only part of a Daily run that is
-            // not already public.
-            "seed" to started.seed.takeIf { started.mode == GameMode.ENDLESS },
-            "daily_date" to dailyDate,
+            // SPEC 17 asks for the seed. It is a private number that makes a
+            // reported run replayable, and with the Daily gone there is no
+            // shared board a seed could leak ahead of its day (D27).
+            "seed" to started.seed,
             // Whether the four writes that claim a player did something
             // actually happened (L63). `debug_session` is stamped on every
             // record by `GrafanaLogTree` and answers a wider question — did
@@ -1165,20 +1102,24 @@ class GameViewModel(
         interstitials.noteRunFinished()
         interstitials.preload()
 
+        // SPEC 12: one non-modal card, at most once per session, and since D28
+        // never before this player has actually been shown an ad. The
+        // coordinator owns both rules; claiming it here rather than asking the
+        // screen to is what keeps "once per session" from becoming "once per
+        // recomposition". Resolved before the update because the ads-seen half
+        // of the answer is on disk.
+        val card = paywall.claimStackedOutCard()
+
         updateState {
-            it.published(best = best).copy(
+            it.published(best = best, bannerAllowed = bannerAllowance()).copy(
                 phase = GamePhase.StackedOut,
                 falling = null,
                 ghost = null,
-                newBest = started.mode == GameMode.ENDLESS && score > 0 && score > bestBeforeRun,
+                newBest = score > 0 && score > bestBeforeRun,
                 unlocked = unlocked,
                 continueSecondsLeft = 0,
                 continueAvailable = mayOfferSecondContinue(),
-                // SPEC 12: one non-modal card, at most once per session. The
-                // coordinator owns the cap; claiming it here rather than asking
-                // the screen to is what keeps "once per session" from becoming
-                // "once per recomposition".
-                showUpsell = paywall.claimStackedOutCard(),
+                showUpsell = card,
             )
         }
         bestBeforeRun = best
@@ -1189,15 +1130,6 @@ class GameViewModel(
      * first continue of a run.
      *
      * Two refusals worth naming.
-     *
-     * **A Daily run is never offered a continue**, and this is the one place
-     * SPEC 12 and SPEC 14 have to be reconciled rather than both applied. The
-     * Daily's whole claim is that everybody played the same board — decision D18
-     * goes as far as pinning `EngineConfig.Default` against remote config to keep
-     * two players' runs comparable. A continue clears three rows and drops a
-     * level, which is a larger change to the board than any config key could
-     * make, and one that only some players would have. Watching an ad is not
-     * allowed to buy a better score on a leaderboard everyone shares.
      *
      * **The second continue is not offered here.** SPEC 12 asks for "a 2nd at
      * higher friction", and the friction is that nothing offers it: the sheet
@@ -1233,8 +1165,39 @@ class GameViewModel(
         )
     }
 
-    private fun mayOfferContinue(): Boolean =
-        started.mode == GameMode.ENDLESS && continuesUsed == 0 && continuesLeft() > 0
+    /**
+     * SPEC 12's third paywall surface, beside the rewarded continue.
+     *
+     * The trigger was declared in C10 with a written rationale and no call site
+     * at all, which is the same shape of dead promise `feature.leaderboards`
+     * was. It is wired here because the rationale is right: the player is
+     * already deciding whether an advertisement is worth their time, and Pro is
+     * the other answer to that question. It does not touch the offer: the
+     * countdown keeps running, the board stays up, and declining Pro leaves the
+     * continue exactly where it was.
+     */
+    private fun GameAction.openProFromContinue() {
+        val offered = paywall.requestOffer(PaywallTrigger.Continue)
+        logger.logEvent(
+            "iap.upsell_tapped",
+            "surface" to PaywallTrigger.Continue.id,
+            "offered" to offered,
+        )
+    }
+
+    /**
+     * The banner under the board either arrived or went away (D28).
+     *
+     * The *layout* does not need this. A banner that did not fill occupies no
+     * height, so the board takes the strip with nothing being told anything.
+     * What it is for is the record that an ad reached the player's screen, which
+     * is what the Pro upsell card is gated on.
+     */
+    private fun GameAction.bannerFilled(filled: Boolean) {
+        if (filled) banners.noteFilled()
+    }
+
+    private fun mayOfferContinue(): Boolean = continuesUsed == 0 && continuesLeft() > 0
 
     /**
      * SPEC 12's hard cap, read at the point of use so `ads.rewarded.continuesPerRun`
@@ -1256,8 +1219,7 @@ class GameViewModel(
      * seconds are there so a board does not sit waiting forever, not to punish
      * someone for not reading fast enough. The cap is the cap either way.
      */
-    private fun mayOfferSecondContinue(): Boolean =
-        started.mode == GameMode.ENDLESS && continuesLeft() > 0
+    private fun mayOfferSecondContinue(): Boolean = continuesLeft() > 0
 
     /**
      * The offer, over a board that is still on screen and **not blurred**.
@@ -1283,6 +1245,10 @@ class GameViewModel(
                 falling = null,
                 ghost = null,
                 continueSecondsLeft = ContinueCountdownSeconds,
+                // Asked now rather than drawn unconditionally: a Pro line that
+                // opens nothing is worse than none, and the two rules that
+                // would refuse it are the coordinator's.
+                proOnContinue = paywall.mayOffer(PaywallTrigger.Continue),
             )
         }
         startCountdown()
@@ -1397,7 +1363,6 @@ class GameViewModel(
     private suspend fun GameAction.continueAgain() {
         if (state.phase != GamePhase.StackedOut) return
         if (continuesLeft() <= 0) return
-        if (started.mode != GameMode.ENDLESS) return
         updateState { it.copy(phase = GamePhase.ContinueOffer, continueSecondsLeft = 0) }
         continueAccept()
     }
@@ -1424,7 +1389,7 @@ class GameViewModel(
      * The numbers come off the same tally `run_record` was written from, so a
      * shared run cannot disagree with the sheet it was shared from. The words do
      * not: [ShareResult] carries no strings and no board, which is what keeps a
-     * Daily share from handing the reader a seed they have not played.
+     * share from handing the reader a run they have not played.
      */
     private suspend fun GameAction.share() {
         sendEvent(
@@ -1436,7 +1401,6 @@ class GameViewModel(
                     level = engine.level,
                     durationMs = tally.playedMs,
                 ),
-                day = dailyDate,
             )
         )
     }
@@ -1449,12 +1413,10 @@ class GameViewModel(
      * not fire. `GameViewModelTest.aFinishedRunPostsItsScoreToTheLeaderboard` is
      * the guard.
      *
-     * Which board depends on the mode, and it is not a preference (decision D19).
-     * **A Daily score goes nowhere**: there is no Daily board (D24), and it must
-     * not be allowed to fall through to the Endless ones, which is exactly what
-     * an `else ->` here would do the next time `GameMode` gains an entry. Hence
-     * the exhaustive `when` over a mode that now has one empty arm — deleting
-     * that arm is a compile error, which is the point of it.
+     * Both boards take the same number. D19 and D24 used to route this on the
+     * run's mode, because a Daily score was not the same quantity and belonged
+     * on neither board; D27 removed the mode, so there is one kind of score and
+     * nothing left to route.
      *
      * Submitting is fire-and-forget by design — nothing here suspends, nothing
      * returns a result, and a player with no Game Center account notices nothing.
@@ -1464,63 +1426,27 @@ class GameViewModel(
      * the moment they earned one; the reasoning is in that file.
      */
     private fun postToLeaderboards(score: Long) {
-        when (started.mode) {
-            GameMode.ENDLESS -> {
-                leaderboards.submit(Leaderboard.AllTimeScore, score)
-                leaderboards.submit(Leaderboard.WeeklyScore, score)
-            }
-
-            GameMode.DAILY -> Unit
-        }
+        leaderboards.submit(Leaderboard.AllTimeScore, score)
+        leaderboards.submit(Leaderboard.WeeklyScore, score)
     }
 
     /**
      * Files the run as an achievement fact and hands back whatever it just
      * unlocked, in catalog order.
      *
-     * The fact is `run_record` plus [RunTally.facts] plus the Daily streak the
-     * run landed on, so the badges and the stats page are reading the same run
-     * rather than two tallies that can drift. A failure here costs the player a
-     * badge announcement and nothing else — the fact log is append-only and the
-     * fold is re-run from scratch on the next write, so the badge is granted
-     * (silently) the next time they finish a run.
+     * The fact is `run_record` plus [RunTally.facts], so the badges and the
+     * stats page are reading the same run rather than two tallies that can
+     * drift. A failure here costs the player a badge announcement and nothing
+     * else — the fact log is append-only and the fold is re-run from scratch on
+     * the next write, so the badge is granted (silently) the next time they
+     * finish a run.
      */
-    private suspend fun recordAchievements(record: RunRecord, streak: Int): List<AchievementId> =
-        Catching { achievements.record(record.outcomeWith(tally.facts, streak)) }
+    private suspend fun recordAchievements(record: RunRecord): List<AchievementId> =
+        Catching { achievements.record(record.outcomeWith(tally.facts)) }
             .logOnFailure { "Could not record achievements for the run" }
             .getOrNull()
             .orEmpty()
             .map { it.id }
-
-    /**
-     * Closes today's Daily row (SPEC 11), if this was a Daily run.
-     *
-     * The day comes from [dailyDate] rather than from the clock, so an attempt
-     * that crossed 00:00 UTC scores against the board it was played on. The write
-     * only ever raises `completed` and takes the better score, so reporting the
-     * same finish twice — which a force-quit on the stacked-out sheet can cause —
-     * costs nothing.
-     *
-     * `run_record` is written either way and carries `mode = DAILY`, which is what
-     * keeps SPEC 15's lifetime numbers whole: a Daily run is a run.
-     *
-     * Returns the streak the day now stands at, which is what SPEC 15's 7- and
-     * 30-day badges are earned against. It is read back from `daily_result`
-     * *after* the write rather than derived here, because the streak has exactly
-     * one owner and a second fold would eventually disagree with the number on
-     * the Daily card. Zero for an Endless run.
-     */
-    private suspend fun bankDailyResult(score: Long): Int {
-        if (started.mode != GameMode.DAILY) return 0
-        val day = dailyDate ?: return 0
-        Catching { daily.recordAttempt(LocalDate.parse(day), score) }
-            .logOnFailure { "Could not record the Daily result" }
-        logger.logEvent("daily.end", "date" to day, "score" to score)
-        return Catching { daily.status().streak.current }
-            .logOnFailure { "Could not read the Daily streak" }
-            .getOrNull()
-            ?: 0
-    }
 
     private suspend fun GameAction.lock() {
         lockJob?.cancel()
@@ -1632,8 +1558,8 @@ class GameViewModel(
      * RNG did not draw, and a board that should have ended it — and the engine's
      * whole value is that it is a pure function of state and a seed (SPEC 4.1).
      * Teaching it about a debug queue would mean a `GameState` no longer
-     * determines the next one, which is the property Daily Challenge, undo,
-     * resume, the balance harness and replay are all built on.
+     * determines the next one, which is the property undo, resume, the balance
+     * harness and replay are all built on.
      *
      * So the engine plays honestly and this rewrites the answer afterwards, which
      * is also why a run that has been through here writes no `run_record`.
@@ -1737,7 +1663,6 @@ class GameViewModel(
             "funnel.first_run_completed",
             "score" to engine.score,
             "level" to engine.level,
-            "mode" to started.mode.name,
         )
     }
 
@@ -1773,7 +1698,6 @@ class GameViewModel(
         val timing = decisions.lastDrop
         logger.logEvent(
             "run.sample",
-            "mode" to started.mode.name,
             "drop" to engine.blocksDropped,
             "level" to engine.level,
             "tick_ms" to intervalMillis(),
@@ -1806,10 +1730,8 @@ class GameViewModel(
                 state = engine,
                 tally = tallyIncludingTimeSoFar(),
                 seed = started.seed,
-                mode = started.mode,
                 resolution = resolutionSnapshot?.takeIf { frameIndex < frames.size }
                     ?.copy(frameIndex = frameIndex),
-                dailyDate = dailyDate,
             )
         )
     }
@@ -1841,9 +1763,9 @@ class GameViewModel(
      */
     private fun GameUiState.published(
         best: Long = this.best,
-        leftHanded: Boolean = this.leftHanded,
         ghostEnabled: Boolean = this.ghostEnabled,
         controlScheme: ControlScheme = this.controlScheme,
+        bannerAllowed: Boolean = this.bannerAllowed,
     ): GameUiState = copy(
         board = engine.board,
         falling = engine.falling,
@@ -1856,11 +1778,26 @@ class GameViewModel(
         dropIndex = engine.blocksDropped,
         inDanger = engine.inDanger,
         biggestTier = tally.highestTier,
-        leftHanded = leftHanded,
         ghostEnabled = ghostEnabled,
         controlScheme = controlScheme,
-        mode = started.mode,
+        bannerAllowed = bannerAllowed,
     )
+
+    /**
+     * Whether a banner may be asked for, re-read at a **run boundary** and
+     * nowhere else.
+     *
+     * Not in [published], which runs on every tick: resolving three config
+     * values sixty times a second to answer a question that can only change
+     * when the player buys Pro or an operator turns a key is work for nothing.
+     *
+     * The boundary is also the right moment on its own terms. SPEC 12.4's
+     * objection to banners is that one which shifts layout mid-run reads as the
+     * game cheating, and that objection survived D28. What changed is the
+     * answer to it: a banner that may appear only between runs cannot move the
+     * board under a falling block.
+     */
+    private fun bannerAllowance(): Boolean = banners.isAllowed()
 
     override fun onCleared() {
         appLifecycle.removeObserver(lifecycleObserver)
@@ -1954,13 +1891,7 @@ data class GameUiState(
     val calloutNonce: Int = 0,
     val biggestTier: Int = 0,
 
-    /**
-     * Whether the run that just ended beat the score it started under.
-     *
-     * Endless only (decision D19). A Daily score cannot own the headline best, so
-     * a Daily that celebrated one was promising a number the stats page would
-     * then refuse to show — `bestScore()` filters Daily rows out.
-     */
+    /** Whether the run that just ended beat the score it started under. */
     val newBest: Boolean = false,
 
     /**
@@ -1971,7 +1902,6 @@ data class GameUiState(
      * run that earned nothing, which after the first few is most of them.
      */
     val unlocked: List<AchievementId> = emptyList(),
-    val leftHanded: Boolean = false,
     val ghostEnabled: Boolean = true,
 
     /**
@@ -1984,8 +1914,13 @@ data class GameUiState(
      * Unlike the palette and reduce motion it cannot come down a CompositionLocal
      * (decision D4), because [Buttons][ControlScheme.Buttons] has to reach the
      * gesture handler on the board and the theme does not know what a board is.
+     *
+     * The default is [Drag][ControlScheme.Drag], matching the setting's own
+     * default (owner ruling, 2026-09-20). A state class that defaulted to a
+     * scheme the player is not given is a preview and a golden of a game nobody
+     * is shipped.
      */
-    val controlScheme: ControlScheme = ControlScheme.Both,
+    val controlScheme: ControlScheme = ControlScheme.Drag,
 
     /**
      * Whether the pause overlay is asking whether Quit was meant.
@@ -2004,16 +1939,6 @@ data class GameUiState(
      * `stringResource` needs a composition and this class has none.
      */
     val tutorial: TutorialFrame? = null,
-
-    /**
-     * Which rules are being played (SPEC 14).
-     *
-     * The screen reads it in exactly one place — the stacked-out sheet, where
-     * "Drop again" would otherwise start an Endless run off the back of a Daily
-     * one and quietly leave the mode. Everything else about a Daily run looks and
-     * plays identically, which is the point.
-     */
-    val mode: GameMode = GameMode.ENDLESS,
 
     /**
      * Seconds left on the continue offer's auto-decline, published by the
@@ -2041,6 +1966,28 @@ data class GameUiState(
      * session's worth of card on the same sheet.
      */
     val showUpsell: Boolean = false,
+
+    /**
+     * Whether the continue offer carries a Pro line beside "No thanks"
+     * (`PaywallTrigger.Continue`, D28). False for a Pro player and with
+     * `pro.upsell.enabled` off, so the control is absent rather than dead.
+     */
+    val proOnContinue: Boolean = false,
+
+    /**
+     * Whether a banner **may be asked for**: ads on, `ads.banner.enabled` on,
+     * not Pro (D28).
+     *
+     * Deliberately not "whether a banner is on screen". Nothing on this state
+     * knows that and nothing needs to: the slot occupies no height until an ad
+     * is really in it, so the board reclaims the strip on a no-fill without
+     * anything here changing. One rule, in one place, and this flag is only the
+     * half of it that a config value can answer.
+     *
+     * The other refusal, that the player has the arrow row on, is the screen's,
+     * because the banner is drawn in the space the arrow row would have used.
+     */
+    val bannerAllowed: Boolean = false,
 )
 
 sealed interface GameEffect {
@@ -2052,20 +1999,16 @@ sealed interface GameEffect {
     /** SPEC 15's stats page, opened from the stacked-out sheet. */
     data object OpenStats : GameEffect
 
-    /** SPEC 14's Daily Challenge, opened from the stacked-out sheet. */
-    data object OpenDaily : GameEffect
-
     /** SPEC 11's settings, opened from the pause overlay. */
     data object OpenSettings : GameEffect
 
     /**
      * SPEC 15's share sheet, from the stacked-out sheet.
      *
-     * The effect carries numbers and a UTC day, never words: the copy is
-     * resolved where there is a composition to resolve it in, and this class has
-     * none. [day] is null for an Endless run.
+     * The effect carries numbers, never words: the copy is resolved where there
+     * is a composition to resolve it in, and this class has none.
      */
-    data class Share(val result: ShareResult, val day: String?) : GameEffect
+    data class Share(val result: ShareResult) : GameEffect
 }
 
 sealed interface GameAction {
@@ -2124,16 +2067,6 @@ sealed interface GameAction {
      */
     data object ReplayTutorial : GameAction
 
-    /**
-     * Play today's Daily Challenge, from `GameRoute(mode = DAILY)`.
-     *
-     * A route argument rather than a second screen, and an action rather than a
-     * constructor parameter, because the ViewModel is built before the back stack
-     * entry is read. It mirrors [ReplayTutorial] exactly, and for the same
-     * reason.
-     */
-    data object StartDaily : GameAction
-
     data object Quit : GameAction
 
     /** SPEC 15's share, offered on the stacked-out sheet. */
@@ -2141,14 +2074,6 @@ sealed interface GameAction {
 
     data object ShowStats : GameAction
 
-    /**
-     * SPEC 14's Daily Challenge, offered from the stacked-out sheet.
-     *
-     * The sheet is the only entry point until C11 builds a menu. It is also the
-     * right one: the moment a player has just lost a run is exactly when a board
-     * everyone else is also playing today is worth offering.
-     */
-    data object ShowDaily : GameAction
     /** `AppData` changed under a live board — see `settingsChanged`. */
     data class SettingsChanged(val data: AppData) : GameAction
 
@@ -2189,6 +2114,17 @@ sealed interface GameAction {
 
     /** The upsell card was tapped (SPEC 12). Opens the paywall; buys nothing. */
     data object OpenPro : GameAction
+
+    /**
+     * The Pro line on the continue offer was tapped
+     * (`PaywallTrigger.Continue`). Its own action rather than [OpenPro] because
+     * the two are different triggers and "which moment converts" is the only
+     * reason the trigger enum carries an id.
+     */
+    data object OpenProFromContinue : GameAction
+
+    /** The banner slot reported a fill, or the loss of one (D28). */
+    data class BannerFilled(val filled: Boolean) : GameAction
 }
 
 /**

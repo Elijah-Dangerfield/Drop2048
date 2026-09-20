@@ -30,11 +30,19 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * (`verifyNoHouseAdsInRelease`), where a wrong answer fails the build rather
  * than shipping.
  *
- * iOS has no per-build-type source set to hang that on, so the fake module is
- * linked into every iOS binary and [HouseAds.isSelected] additionally refuses to
- * latch unless `BuildInfo.isDebug` — which on Native is
- * `Platform.isDebugBinary`, a property of the Xcode configuration rather than of
- * anything the app can set.
+ * iOS has no per-build-type source set to hang that on, so the same exclusion is
+ * decided one level up: `:apps:compose` puts the fake module on the iOS compile
+ * classpath only when Xcode's `CONFIGURATION` says Debug, and
+ * `verifyNoHouseAdsInIosRelease` plus `verifyNoHouseAdsIn…ReleaseFramework`
+ * check the graph and the linked `ComposeApp` respectively. Before that the
+ * module was in every iOS binary and this was the platform where the guarantee
+ * was a runtime check alone.
+ *
+ * [HouseAds.isSelected] still refuses to latch unless `BuildInfo.isDebug`, which
+ * on Native is `Platform.isDebugBinary`, a property of the Xcode configuration
+ * rather than of anything the app can set. It is the third layer now rather than
+ * the only one, and it is what covers a build that somehow contains the class
+ * anyway.
  *
  * ### [Surface] is a composable on the interface
  *

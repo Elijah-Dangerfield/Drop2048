@@ -72,6 +72,34 @@ data class Spotlight(
 class FocusRegistry {
     internal val bounds = mutableStateMapOf<FocusTargetKey, Rect>()
 
+    /**
+     * Whether anything on screen has reported a position for [key].
+     *
+     * A spotlight on a key nothing registers fails silently and *looks* like a
+     * design decision: the scrim punches no hole and the card anchors on
+     * `Rect.Zero` in the corner. That is exactly what shipped in the game's
+     * tutorial under the drag scheme, so the ability to ask is what lets a
+     * feature assert that the things its own script points at are things it
+     * draws. Reading it inside a composition also subscribes to the map, which
+     * is a snapshot state, so a caller sees keys as the layout settles.
+     */
+    fun registered(key: FocusTargetKey): Boolean = bounds.containsKey(key)
+
+    /**
+     * Where [key] actually landed, in root coordinates, or null if nothing has
+     * reported it.
+     *
+     * The wider form of [registered], and it exists for the same reason: a
+     * layout rule is a claim about rectangles, and the only honest way to hold
+     * one is to measure the rectangle. `:features:game`'s board is already a
+     * focus target, so a test can ask where the board ended up without the
+     * screen growing a test tag for it.
+     *
+     * Read inside a composition it subscribes to the backing snapshot map; read
+     * from a test after the layout has settled it is a plain lookup.
+     */
+    fun boundsOf(key: FocusTargetKey): Rect? = bounds[key]
+
     internal fun report(key: FocusTargetKey, rect: Rect) {
         bounds[key] = rect
     }

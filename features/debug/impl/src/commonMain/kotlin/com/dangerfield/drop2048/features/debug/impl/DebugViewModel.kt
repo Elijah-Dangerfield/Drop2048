@@ -33,7 +33,6 @@ import com.dangerfield.drop2048.libraries.drop2048.storage.db.ClearableDao
 import com.dangerfield.drop2048.libraries.flowroutines.DispatcherProvider
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.flowroutines.collectIn
-import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -68,7 +67,6 @@ class DebugViewModel(
     private val diagnostics: Diagnostics,
     private val gate: DebugMenuGate,
     private val proGrant: ProGrant,
-    private val daily: DailyRepository,
     private val adGate: AdGate,
     private val interstitials: InterstitialGate,
     private val adDiagnostics: AdDiagnostics,
@@ -156,7 +154,6 @@ class DebugViewModel(
 
             is DebugAction.SetProGranted -> proGrant.setGranted(action.granted)
             DebugAction.ResetPurchases -> proGrant.setGranted(false)
-            DebugAction.ClearDailyToday -> action.clearDaily()
 
             DebugAction.ResetTutorial -> action.resetTutorial()
             DebugAction.ResetAllLocalData -> action.resetAllLocalData()
@@ -282,12 +279,8 @@ class DebugViewModel(
         takeAction(DebugAction.RefreshAds)
     }
 
-    private suspend fun DebugAction.load() {
+    private fun DebugAction.load() {
         takeAction(DebugAction.RefreshAds)
-        val streak = Catching { daily.status().streak.current }
-            .logOnFailure { "Could not read the Daily streak" }
-            .getOrNull() ?: 0
-        updateState { it.copy(dailyStreak = streak) }
     }
 
     private suspend fun DebugAction.SubmitPassphrase.submitPassphrase() {
@@ -363,21 +356,11 @@ class DebugViewModel(
      * for this — would be a production type that exists for the debug menu. What
      * this touches is the one nullable string, and `SavedRunStore` treats a null
      * slot as "no saved run" by construction.
-     *
-     * Only the Endless slot. A Daily attempt is spent and cannot be given back
-     * (SPEC 14), so deleting one to make room for a debug board would cost the
-     * tester's device a day it can never replay.
      */
     private suspend fun DebugAction.startForcedRun() {
         Catching { appCache.update { data -> data.copy(savedRun = null) } }
             .logOnFailure { "Could not clear the saved run before a forced one" }
         sendEvent(DebugEvent.StartRun)
-    }
-
-    private suspend fun DebugAction.clearDaily() {
-        Catching { daily.reset() }.logOnFailure { "Could not reset the Daily ledger" }
-        updateState { it.copy(dailyStreak = 0) }
-        sendEvent(DebugEvent.Message(DebugMessage.DailyCleared))
     }
 
     private suspend fun DebugAction.resetTutorial() {
@@ -399,10 +382,8 @@ class DebugViewModel(
         clearableDaos.forEach { dao ->
             Catching { dao.deleteAll() }.logOnFailure { "Could not clear a table" }
         }
-        Catching {
-            appCache.update { data -> data.copy(savedRun = null, savedDailyRun = null) }
-        }.logOnFailure { "Could not clear the in-flight runs" }
-        updateState { it.copy(dailyStreak = 0) }
+        Catching { appCache.update { data -> data.copy(savedRun = null) } }
+            .logOnFailure { "Could not clear the in-flight run" }
         sendEvent(DebugEvent.Message(DebugMessage.LocalDataReset))
     }
 
@@ -457,7 +438,6 @@ data class DebugState(
     val transcript: List<TranscriptLine> = emptyList(),
 
     val proGranted: Boolean = false,
-    val dailyStreak: Int = 0,
 
     val soaking: Boolean = false,
     val soak: SoakSummary? = null,
@@ -509,7 +489,6 @@ data class SoakSummary(
 /** The two-line confirmations the menu gives back. Enum, not a string, so the copy stays in the screen. */
 enum class DebugMessage {
     OverridesCleared,
-    DailyCleared,
     TutorialReset,
     LocalDataReset,
 }
@@ -567,7 +546,6 @@ sealed interface DebugAction {
 
     data class SetProGranted(val granted: Boolean) : DebugAction
     data object ResetPurchases : DebugAction
-    data object ClearDailyToday : DebugAction
 
     data object ResetTutorial : DebugAction
     data object ResetAllLocalData : DebugAction

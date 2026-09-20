@@ -12,18 +12,15 @@ import kotlinx.serialization.Serializable
  * ### Nothing here is an `EngineConfig`
  *
  * That is the single most important thing about this type, and it is what keeps
- * a forced board out of a Daily Challenge. D18 pins the Daily to
- * `EngineConfig.Default` so that everyone who plays a day plays the same game,
- * and D5 puts the config *inside* `GameState` so a replayed seed reproduces the
- * run it was recorded under. A debug override that took the shape of an
- * `EngineConfig` would travel inside a saved run, inside a `run_record` replay
- * and — if anyone ever wired it into `dailyRun` — inside a shared seed.
+ * a forced board out of a replay. D5 puts the config *inside* `GameState` so a
+ * replayed seed reproduces the run it was recorded under, and a debug override
+ * that took the shape of an `EngineConfig` would travel inside a saved run and
+ * inside a `run_record` replay.
  *
  * So there is no config override, and there is no guard against one either.
  * These are edits to a *starting state* and to the ViewModel's clock, both of
  * which stop at the boundary of the run they were applied to. The strongest
- * version of "a debug config cannot leak into a Daily" is that no debug config
- * exists.
+ * version of "a debug config cannot leak" is that no debug config exists.
  *
  * [tickIntervalMs] is the clearest case: SPEC 5.5's speed curve is a config key,
  * and this is deliberately *not* it. It is a number the ViewModel's ticker reads
@@ -85,19 +82,19 @@ data class Placement(val cell: Cell, val block: Block?)
  *
  * ### Why the session is the unit, and not the run
  *
- * Anything a debug menu writes to `run_record`, `daily_result` or
+ * Anything a debug menu writes to `run_record`, the achievement fact log or
  * `Leaderboards.submit` is a lie about a player. The tempting design is to taint
  * individual runs — mark the run that was forced, leave the rest alone — and it
  * is wrong in the only direction that matters. A tester who loads a preset,
  * plays it, exits, then plays a "normal" run has still had their hands on a menu
  * that can set a seed and grant Pro; treating that second run as real data means
  * the person most likely to be producing junk is the one the guard trusts. And
- * per-run tainting has to be *remembered* at four call sites, which is four
+ * per-run tainting has to be *remembered* at three call sites, which is three
  * places to forget it.
  *
  * So [isDebugSession] latches the first time the menu is opened, and stays
  * latched until the process dies. From that moment the run that ends writes no
- * `run_record`, banks no `daily_result` and posts no score, and every analytics
+ * `run_record`, files no achievement fact and posts no score, and every analytics
  * event carries `debug_session: true` (SPEC 17, consumed by C8). It cannot be
  * switched back off from inside the app: an escape hatch is the same hole with a
  * confirmation dialog in front of it. Relaunching is the reset, which is both

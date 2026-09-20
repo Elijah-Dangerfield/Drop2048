@@ -85,7 +85,6 @@ class AchievementDaoTest {
         endedAt: Long = 1,
     ) = AchievementFactEntity(
         key = key,
-        mode = "ENDLESS",
         score = score,
         level = 4,
         blocksPlaced = 60,
@@ -98,7 +97,6 @@ class AchievementDaoTest {
         stoneBursts = 0,
         wildcardBursts = 0,
         longestDangerRun = 2,
-        dailyStreakDays = 0,
         endedAt = endedAt,
     )
 }

@@ -36,8 +36,8 @@ kotlin {
             implementation(projects.libraries.navigation)
 
             // SPEC 19's "grant Pro". The flag is `ProGrant` in :libraries:billing
-            // rather than a type this feature owns, because the Daily's second
-            // attempt is decided in a library impl that cannot read a feature.
+            // rather than a type this feature owns, so a library impl that
+            // cannot read a feature still sees the grant.
             implementation(projects.libraries.billing)
             // SPEC 19's force-show controls and the gate's own inputs. The api
             // module only: the house network lives in `:libraries:ads:fake`, and

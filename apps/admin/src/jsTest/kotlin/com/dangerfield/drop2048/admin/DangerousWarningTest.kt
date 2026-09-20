@@ -26,7 +26,7 @@ class DangerousWarningTest {
         val warning = dangerousWarning("level.blocksPerLevel", "15").orEmpty()
 
         assertTrue(warning.contains("DETERMINISM DIGEST"), "names the hazard")
-        assertTrue(warning.contains("Daily Challenge"), "names what breaks")
+        assertTrue(warning.contains("bug report"), "names what breaks")
     }
 
     @Test
@@ -52,7 +52,7 @@ class DangerousWarningTest {
         assertNull(dangerousWarning("ads.enabled", "false"))
         assertNull(dangerousWarning("ads.interstitial.cooldownSeconds", "300"))
         assertNull(dangerousWarning("pro.upsell.enabled", "false"))
-        assertNull(dangerousWarning("feature.dailyChallenge", "false"))
+        assertNull(dangerousWarning("feature.leaderboards", "false"))
     }
 
     @Test

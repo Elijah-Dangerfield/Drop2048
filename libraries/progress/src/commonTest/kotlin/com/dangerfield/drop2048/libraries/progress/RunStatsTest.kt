@@ -19,38 +19,20 @@ class RunStatsTest {
     }
 
     /**
-     * Decision D19, on the stats page: a Daily run feeds every lifetime total on
-     * it and cannot own the best score.
-     *
-     * The two halves are the same 40,000-point run recorded under two modes, so
-     * the only variable is the mode. Without the second half this would pass on a
-     * fold that had dropped the row entirely, which would take `runsPlayed` and
-     * the whole Lifetime card with it.
+     * The best score is a max over every row, and the rest of the page counts
+     * every row too. D19 used to carve Daily runs out of the best; D27 removed
+     * the mode, so there is nothing left to carve.
      */
     @Test
-    fun bestScore_countsEndlessRunsOnly() {
-        val endless = threeRuns.first().copy(score = 1_000, mode = GameMode.ENDLESS)
-        val daily = threeRuns.first().copy(score = 40_000, mode = GameMode.DAILY)
+    fun bestScore_isTheHighestOfEveryRun() {
+        val modest = threeRuns.first().copy(score = 1_000)
+        val big = threeRuns.first().copy(score = 40_000, endedAt = 2)
 
-        val withDaily = statsFrom(listOf(endless, daily))
-        assertEquals(1_000, withDaily.bestScore)
-        assertEquals(2, withDaily.runsPlayed, "the Daily still counts everywhere else")
-        assertEquals(20_500, withDaily.averageScore)
+        val stats = statsFrom(listOf(modest, big))
 
-        assertEquals(
-            40_000,
-            statsFrom(listOf(endless, daily.copy(mode = GameMode.ENDLESS))).bestScore,
-            "the same score in Endless does take the best",
-        )
-    }
-
-    /** A player whose only runs are Dailies has no best score, not a Daily one. */
-    @Test
-    fun bestScore_isZeroWhenEveryRunIsADaily() {
-        val stats = statsFrom(listOf(threeRuns.first().copy(score = 40_000, mode = GameMode.DAILY)))
-
-        assertEquals(0, stats.bestScore)
-        assertEquals(1, stats.runsPlayed)
+        assertEquals(40_000, stats.bestScore)
+        assertEquals(2, stats.runsPlayed)
+        assertEquals(20_500, stats.averageScore)
     }
 
     @Test
@@ -61,6 +43,7 @@ class RunStatsTest {
         assertEquals(9_000, stats.bestScore)
         // 1200 + 9000 + 4400 + 400 = 15000, over four runs.
         assertEquals(3_750, stats.averageScore)
+        assertEquals(12, stats.highestLevel)
         assertEquals(2048, stats.highestTier)
         assertEquals(120, stats.totalMerges)
         assertEquals(305, stats.totalBlocksPlaced)
@@ -93,6 +76,25 @@ class RunStatsTest {
         assertEquals(512, statsFrom(threeRuns.filterNot { it.highestTier == 2048 }).highestTier)
     }
 
+    /**
+     * The owner asked for this one on 2026-09-20, and the pair of assertions is
+     * the reason it is not the same number as [RunStats.highestTier].
+     *
+     * Levels advance on blocks dropped, so the furthest level is a survival
+     * record. The run that reached level 12 here is the one that made a 2048,
+     * but the run that reached level 9 never got past 512 — drop the 2048 run
+     * and the two figures come apart, which is what a single "best run" stat
+     * would hide.
+     */
+    @Test
+    fun highestLevel_isTheFurthestAnyRunGot() {
+        assertEquals(12, statsFrom(threeRuns).highestLevel)
+
+        val withoutTheBestRun = threeRuns.filterNot { it.highestTier == 2048 }
+        assertEquals(9, statsFrom(withoutTheBestRun).highestLevel)
+        assertEquals(512, statsFrom(withoutTheBestRun).highestTier)
+    }
+
     @Test
     fun recentScores_areNewestFirstAndCapped() {
         val many = (1..RunStats.RecentRunCount + 5).map { run(score = it.toLong(), endedAt = it.toLong()) }
@@ -108,6 +110,7 @@ class RunStatsTest {
             run(
                 score = 1_200,
                 endedAt = 1,
+                level = 4,
                 merges = 20,
                 blocksPlaced = 40,
                 longestCascade = 3,
@@ -118,6 +121,7 @@ class RunStatsTest {
             run(
                 score = 9_000,
                 endedAt = 2,
+                level = 12,
                 merges = 60,
                 blocksPlaced = 150,
                 longestCascade = 7,
@@ -128,6 +132,7 @@ class RunStatsTest {
             run(
                 score = 4_400,
                 endedAt = 3,
+                level = 9,
                 merges = 35,
                 blocksPlaced = 100,
                 longestCascade = 5,
@@ -138,6 +143,7 @@ class RunStatsTest {
             run(
                 score = 400,
                 endedAt = 4,
+                level = 2,
                 merges = 5,
                 blocksPlaced = 15,
                 longestCascade = 1,
@@ -151,6 +157,7 @@ class RunStatsTest {
         fun run(
             score: Long,
             endedAt: Long,
+            level: Int = 1,
             merges: Int = 0,
             blocksPlaced: Int = 0,
             longestCascade: Int = 0,
@@ -160,7 +167,7 @@ class RunStatsTest {
         ) = RunRecord(
             endedAt = endedAt,
             score = score,
-            level = 1,
+            level = level,
             blocksPlaced = blocksPlaced,
             durationMs = durationMs,
             highestTier = highestTier,
@@ -168,7 +175,6 @@ class RunStatsTest {
             longestCascade = longestCascade,
             bursts = bursts,
             merges = merges,
-            mode = GameMode.ENDLESS,
             seed = 1,
         )
     }

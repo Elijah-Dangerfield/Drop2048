@@ -11,7 +11,6 @@ import com.dangerfield.drop2048.libraries.achievements.RunOutcome
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
@@ -47,7 +46,6 @@ class AchievementsViewModelTest : CoroutineTest() {
     @Test
     fun progressIsResolvedAgainstThePlayersCountersAndClampedAtTheTarget() = runUnitTest {
         val outcome = RunOutcome(
-            mode = GameMode.ENDLESS,
             score = 0,
             level = 1,
             blocksPlaced = 0,

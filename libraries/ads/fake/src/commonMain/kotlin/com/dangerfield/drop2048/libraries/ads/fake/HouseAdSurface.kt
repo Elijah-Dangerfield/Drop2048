@@ -73,7 +73,7 @@ internal fun HouseAdHost(network: HouseAdNetwork) {
         network.finish(
             when (ad.format) {
                 AdFormat.Rewarded -> AdShowResult.Rewarded
-                AdFormat.Interstitial -> AdShowResult.Dismissed
+                AdFormat.Interstitial, AdFormat.Banner -> AdShowResult.Dismissed
             }
         )
     }
@@ -86,7 +86,7 @@ internal fun HouseAdHost(network: HouseAdNetwork) {
             network.finish(
                 when (ad.format) {
                     AdFormat.Rewarded -> AdShowResult.Rewarded
-                    AdFormat.Interstitial -> AdShowResult.Dismissed
+                    AdFormat.Interstitial, AdFormat.Banner -> AdShowResult.Dismissed
                 }
             )
         },
@@ -206,6 +206,10 @@ internal object HouseAdCopy {
     fun placement(format: AdFormat): String = when (format) {
         AdFormat.Rewarded -> "Rewarded video"
         AdFormat.Interstitial -> "Interstitial"
+        // Unreachable: `HouseAdNetwork.show` refuses the format before anything
+        // here is composed. Named rather than thrown on, because a placeholder
+        // that crashed the debug menu would be a worse answer than a label.
+        AdFormat.Banner -> "Banner"
     }
 }
 

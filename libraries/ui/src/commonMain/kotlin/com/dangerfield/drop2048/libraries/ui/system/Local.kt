@@ -36,8 +36,10 @@ val LocalClock = staticCompositionLocalOf<Clock> {
 /**
  * True when animation should be shortened and shake and particles dropped.
  *
- * The in-app accessibility toggle ORed with the OS setting, resolved once in
- * `AppThemeProvider`. Components read it here and nowhere else (decision D4):
+ * The OS accessibility setting, resolved once in `AppThemeProvider`. There was
+ * an in-app toggle ORed with it until the owner ruling of 2026-09-20; the phone's
+ * own setting is the only source now. Components read it here and nowhere else
+ * (decision D4):
  * threading it as a parameter is how Sodogku ended up with three incompatible
  * idioms for one setting in one repo, one of which turned out to be a battery
  * setting wearing an accessibility setting's name.

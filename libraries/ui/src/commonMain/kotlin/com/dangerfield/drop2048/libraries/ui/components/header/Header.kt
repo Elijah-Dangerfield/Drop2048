@@ -60,14 +60,13 @@ fun TopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .thenIf(liftOnScroll) { elevateOnScroll(scrollState) }
             .then(surface)
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal
                 )
-            )
-            .thenIf(liftOnScroll) { elevateOnScroll(scrollState) }
-            ,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -96,14 +95,33 @@ fun TopBar(
     }
 }
 
-// `@Composable` rather than `composed`, and `graphicsLayer` rather than
-// `Modifier.shadow`. The two go together: dropping `composed` moves this body
-// into TopBar's own composition, so the animated elevation had to stop being
-// read there, or every lift would recompose the whole header at 60fps.
-// `shadow()` takes its elevation as a plain argument and has no lambda form;
-// `graphicsLayer` does, and `shadow()` is itself only a graphicsLayer setting
-// shadowElevation, shape and clip. Reading `.value` in the lambda keeps the lift
-// a draw-phase invalidation, so the suppression this used to carry is gone.
+/**
+ * The bar's lift, as a shadow cast by the bar.
+ *
+ * **Where this goes in the chain is the whole component.** A `graphicsLayer`
+ * only contains what comes *after* it, so applied below the bar's background and
+ * its inset padding it wrapped the title row and nothing else: the surface was
+ * drawn outside the layer and could not occlude the shadow, and the layer's
+ * bounds were the padded content box rather than the bar, so the lift rendered
+ * as a hard rectangle around the title *on top of* the header instead of under
+ * the header onto the scrolling content. It looked exactly like a drop shadow on
+ * the text, which is how it was reported. It has to sit above both the surface
+ * and the inset padding so the layer is the bar.
+ *
+ * `@Composable` rather than `composed`, and `graphicsLayer` rather than
+ * `Modifier.shadow`. The two go together: dropping `composed` moves this body
+ * into [TopBar]'s own composition, so the animated elevation had to stop being
+ * read there, or every lift would recompose the whole header at 60fps.
+ * `shadow()` takes its elevation as a plain argument and has no lambda form;
+ * `graphicsLayer` does, and `shadow()` is itself only a graphicsLayer setting
+ * shadowElevation, shape and clip. Reading `.value` in the lambda keeps the lift
+ * a draw-phase invalidation, so the suppression this used to carry is gone.
+ *
+ * `clip` mirrors what `shadow()` does — it defaults to `elevation > 0.dp`, not
+ * to false — so the lift clips to bounds exactly as it did before. Shape stays
+ * the graphicsLayer default, which is the `RectangleShape` `shadow()` also
+ * defaults to.
+ */
 @Composable
 private fun Modifier.elevateOnScroll(
     scrollState: ScrollState?,
@@ -121,10 +139,6 @@ private fun Modifier.elevateOnScroll(
         }, label = ""
     )
 
-    // `clip` mirrors what `shadow()` does — it defaults to `elevation > 0.dp`,
-    // not to false — so the lift clips to bounds exactly as it did before.
-    // Shape stays the graphicsLayer default, which is the RectangleShape
-    // `shadow()` also defaults to.
     return this.graphicsLayer {
         shadowElevation = elevation.value.toPx()
         clip = shadowElevation > 0f

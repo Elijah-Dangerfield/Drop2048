@@ -53,7 +53,7 @@ class RemoteConfigRunBoundaryTest : CoroutineTest() {
     }
 
     @Test
-    fun `the factory reads the map at the moment a run starts, not before`() {
+    fun `the factory reads the map at the moment a run starts and not before`() {
         val config = MutableConfigMap()
         val factory = RealRunFactory(remoteEngineConfig(config), NoDebugController)
 
@@ -124,7 +124,6 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         appCache = FakeAppCache(AppData(hasUserOnboarded = true)),
         savedRunStore = FakeSavedRunStore(),
         progress = FakeProgressRepository(),
-        daily = FakeDailyRepository(),
         achievements = FakeAchievementsRepository(),
         leaderboards = FakeLeaderboards(),
         clock = MutableClock(),
@@ -135,6 +134,7 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         interstitials = FakeInterstitialGate(),
         runActivity = InMemoryRunActivity(),
         paywall = FakePaywallCoordinator(),
+        banners = FakeBannerAds(),
         continuesPerRun = RewardedContinuesPerRun(config),
     )
     if (viewModel.state.phase == GamePhase.Ready) viewModel.takeAction(GameAction.Start)

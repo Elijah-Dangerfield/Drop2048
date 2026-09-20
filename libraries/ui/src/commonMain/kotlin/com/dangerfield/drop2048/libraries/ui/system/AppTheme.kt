@@ -61,6 +61,14 @@ object AppTheme {
  *
  * Every argument has a default that is right for a preview, which is what keeps
  * `PreviewContent` a no-argument call.
+ *
+ * @param reduceMotion is **not** a player setting any more (owner ruling,
+ *   2026-09-20). In the app it is always left at its default and the live value
+ *   comes from [isOsReduceMotionEnabled] below, so the phone's own accessibility
+ *   setting is the single source. It survives as a parameter because a preview
+ *   and a screenshot golden have no OS setting to read and still have to be able
+ *   to render the reduced state. Passing `true` from production code would put a
+ *   second source back.
  */
 @Composable
 fun AppThemeProvider(

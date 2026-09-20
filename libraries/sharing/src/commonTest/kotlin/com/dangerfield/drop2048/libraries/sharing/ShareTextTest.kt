@@ -26,33 +26,22 @@ class ShareTextTest {
     }
 
     @Test
-    fun theStreakLineIsOmittedEntirelyWhenThereIsNoStreak() {
+    fun aShareWithNoFooterIsTitleAndStatsAndNothingElse() {
         val text = ShareText.format(run(), ShareLabels(title = "Drop 2048"))
 
-        assertEquals(2, text.lines().size, "an empty line was left where the streak goes")
-    }
-
-    @Test
-    fun theStreakLineSitsUnderTheStats() {
-        val text = ShareText.format(
-            result = run(),
-            labels = ShareLabels(title = "Drop 2048", streak = "🔥 12 day streak"),
-        )
-
-        assertEquals("🔥 12 day streak", text.lines().last())
+        assertEquals(2, text.lines().size, "a blank line was left on the end")
     }
 
     /**
      * The one property the type is shaped to guarantee. A [ShareResult] holds no
      * board, no seed and no transcript, so there is nothing the formatter could
-     * print that would tell a reader who has not played today's Daily anything
-     * about it.
+     * print that would tell a reader anything about a run they have not played.
      */
     @Test
     fun aShareCarriesNothingThatCouldGiveTheBoardAway() {
         val text = ShareText.format(
             result = run(score = 1_000, biggestTier = 512, longestCascade = 4, level = 11),
-            labels = ShareLabels(title = "Drop 2048 Daily · Sep 10"),
+            labels = ShareLabels(title = "Drop 2048 · Endless"),
         )
 
         assertFalse(text.contains("seed", ignoreCase = true))
@@ -101,7 +90,7 @@ class ShareTextTest {
     )
 
     private companion object {
-        /** Title, stats, blank, streak or footer. Anything longer is a body. */
+        /** Title, stats, blank, footer. Anything longer is a body. */
         const val MaxLines = 4
     }
 }

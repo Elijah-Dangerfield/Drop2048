@@ -6,7 +6,6 @@ import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
 import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -155,7 +154,7 @@ class AdsAtTheBoardTest : CoroutineTest() {
             act(GameAction.ContinueAccept)
             assertPhase(GamePhase.Playing)
 
-            landAgainOnto(StackedOutBoard)
+            landAgainOnto()
 
             assertPhase(GamePhase.StackedOut)
             assertTrue(state.continueAvailable, "the sheet should carry the second continue")
@@ -174,9 +173,9 @@ class AdsAtTheBoardTest : CoroutineTest() {
             land()
             waitOutResolution()
             act(GameAction.ContinueAccept)
-            landAgainOnto(StackedOutBoard)
+            landAgainOnto()
             act(GameAction.ContinueAgain)
-            landAgainOnto(StackedOutBoard)
+            landAgainOnto()
 
             assertFalse(state.continueAvailable, "the cap is two")
 
@@ -184,34 +183,6 @@ class AdsAtTheBoardTest : CoroutineTest() {
 
             assertPhase(GamePhase.StackedOut)
             assertEquals(2, ads.requests.size)
-        }
-    }
-
-    /**
-     * SPEC 14 against SPEC 12, and the Daily wins.
-     *
-     * Everyone who plays a day plays the same board — decision D18 goes as far as
-     * pinning `EngineConfig.Default` against remote config to keep two players'
-     * runs comparable. A continue clears three rows and drops a level, which is a
-     * larger change to the board than any config key could make and one only some
-     * players would have.
-     */
-    @Test
-    fun `a daily run is never offered a continue`() = runUnitTest {
-        playing(
-            picture = StackedOutBoard,
-            fallingAt = Cell(2, 0),
-            daily = FakeDailyRepository().grant(),
-        ) {
-            act(GameAction.StartDaily)
-            assertEquals(GameMode.DAILY, state.mode)
-
-            land()
-            waitOutResolution()
-
-            assertPhase(GamePhase.StackedOut)
-            assertFalse(state.continueAvailable)
-            assertTrue(ads.requests.isEmpty())
         }
     }
 
@@ -362,10 +333,92 @@ class AdsAtTheBoardTest : CoroutineTest() {
     }
 
     /**
-     * L63 makes the *session* the taint and gates the four writes that claim a
-     * player did something: `run_record`, `daily_result`, leaderboard submission
-     * and the achievement fact log. A continue is none of those, and `endRun`
-     * refuses all four for a debug run whether it was continued or not — so a
+     * SPEC 12's third paywall surface, wired on 2026-09-20 (D28).
+     *
+     * `PaywallTrigger.Continue` was declared in C10 with a written rationale and
+     * **zero call sites anywhere, including tests**, which is a documented
+     * surface that did not exist. This is the test that stops it going back to
+     * that: the offer draws the line, tapping it reaches the coordinator, and it
+     * arrives under its own trigger rather than borrowing the card's.
+     */
+    @Test
+    fun `the continue offer carries a Pro entry point`() = runUnitTest {
+        playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
+            land()
+            waitOutResolution()
+
+            assertPhase(GamePhase.ContinueOffer)
+            assertTrue(state.proOnContinue, "the offer draws a Pro line")
+
+            act(GameAction.OpenProFromContinue)
+
+            assertEquals(listOf(PaywallTrigger.Continue), paywall.offers)
+        }
+    }
+
+    /**
+     * A dead control is worse than no control. The coordinator refuses every
+     * trigger but `Direct` when `pro.upsell.enabled` is off, and it refuses all
+     * of them for a player who already owns Pro, so the offer asks first.
+     */
+    @Test
+    fun `the continue offer draws no Pro line when the paywall would refuse it`() = runUnitTest {
+        playing(
+            picture = StackedOutBoard,
+            fallingAt = Cell(2, 0),
+            paywall = FakePaywallCoordinator(offerable = false),
+        ) {
+            land()
+            waitOutResolution()
+
+            assertPhase(GamePhase.ContinueOffer)
+            assertFalse(state.proOnContinue)
+        }
+    }
+
+    /**
+     * The banner's policy half (D28), which is the only half a ViewModel test
+     * can see. Whether an ad actually arrives is the surface's, and the layout
+     * consequence of it not arriving is `BoardTakesTheStripTest`'s.
+     */
+    @Test
+    fun `the banner is allowed while ads are on and refused when they are not`() = runUnitTest {
+        playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
+            assertTrue(state.bannerAllowed)
+        }
+
+        playing(
+            picture = StackedOutBoard,
+            fallingAt = Cell(2, 0),
+            banners = FakeBannerAds(allowed = false),
+        ) {
+            assertFalse(state.bannerAllowed)
+        }
+    }
+
+    /**
+     * A banner on screen is an ad this player has seen, which is what the Pro
+     * card is gated on. A banner that never filled is not, and reporting one
+     * would put the "Tired of the ads?" lie back with a different source.
+     */
+    @Test
+    fun `only a filled banner counts as an ad the player has seen`() = runUnitTest {
+        playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
+            act(GameAction.BannerFilled(filled = false))
+
+            assertEquals(0, banners.fills)
+
+            act(GameAction.BannerFilled(filled = true))
+
+            assertEquals(1, banners.fills)
+        }
+    }
+
+    /**
+     * L63 makes the *session* the taint and gates the three writes that claim a
+     * player did something: `run_record`, leaderboard submission and the
+     * achievement fact log. A continue is none of those, and `endRun` refuses
+     * all three for a debug run whether it was continued or not — so a
      * continued debug run still reaches the economy exactly as much as it did
      * before, which is not at all.
      *
@@ -398,12 +451,31 @@ class AdsAtTheBoardTest : CoroutineTest() {
      * continue needs and what no single action can produce: the continue cleared
      * the top three rows, so the run has to be killed a second time.
      */
-    private fun GameScenario.landAgainOnto(picture: String) {
-        var guard = 0
-        while (state.phase == GamePhase.Playing && guard < RefillBudget) {
+    /**
+     * Drops block after block, steering none of them, until the run stacks out
+     * again — which is what a player who took a continue and then gave up looks
+     * like, and all these tests need from the board between two continues.
+     *
+     * The budget used to be 60 and used to be reached in a handful of drops,
+     * because every block entered the column the fixture had filled to the top.
+     * Since the 2026-09-20 ruling a block enters anywhere, so the stack builds
+     * across all five columns and level-1 twos merge with each other on the way.
+     * It still terminates — the board is finite and nothing but a merge or a
+     * burst removes a block — it now takes between 80 and 100 drops, measured by
+     * walking the budget down until these tests failed. 250 is the headroom on
+     * that, not a number anything is expected to approach.
+     *
+     * Running out of budget now fails here and says so. It used to fall through
+     * and leave the caller asserting `StackedOut` against a run that was still
+     * happily playing, which reads as the continue cap being broken.
+     */
+    private fun GameScenario.landAgainOnto() {
+        var dropped = 0
+        while (state.phase == GamePhase.Playing) {
+            assertTrue(dropped < RefillBudget, "the board did not refill inside $RefillBudget drops")
             land()
             waitOutResolution()
-            guard++
+            dropped++
         }
     }
 
@@ -422,6 +494,6 @@ class AdsAtTheBoardTest : CoroutineTest() {
             .  .  256 . .
         """
 
-        const val RefillBudget = 60
+        const val RefillBudget = 250
     }
 }

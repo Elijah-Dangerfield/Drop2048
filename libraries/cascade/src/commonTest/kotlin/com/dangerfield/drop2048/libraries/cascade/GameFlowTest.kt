@@ -21,7 +21,7 @@ class GameFlowTest {
         assertEquals(1, state.level)
         assertEquals(0L, state.score)
         assertEquals(1, state.drawsMade, "exactly one draw, and it is the block in flight")
-        assertEquals(Cell(2, 0), state.falling?.cell)
+        assertEquals(0, state.falling?.cell?.row, "a block always enters at the top")
         assertTrue(state.board.isClear)
     }
 
@@ -38,7 +38,7 @@ class GameFlowTest {
 
     @Test
     fun movingRecordsTheLastInputDirectionAndIsRefusedAtTheWall() {
-        val start = Cascade.newGame(seed = 3)
+        val start = stateOf(Board.empty(EngineConfig.DEFAULT_COLS, EngineConfig.DEFAULT_ROWS), FallingBlock(value(2), Cell(2, 0)))
         val moved = Cascade.apply(start, Input.MoveLeft).state
 
         assertEquals(Direction.LEFT, moved.falling?.lastDirection)
@@ -53,15 +53,16 @@ class GameFlowTest {
     @Test
     fun aHardDropFromTheSpawnRowLandsOnTheFloorAndEndsTheDrop() {
         val start = Cascade.newGame(seed = 4)
+        val enteredIn = start.falling!!.cell.col
         val dropped = Cascade.apply(start, Input.Lock)
 
         assertEquals(
             start.falling?.block,
-            dropped.state.board[Cell(2, EngineConfig.DEFAULT_ROWS - 1)],
-            "the block the player committed is on the floor",
+            dropped.state.board[Cell(enteredIn, EngineConfig.DEFAULT_ROWS - 1)],
+            "the block the player committed is on the floor of the column it fell in",
         )
         assertEquals(start.blocksDropped + 1, dropped.state.blocksDropped)
-        assertEquals(Cell(2, 0), dropped.state.falling?.cell, "and the next block has spawned")
+        assertEquals(0, dropped.state.falling?.cell?.row, "and the next block has spawned at the top")
     }
 
     /**
@@ -82,18 +83,26 @@ class GameFlowTest {
         )
     }
 
+    /**
+     * Read off `blocksPerLevel` rather than off the number 20, which is what it
+     * was until the 2026-09-20 pacing ruling moved it to 15. The rule SPEC 5.5
+     * states is "every `blocksPerLevel` blocks", and a test that names the
+     * current value instead fails on the next tune without anything being
+     * broken.
+     */
     @Test
-    fun theLevelIsStoredAndAdvancesEveryTwentyDrops() {
+    fun theLevelIsStoredAndAdvancesEveryBlocksPerLevelDrops() {
+        val perLevel = EngineConfig.DEFAULT_BLOCKS_PER_LEVEL
         var state = stateOf(Board.empty(5, 8))
-        val levelAfter = (1..40).map {
+        val levelAfter = (1..perLevel * 2).map {
             state = drop(state, SpecialBlock(Special.BOMB), col = 2).state
             state.level
         }
 
-        assertEquals(1, levelAfter[18], "still level 1 after 19 drops")
-        assertEquals(2, levelAfter[19], "the 20th drop is the boundary")
-        assertEquals(3, levelAfter[39])
-        assertEquals(40, state.blocksDropped)
+        assertEquals(1, levelAfter[perLevel - 2], "still level 1 one drop short of the boundary")
+        assertEquals(2, levelAfter[perLevel - 1], "the boundary drop advances the level")
+        assertEquals(3, levelAfter[perLevel * 2 - 1])
+        assertEquals(perLevel * 2, state.blocksDropped)
     }
 
     @Test

@@ -3,27 +3,33 @@
 What the Roborazzi goldens can and cannot do as store assets, measured rather than assumed, plus
 the shot list they support.
 
-Derived 2026-09-10 for C13. **No store screenshots have been produced.** This is the investigation
-the chunk was asked for, and its headline is that the goldens are *nearly* usable on Play and are
-not usable at all on the App Store, for two different reasons.
+Derived 2026-09-10 for C13, recounted 2026-09-20 after D27. **No store screenshots have been
+produced.** This is the investigation the chunk was asked for, and its headline is that the goldens
+are *nearly* usable on Play and are not usable at all on the App Store, for two different reasons.
 
 ---
 
 ## 1. What exists
 
-81 committed PNGs across nine `screenshots/` directories:
+86 committed PNGs across ten `screenshots/` directories:
 
 | Module | Frames | Notable |
 |---|---|---|
-| `features/game/impl` | 22 | The game screen in every state: playing, danger, paused, stacked out, the three specials' ghosts, the continue offer, the upsell, the tutorial burst, and five accessibility variants |
-| `libraries/ui` | 17 | Design-system pieces: the five tile ramps, board states, toasts, coach marks, wordmark |
+| `features/game/impl` | 27 | The game screen in every state: playing, danger, paused, stacked out, the three specials' ghosts, the continue offer, the upsell, four tutorial frames, both control schemes, and seven accessibility variants |
+| `libraries/ui` | 19 | Design-system pieces: the five tile ramps, board states, toasts, coach marks, wordmark |
 | `features/settings/impl` | 7 | Including the accessible-settings frame |
+| `features/debug/impl` | 7 | |
 | `features/achievements/impl` | 6 | Grid, detail, unlock toast |
-| `features/daily/impl` | 5 | Not played, in progress, completed, streak milestone |
-| `features/stats/impl` | 4 | Empty, first run, populated, daily-only |
-| `features/paywall/impl`, `features/gate/impl`, `features/debug/impl` | the rest | |
+| `features/gate/impl` | 6 | |
+| `features/paywall/impl` | 4 | |
+| `libraries/devfeedback/tester` | 4 | |
+| `features/stats/impl` | 3 | Empty, first run, populated |
+| `libraries/ads/fake` | 3 | The house-ad placeholders |
 
-**56 of them are full-screen 720x1280 frames**, rendered from the real composables with real state.
+`features/daily/impl` held five frames and is gone with the module (D27), and the `stats-daily-only`
+frame went with it.
+
+**57 of them are full-screen 720x1280 frames**, rendered from the real composables with real state.
 There is no status bar, no gesture bar and no emulator chrome, because Robolectric draws the
 composable and nothing else. That is a genuine advantage over the sibling project's approach, which
 captured an emulator and then cropped 150 rows off the top to remove the system bars.
@@ -58,7 +64,7 @@ arithmetic is exact and not a guess.
 | `w360dp-h640dp-xxhdpi` | 1080x1920 | Yes, and this is the one to want |
 | `w360dp-h640dp-xxxhdpi` | 1440x2560 | Yes |
 
-**But changing `ROBOLECTRIC_QUALIFIERS` invalidates all 56 goldens**, which then have to be
+**But changing `ROBOLECTRIC_QUALIFIERS` invalidates every golden**, all 86 of which then have to be
 re-recorded, which throws away the byte-for-byte comparison that has caught real bugs three times
 in this project (L39a). The goldens' job is regression detection and the store's job is marketing,
 and they want different densities for good reasons. **Do not raise the golden density to get store
@@ -92,7 +98,7 @@ Robolectric render submitted as an iPhone screenshot. Sodogku's store doc says t
 one line and it is worth repeating: Android renders must not be submitted as iPhone screenshots.
 
 It matters more here than it would in a normal project, because **nothing in this app has ever been
-rendered on iOS.** The screenshot harness is Robolectric, so all 81 goldens are Android, and
+rendered on iOS.** The screenshot harness is Robolectric, so all 86 goldens are Android, and
 `OWNER-TODO.md`'s first blocking item is the missing `/var/db/xcode_select_link` that stops any
 agent from launching a simulator at all. So the iOS screenshots are not a task anyone can do today,
 and the honest status is **blocked on an owner task**, not "not done yet".
@@ -112,7 +118,7 @@ third. This order answers, in sequence: what is this, why would I care, is there
 | 1 | `features/game/impl/screenshots/game-playing.png` | Mid-run, level 7, a 1024 on the board, a falling 4 and its ghost outline | The mechanic in one glance. The ghost says "you steer this", the 1024 says "these get big", and the score says there is a game here. The single best frame in the set. |
 | 2 | `game-callout.png` | A chain callout mid-cascade | The payoff. Chains are what the game is actually about and they are impossible to describe in a sentence. |
 | 3 | `game-danger.png` | The board near the top with the danger ring armed | Tension, and the fail state, without spending a frame on losing. |
-| 4 | `daily-not-played.png` or `daily-streak-milestone.png` | The Daily card with the countdown, or a streak | A reason to come back tomorrow. Pick the streak frame if the numbers on it read well. |
+| 4 | `features/game/impl/screenshots/tutorial-spotlight.png` | The opening beat of the guided run: the block at the far edge, the cell it has to reach outlined, and the card asking for it | That you will be shown how. This slot used to hold a Daily card and D27 deleted the mode; the frame that took it over is the coach-mark shot "Still missing" below spent a paragraph asking for. |
 | 5 | `game-ghost-wildcard.png` or `game-ghost-bomb` | A special block with its landing ghost | Depth. It says the game has rules you have not met yet. |
 | 6 | `a11y-high-contrast.png` or `a11y-tritanopia.png` | The board on an accessibility palette | Earns the accessibility line in the description, and is a genuinely distinctive image next to every other puzzle listing. |
 | 7 | `achievements-full.png` | The badge grid, mostly locked | Something to come back for. Weakest of the set, **hold it until the placeholder emoji are replaced** (`OWNER-TODO.md`, "Badge art"). |
@@ -125,9 +131,12 @@ also invites a policy read of the listing that nobody needs.
 
 ### Still missing, and no golden covers them
 
-- **A tutorial / coach-mark frame.** `tutorial-burst.png` exists but is the burst rather than the
-  teaching moment. A coach-mark frame is a strong #2 for a puzzle game, because it says "this
-  teaches you". `coach-mark.png` in `:libraries:ui` is the component in isolation, not the screen.
+- ~~A tutorial / coach-mark frame.~~ **Now covered.** The control-scheme round added
+  `tutorial-spotlight.png`, `tutorial-coach.png` and `tutorial-coach-arrows.png` to
+  `features/game/impl`, all of them the real screen rather than `:libraries:ui`'s isolated
+  `coach-mark.png`. `tutorial-spotlight.png` is the one in the shot list; the other two are the same
+  beat under each control scheme and exist to catch a scrim bug, so they are regression frames and
+  not marketing.
 - **A Play feature graphic** (1024x500). Wants the icon artwork first, and the icon does not exist.
 - **An App Store preview video.** Same dependency, plus a simulator.
 - **Anything at all on iOS.** §3.

@@ -112,6 +112,14 @@ class LegalForceReacceptBelow(appConfigMap: AppConfigMap) : IntConfigValue(appCo
     override val default = 0
 }
 
+/**
+ * Defaults to the live GitHub Pages copy served out of `pages/`, which is the
+ * only terms page that has ever existed. The earlier `drop2048.app` default was
+ * a domain nobody had published, so a build that could not reach the server
+ * opened a dead link from the gate the player has to clear.
+ *
+ * A custom domain later is a config push, not a release.
+ */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
@@ -119,9 +127,10 @@ class LegalTermsUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap
     override val name = "Terms URL"
     override val description = "Remote so a moved page is a config change, not a release."
     override val path = "legal.termsUrl"
-    override val default = "https://drop2048.app/terms"
+    override val default = "https://elijah-dangerfield.github.io/Drop2048/terms.html"
 }
 
+/** The live GitHub Pages copy, for the reason on [LegalTermsUrl]. */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
@@ -129,5 +138,5 @@ class LegalPrivacyUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigM
     override val name = "Privacy policy URL"
     override val description = "Remote so a moved page is a config change, not a release."
     override val path = "legal.privacyUrl"
-    override val default = "https://drop2048.app/privacy"
+    override val default = "https://elijah-dangerfield.github.io/Drop2048/privacy.html"
 }

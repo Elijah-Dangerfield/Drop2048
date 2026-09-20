@@ -113,7 +113,6 @@ class DebugFeatureEntryPoint(
 
     private fun messageFor(message: DebugMessage): String = when (message) {
         DebugMessage.OverridesCleared -> DebugCopy.MessageOverridesCleared
-        DebugMessage.DailyCleared -> DebugCopy.MessageDailyCleared
         DebugMessage.TutorialReset -> DebugCopy.MessageTutorialReset
         DebugMessage.LocalDataReset -> DebugCopy.MessageLocalDataReset
     }

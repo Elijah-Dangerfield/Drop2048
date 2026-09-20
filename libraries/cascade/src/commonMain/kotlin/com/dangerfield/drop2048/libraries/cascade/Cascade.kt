@@ -21,7 +21,7 @@ object Cascade {
         return GameState(
             config = config,
             board = board,
-            falling = FallingBlock(draw.block, Cell(config.spawnColumn, 0)),
+            falling = FallingBlock(draw.block, Cell(draw.column, 0)),
             rng = draw.rng,
             drawsMade = 1,
             lastDrawWasSpecial = draw.wasSpecial,
@@ -175,6 +175,14 @@ object Cascade {
      * SPEC 18.1: spawning into an occupied cell is impossible if the stacked-out
      * check is correct, so if it happens the run ends *and* the engine reports a
      * fault. Silently recovering here would hide the bug that caused it.
+     *
+     * The 2026-09-20 random spawn column does not weaken that. The guarantee was
+     * never "the middle cell of row 0 is empty", it was "row 0 is empty", which
+     * is what `isRowOccupied(TOP_ROW)` above and in [continueRun] enforce — so
+     * every column is equally safe to spawn into and no column needs choosing
+     * around an obstruction. Retrying the draw against the board would be the
+     * tempting alternative and is the wrong one: it would make the fault
+     * unreachable by construction and take the check's diagnostic value with it.
      */
     private fun spawnNext(state: GameState): Spawned {
         val draw = Spawn.draw(
@@ -190,7 +198,7 @@ object Cascade {
             drawsMade = state.drawsMade + 1,
             lastDrawWasSpecial = draw.wasSpecial,
         )
-        val cell = Cell(state.config.spawnColumn, 0)
+        val cell = Cell(draw.column, 0)
         if (drawn.board[cell] != null) {
             return Spawned(
                 state = drawn.copy(

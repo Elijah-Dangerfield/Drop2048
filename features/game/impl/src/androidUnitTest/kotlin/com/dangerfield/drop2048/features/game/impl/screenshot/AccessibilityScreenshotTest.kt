@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.features.game.impl.GamePhase
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.game.impl.GameScreen
 import com.dangerfield.drop2048.features.game.impl.GameUiState
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
@@ -144,6 +145,11 @@ private fun ComposeContentTestRule.captureAccessible(
 }
 
 private fun accessibilityState() = GameUiState(
+    // The arrow row, named rather than inherited: the shipping default is Drag
+    // since the owner's 2026-09-20 ruling, and these frames are about colour and
+    // numerals on a loaded board. Pinning the scheme keeps a control-scheme
+    // change out of seven images that have nothing to say about it.
+    controlScheme = ControlScheme.Both,
     board = Board.empty(COLS, ROWS)
         .with(Cell(0, 7), NumberBlock(BlockValue.V2))
         .with(Cell(1, 7), NumberBlock(BlockValue.V16))

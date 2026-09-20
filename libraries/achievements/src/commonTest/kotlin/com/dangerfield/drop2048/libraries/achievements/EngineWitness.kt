@@ -145,7 +145,7 @@ internal object EngineWitness {
     private fun bestColumn(state: GameState, random: Random, config: EngineConfig): Int {
         var bestMerges = -1
         var bestRoom = -1
-        var chosen = state.falling?.cell?.col ?: config.spawnColumn
+        var chosen = state.falling?.cell?.col ?: config.centreColumn
         var ties = 0
         for (col in 0 until config.cols) {
             val count = lockInto(state, col).transcript.merges.size

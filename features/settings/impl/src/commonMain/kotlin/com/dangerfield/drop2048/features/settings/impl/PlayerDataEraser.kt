@@ -49,9 +49,8 @@ class PlayerDataEraser(
             Catching { dao.deleteAll() }
                 .logOnFailure { "Failed to clear a table during reset progress" }
         }
-        Catching {
-            appCache.update { data -> data.copy(savedRun = null, savedDailyRun = null) }
-        }.logOnFailure { "Failed to clear the in-flight run during reset progress" }
+        Catching { appCache.update { data -> data.copy(savedRun = null) } }
+            .logOnFailure { "Failed to clear the in-flight run during reset progress" }
     }
 
     /**
@@ -73,13 +72,9 @@ class PlayerDataEraser(
                     blockPalette = data.blockPalette,
                     hapticsSetting = data.hapticsSetting,
                     controlScheme = data.controlScheme,
-                    reduceMotion = data.reduceMotion,
                     largeBlockNumbers = data.largeBlockNumbers,
                     soundEnabled = data.soundEnabled,
-                    musicEnabled = data.musicEnabled,
-                    leftHandedControls = data.leftHandedControls,
                     ghostEnabled = data.ghostEnabled,
-                    confirmBeforeQuit = data.confirmBeforeQuit,
                     diagnosticsOptIn = data.diagnosticsOptIn,
                 )
             }

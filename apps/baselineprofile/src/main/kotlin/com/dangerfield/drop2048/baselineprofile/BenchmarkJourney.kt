@@ -18,7 +18,7 @@ import java.util.regex.Pattern
  * ## What this walks
  *
  * Drop 2048 has no home screen — C5 deleted it — so the destination is the
- * **pause overlay**: Restart, Quit, Daily Challenge, Stats, Settings, over a run
+ * **pause overlay**: Restart, Quit, Stats, Settings, over a run
  * in progress. Getting there on a fresh install means playing, because SPEC 13
  * drops first launch straight into the scripted tutorial and
  * `Tutorial.SkippableFromDrop = 3` withholds "Skip tutorial" until the third
@@ -72,8 +72,8 @@ object BenchmarkJourney {
      *
      * ## The menu is the pause overlay, and finding that out cost two runs
      *
-     * The obvious destination is the **start** overlay — Play, Daily, Stats,
-     * Settings, over a board that has not begun — and it is very nearly
+     * The obvious destination is the **start** overlay — Play, Stats, Settings,
+     * over a board that has not begun — and it is very nearly
      * unreachable from here. `finishTutorial` calls `resetToRun`, which sets the
      * phase to `Playing` and starts the clock, so skipping the tutorial drops
      * the player straight into a live run rather than into a menu. Every
@@ -158,12 +158,12 @@ object BenchmarkJourney {
     }
 
     /**
-     * Stats, Daily Challenge and Settings, each pushed and popped.
+     * Stats and Settings, each pushed and popped.
      *
      * Deeper than the startup path on purpose: this covers the first run of
-     * navigation, three ViewModels and the Room reads behind Stats and the
-     * Daily, which is where the app spends its time after launch and which the
-     * startup profile must NOT carry.
+     * navigation, two ViewModels and the Room reads behind Stats, which is where
+     * the app spends its time after launch and which the startup profile must
+     * NOT carry.
      *
      * ## Achievements is deliberately not here
      *
@@ -174,22 +174,15 @@ object BenchmarkJourney {
      * rather than clicking through it, on a row whose clickable is a different
      * semantics node from the text that identifies it.
      *
-     * The Daily Challenge is one tap from this same menu, is a `@Serializable`
-     * route like any other, and reads Room on the way in. It buys the same thing
-     * this walk is actually for. The cost is named rather than hidden: the
-     * achievements grid has no profile coverage and no R8 coverage, and
-     * `docs/todos.md` should carry it.
+     * The Daily Challenge used to stand in for it here — one tap from this same
+     * menu, a `@Serializable` route, a Room read on the way in — and D27 deleted
+     * it. The cost is named rather than hidden: the achievements grid has no
+     * profile coverage and no R8 coverage, and `docs/todos.md` should carry it.
      */
     fun UiDevice.visitDetailScreens() {
         tapRequired(STATS)
         check(wait(Until.hasObject(anyStatsAnchor), SCREEN_TIMEOUT_MS) == true) {
             "Tapped $STATS but the stats screen never appeared. " + describeScreen()
-        }
-        pressBack()
-
-        tapRequired(DAILY)
-        check(wait(Until.hasObject(ciText(DAILY_SUBTITLE)), SCREEN_TIMEOUT_MS) == true) {
-            "Tapped $DAILY but the Daily screen never appeared. " + describeScreen()
         }
         pressBack()
 
@@ -262,8 +255,6 @@ object BenchmarkJourney {
     const val CONTINUE_DECLINE = "No thanks"
     const val STATS = "Stats"
     const val SETTINGS = "Settings"
-    const val DAILY = "Daily Challenge"
-    const val DAILY_SUBTITLE = "One board. Everyone plays the same one."
     const val STATS_EMPTY = "No runs yet"
     const val STATS_LIFETIME = "Lifetime"
     const val SETTINGS_SOUND_SECTION = "Sound and feel"

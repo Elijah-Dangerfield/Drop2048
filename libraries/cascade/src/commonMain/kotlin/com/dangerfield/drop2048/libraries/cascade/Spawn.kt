@@ -1,6 +1,6 @@
 package com.dangerfield.drop2048.libraries.cascade
 
-internal data class Draw(val rng: Rng, val block: Block, val wasSpecial: Boolean)
+internal data class Draw(val rng: Rng, val block: Block, val column: Int, val wasSpecial: Boolean)
 
 /**
  * SPEC 5.3's two stacked constraints, plus SPEC 5.2's special rates.
@@ -23,6 +23,29 @@ internal data class Draw(val rng: Rng, val block: Block, val wasSpecial: Boolean
  * straight after a special — the special roll is not taken at all rather than
  * taken and discarded. Either is deterministic; not taking it keeps the RNG
  * stream shorter and makes a stream diff readable.
+ *
+ * ### The column is drawn here too, and it is uniform
+ *
+ * Blocks used to enter at `cols / 2` on every drop. The owner's 2026-09-20
+ * ruling made the entry column random, and the draw belongs in this function
+ * rather than at either call site in [Cascade] because it has to come off
+ * [GameState]'s own RNG — a column decided anywhere else would break the one
+ * property the whole engine is built on, that a seed plus a list of inputs
+ * reproduces a run byte for byte (SPEC 4.1).
+ *
+ * The column roll is taken **after** the value roll rather than before it, so
+ * every roll that existed before this change stays in the order it was in and a
+ * diff of two RNG streams reads as one appended roll per draw instead of a
+ * re-alignment. It is taken unconditionally, including when a special was drawn,
+ * because a roll that is sometimes skipped is a second alignment rule to keep
+ * straight for no benefit — the suppression above is skipped-not-discarded only
+ * because it fires on a run's first three draws and would otherwise dominate the
+ * opening of every stream diff.
+ *
+ * Nothing constrains the column against the board. It does not need to: a run
+ * ends when row 0 is occupied after a resolution completes, so by the time
+ * [Cascade] spawns anything, row 0 is empty in every column. [Cascade]'s
+ * `SPAWN_BLOCKED` fault still guards that reasoning rather than trusting it.
  */
 internal object Spawn {
 
@@ -44,7 +67,7 @@ internal object Spawn {
             var threshold = 0
             eligible.forEach { rate ->
                 threshold += rate.perMille
-                if (roll < threshold) return Draw(current, SpecialBlock(rate.special), wasSpecial = true)
+                if (roll < threshold) return withColumn(current, SpecialBlock(rate.special), wasSpecial = true, config)
             }
         }
 
@@ -60,7 +83,12 @@ internal object Spawn {
                 break
             }
         }
-        return Draw(current, NumberBlock(capped(drawn, board, config)), wasSpecial = false)
+        return withColumn(current, NumberBlock(capped(drawn, board, config)), wasSpecial = false, config)
+    }
+
+    private fun withColumn(rng: Rng, block: Block, wasSpecial: Boolean, config: EngineConfig): Draw {
+        val advanced = rng.next()
+        return Draw(advanced, block, advanced.valueIn(config.cols), wasSpecial)
     }
 
     /**

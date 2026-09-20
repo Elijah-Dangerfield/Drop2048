@@ -370,7 +370,7 @@ private fun backgroundColor(
     style != ButtonStyle.Filled -> null
     else -> when (type) {
         ButtonType.Primary -> accentSolid(accent)
-        ButtonType.Secondary -> AppTheme.colors.surfacePrimary
+        ButtonType.Secondary -> AppTheme.colors.surfaceElevated
         ButtonType.Ghost -> null
         ButtonType.Danger -> AppTheme.colors.danger
     }
@@ -424,7 +424,7 @@ private fun contentColor(
     !enabled -> AppTheme.colors.textDisabled
     style == ButtonStyle.Filled -> when (type) {
         ButtonType.Primary -> onAccent(accent)
-        ButtonType.Secondary -> AppTheme.colors.onSurfacePrimary
+        ButtonType.Secondary -> AppTheme.colors.onSurfaceElevated
         ButtonType.Ghost -> AppTheme.colors.text
         ButtonType.Danger -> AppTheme.colors.danger.onColor
     }

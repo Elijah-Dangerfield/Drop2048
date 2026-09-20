@@ -6,7 +6,6 @@ import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -24,12 +23,12 @@ import kotlin.test.assertTrue
 class RunEventsTest : CoroutineTest() {
 
     @Test
-    fun startingARunReportsItsModeAndLevel() = runUnitTest {
+    fun startingARunReportsItsSeedAndLevel() = runUnitTest {
         recordingEvents { events ->
             playing(level = 4) {
                 val start = assertNotNull(events.named("run.start").lastOrNull())
                 assertEquals(4, start["level"])
-                assertEquals("ENDLESS", start["mode"])
+                assertEquals(SCENARIO_SEED, start["seed"])
             }
         }
     }
@@ -58,15 +57,13 @@ class RunEventsTest : CoroutineTest() {
     }
 
     /**
-     * SPEC 14's seed is the board the whole world plays that day, and a
-     * `run.end` ships the moment the attempt ends — which on a Daily started at
-     * 00:05 UTC is nineteen hours before the day is over. So Endless carries
-     * its seed (a private number that makes a reported run replayable) and
-     * Daily carries the date instead, which is the only part of a Daily run
-     * that was public already.
+     * SPEC 17 asks for the seed, and it is the number that makes a reported run
+     * replayable. It used to be omitted on a Daily run, because that seed was
+     * the board the whole world was playing that day; D27 removed the mode, so
+     * every run carries it.
      */
     @Test
-    fun anEndlessRunCarriesItsSeedAndADailyRunCarriesOnlyItsDate() = runUnitTest {
+    fun aFinishedRunCarriesItsSeed() = runUnitTest {
         recordingEvents { events ->
             playing(picture = BrimmingBoard, fallingAt = Cell(2, 0)) {
                 land()
@@ -75,21 +72,6 @@ class RunEventsTest : CoroutineTest() {
 
                 val end = assertNotNull(events.named("run.end").singleOrNull())
                 assertEquals(SCENARIO_SEED, end["seed"])
-                assertFalse("daily_date" in end, "an Endless run reported a Daily date")
-            }
-        }
-
-        recordingEvents { events ->
-            val daily = FakeDailyRepository().grant()
-            playing(picture = BrimmingBoard, fallingAt = Cell(2, 0), daily = daily) {
-                act(GameAction.StartDaily)
-                land()
-                waitOutResolution()
-                declineContinue()
-
-                val end = assertNotNull(events.named("run.end").lastOrNull())
-                assertFalse("seed" in end, "a Daily seed shipped on an event; SPEC 14's board leaks")
-                assertTrue("daily_date" in end)
             }
         }
     }
@@ -97,7 +79,7 @@ class RunEventsTest : CoroutineTest() {
     /**
      * L63's other half. `debug_session` itself is stamped on every record by
      * `GrafanaLogTree` — one place, so no call site can forget it — and this is
-     * the narrower flag the dashboards need beside it: whether the four writes
+     * the narrower flag the dashboards need beside it: whether the three writes
      * that claim a player did something actually happened. Without it, "no
      * `run_record` row was written" and "the row was written and never reached
      * us" are the same shape downstream.

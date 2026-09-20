@@ -104,8 +104,8 @@ internal fun randomUuid(): String = js("crypto.randomUUID()") as String
  * most one (L19). All three are safe to turn live.
  *
  * `level.blocksPerLevel` feeds level advancement, so it **moves the pinned
- * determinism digest**. Every Daily Challenge score and every seed-attached bug
- * report recorded under the old value replays as a different run under the new
+ * determinism digest**. Every seed-attached bug report recorded under the old
+ * value replays as a different run under the new
  * one — and it still replays, which is the expensive kind of wrong. D9 keeps the
  * key in reserve rather than excluding it, so the console's job is to make
  * changing it a deliberate act. On prod the warning also forces the operator to
@@ -121,8 +121,8 @@ internal fun dangerousWarning(path: String, value: String): String? {
         path == "upgrade.minSupportedVersionCode" ->
             "Raising the minimum supported version force-upgrades every user below it. Double-check the number. Continue?"
         path in DIGEST_MOVING_PATHS ->
-            "This MOVES THE DETERMINISM DIGEST. Every Daily Challenge score and every seed-attached bug " +
-                "report recorded under the old value will replay as a DIFFERENT run — silently, because it " +
+            "This MOVES THE DETERMINISM DIGEST. Every seed-attached bug report recorded under the old " +
+                "value will replay as a DIFFERENT run — silently, because it " +
                 "still replays. Only the clock behaves this way; the speed curve and the spawn table were " +
                 "both measured safe to change live. Continue?"
         else -> null

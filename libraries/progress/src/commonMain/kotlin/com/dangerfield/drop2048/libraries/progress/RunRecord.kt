@@ -1,24 +1,5 @@
 package com.dangerfield.drop2048.libraries.progress
 
-import kotlinx.serialization.Serializable
-
-/**
- * Which set of rules a run was played under.
- *
- * Daily shares `run_record` rather than getting a table of its own — the stats in
- * SPEC 15 are lifetime numbers and a second table would mean every one of them
- * became a union. `daily_result` holds what is true about a *day*; this column
- * holds what is true about a *run*.
- *
- * `@Serializable` for two reasons that both had to be satisfied at once: it is a
- * field of the saved-run blob, and it is a `GameRoute` argument. Native has no
- * built-in enum NavType, so a route enum is resolved through the destination's
- * typeMap and a plain enum there fails graph construction with a message naming
- * the wrong argument. See `baseRouteTypeMap`.
- */
-@Serializable
-enum class GameMode { ENDLESS, DAILY }
-
 /**
  * One completed run, exactly as SPEC 11 lists it.
  *
@@ -41,6 +22,11 @@ enum class GameMode { ENDLESS, DAILY }
  * merges". It is stored per-run rather than as a lifetime counter for the same
  * reason as everything else here: a counter has no witness, and a fold over the
  * rows is retroactively fixable.
+ *
+ * There is no `mode` column. It existed to tell an Endless run from a Daily one
+ * and D27 removed the Daily, so every run this table can hold is the same kind
+ * of run. A discriminator with one value is a discriminator that cannot be read
+ * wrong and cannot be read right either.
  */
 data class RunRecord(
     val id: Long = 0,
@@ -62,6 +48,5 @@ data class RunRecord(
     val longestCascade: Int,
     val bursts: Int,
     val merges: Int,
-    val mode: GameMode,
     val seed: Long,
 )

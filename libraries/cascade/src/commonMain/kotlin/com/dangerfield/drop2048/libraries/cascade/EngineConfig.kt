@@ -39,13 +39,40 @@ data class EngineConfig(
         require(cascadeStepCap > 0) { "cascadeStepCap must be positive" }
     }
 
-    /** The column a new falling block enters at. */
-    val spawnColumn: Int get() = cols / 2
+    /**
+     * The middle column, for the things that script a board rather than play one.
+     *
+     * This used to be `spawnColumn` and used to be exactly that: every block
+     * entered here. The owner's 2026-09-20 ruling made the entry column a
+     * uniform draw off the run's own RNG, so the engine no longer reads this at
+     * all — see [Spawn].
+     *
+     * It survives under a name that says what it is because three callers want a
+     * *fixed* column and always did: the tutorial's scripted drops, the debug
+     * menu's forced boards, and the autoplay policies' fallback for a state with
+     * no falling block. Each of those wants "the middle" and would have to
+     * recompute `cols / 2` locally otherwise, which is the same constant in four
+     * places waiting to disagree about a remote `board.cols`.
+     */
+    val centreColumn: Int get() = cols / 2
 
     companion object {
         const val DEFAULT_COLS = 5
         const val DEFAULT_ROWS = 8
-        const val DEFAULT_BLOCKS_PER_LEVEL = 20
+        /**
+         * SPEC 5.5's clock. **20 until 2026-09-20**, when the owner ruled the
+         * game does not get hard quickly enough and `tools/balance` measured
+         * this as the only one of the three candidate levers that moves the
+         * opening.
+         *
+         * 15 rather than 12 because 12 takes the Random policy's median level to
+         * 6, and SPEC 4.4 reads "Random reaches level 6" as the game being too
+         * easy. It would be reading an inflated number rather than an easier
+         * game — a cheaper level is not a lower difficulty — but a tripwire that
+         * has to be explained away every time it fires is a tripwire nobody
+         * reads. 15 keeps Random's median at 5, which is where it was at 20.
+         */
+        const val DEFAULT_BLOCKS_PER_LEVEL = 15
         const val DEFAULT_CAP_DIVISOR = 16
         const val DEFAULT_CAP_FLOOR = 4
         const val DEFAULT_SUPPRESSED_DRAWS = 3

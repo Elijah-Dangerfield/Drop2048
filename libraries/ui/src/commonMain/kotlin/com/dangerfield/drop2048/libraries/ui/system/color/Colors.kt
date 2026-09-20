@@ -43,6 +43,14 @@ interface Colors {
     val surfaceTertiary: ColorResource
     val onSurfaceTertiary: ColorResource
 
+    /**
+     * For a surface that has to read as sitting **on** [surfacePrimary] rather
+     * than beside it — a filled secondary button on a dialog card being the case
+     * that forced it. See `GameColors.ControlElevated`.
+     */
+    val surfaceElevated: ColorResource
+    val onSurfaceElevated: ColorResource
+
     val surfaceDisabled: ColorResource
     val onSurfaceDisabled: ColorResource
 
@@ -110,6 +118,9 @@ val defaultColors = object : Colors {
     override val onSurfaceSecondary = token(GameColors.Ink, "ink")
     override val surfaceTertiary = token(GameColors.BoardWell, "board-well")
     override val onSurfaceTertiary = token(GameColors.InkFaint, "ink-faint")
+
+    override val surfaceElevated = token(GameColors.ControlElevated, "control-elevated")
+    override val onSurfaceElevated = token(GameColors.Ink, "ink")
 
     override val surfaceDisabled = token(GameColors.ControlRaised, "control-raised")
     override val onSurfaceDisabled = token(GameColors.InkMuted, "ink-muted")

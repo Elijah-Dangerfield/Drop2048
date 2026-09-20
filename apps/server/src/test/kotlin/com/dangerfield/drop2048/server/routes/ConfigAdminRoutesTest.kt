@@ -320,7 +320,7 @@ class ConfigAdminRoutesTest {
             assertTrue("level.blocksPerLevel" in paths, "SPEC 10 gameplay key is listed")
             assertTrue("spawn.table" in paths, "the spawn table is listed")
             assertTrue("ads.interstitial.cooldownSeconds" in paths, "the ad gates are listed")
-            assertTrue("feature.dailyChallenge" in paths, "the kill switches are listed")
+            assertTrue("feature.leaderboards" in paths, "the kill switch is listed")
         }
     }
 

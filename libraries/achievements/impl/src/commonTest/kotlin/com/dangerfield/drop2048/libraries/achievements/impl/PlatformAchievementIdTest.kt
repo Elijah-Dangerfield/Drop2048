@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * against each other.
  *
  * The failure being guarded is the same one `LeaderboardTest` guards for boards,
- * and it is worse here because there are twenty-four of them: a duplicate id
+ * and it is worse here because there are twenty-two of them: a duplicate id
  * files one badge under another's name, so a player unlocks a badge on their
  * profile that they did not earn and does not get the one they did. Nothing in
  * this app ever reads an achievement back from Game Center, so no other test,
@@ -81,7 +81,7 @@ class PlatformAchievementIdTest {
     }
 
     private companion object {
-        /** SPEC 15's twenty-four. */
-        const val CatalogSize = 24
+        /** SPEC 15's twenty-two, since D27 cut the two Daily streak badges. */
+        const val CatalogSize = 22
     }
 }

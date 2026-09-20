@@ -115,6 +115,7 @@ class GameViewModelTest : CoroutineTest() {
     @Test
     fun moveDuringResolution_appliesToTheNextBlock() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
+            val arrivesIn = nextSpawnColumn
             land()
             assertPhase(GamePhase.Resolving)
 
@@ -125,20 +126,36 @@ class GameViewModelTest : CoroutineTest() {
             declineContinue()
 
             assertPhase(GamePhase.Playing)
-            assertFallingAt(col = 1, row = 0)
+            assertFallingAt(col = arrivesIn - 1, row = 0)
         }
     }
 
+    /**
+     * Three presses, one column of movement: the buffer holds the last one and
+     * drops the two before it rather than queueing them up behind it.
+     *
+     * All three go the same way, and away from the nearer wall. The 2026-09-20
+     * ruling made the arrival column a draw, so the direction cannot be picked
+     * in advance — and a sequence that runs into a wall stops discriminating,
+     * because a refused move and a discarded one leave the board in the same
+     * place. Pressed toward the far side there are always at least two columns
+     * of room on a five-wide board, so "moved one" and "moved three" are
+     * different answers from whichever column the block arrived in.
+     */
     @Test
     fun moveDuringResolution_keepsOnlyTheLastOne() = runUnitTest {
         playing(fallingAt = Cell(2, 0)) {
+            val arrivesIn = nextSpawnColumn
+            val rightwards = arrivesIn * 2 < state.board.cols - 1
             land()
-            act(GameAction.MoveLeft, GameAction.MoveLeft, GameAction.MoveRight)
+
+            val press = if (rightwards) GameAction.MoveRight else GameAction.MoveLeft
+            act(press, press, press)
 
             waitOutResolution()
             declineContinue()
 
-            assertFallingAt(col = 3, row = 0)
+            assertFallingAt(col = if (rightwards) arrivesIn + 1 else arrivesIn - 1, row = 0)
         }
     }
 
@@ -407,6 +424,7 @@ class GameViewModelTest : CoroutineTest() {
             """,
             fallingAt = Cell(2, 0),
         ) {
+            val arrivesIn = nextSpawnColumn
             land()
             assertPhase(GamePhase.Resolving)
 
@@ -414,7 +432,7 @@ class GameViewModelTest : CoroutineTest() {
             waitOutResolution()
             declineContinue()
 
-            assertFallingAt(col = 2, row = 0)
+            assertFallingAt(col = arrivesIn, row = 0)
         }
     }
 

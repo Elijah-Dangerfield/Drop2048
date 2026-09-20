@@ -7,7 +7,6 @@ import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.flowroutines.AppCoroutineScope
 import com.dangerfield.drop2048.libraries.flowroutines.testing.CoroutineTest
 import com.dangerfield.drop2048.libraries.gameconfig.AdsEnabled
-import com.dangerfield.drop2048.libraries.progress.daily.RewardOutcome as DailyRewardOutcome
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
@@ -65,8 +64,8 @@ class RealAdGateTest : CoroutineTest() {
      * [AdShowResult.NotShown] rather than pretending — Sodogku shipped a stub
      * that answered `Rewarded` and paid out for free, which every log read as a
      * watched ad. `NotShown` becoming [RewardOutcome.NoFill] means the *caller*
-     * decides what an unserved ad is worth, and the two callers decide
-     * differently: a continue is granted, a Daily retry is not spent.
+     * decides what an unserved ad is worth, and the continue caller decides to
+     * grant it rather than take the player's board.
      */
     @Test
     fun `an unwired network reports nothing shown rather than a reward`() = runUnitTest {
@@ -118,36 +117,6 @@ class RealAdGateTest : CoroutineTest() {
         scenario.gate.showRewarded(AdPlacement.ContinueRun)
 
         assertEquals(Now, scenario.cache.get().lastRewardedAtMs)
-    }
-
-    /**
-     * The Daily's asymmetry, from the other side. An unserved ad grants a
-     * continue and does **not** grant a retry — because on the continue an
-     * ad failure would take the player's board, and on the retry it would take
-     * the day's one cap, which is worse and cannot be bought back.
-     */
-    @Test
-    fun `an unserved daily retry is unavailable rather than dismissed`() = runUnitTest {
-        val scenario = scenario(AdShowResult.NoFill)
-        val retry = RewardedDailyRetryAd(scenario.gate)
-
-        assertEquals(DailyRewardOutcome.Unavailable, retry.show())
-    }
-
-    @Test
-    fun `a watched daily retry is earned`() = runUnitTest {
-        val scenario = scenario(AdShowResult.Rewarded)
-        val retry = RewardedDailyRetryAd(scenario.gate)
-
-        assertEquals(DailyRewardOutcome.Earned, retry.show())
-    }
-
-    @Test
-    fun `a dismissed daily retry is the only one that costs the player`() = runUnitTest {
-        val scenario = scenario(AdShowResult.Dismissed)
-        val retry = RewardedDailyRetryAd(scenario.gate)
-
-        assertEquals(DailyRewardOutcome.Dismissed, retry.show())
     }
 
     /**

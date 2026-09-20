@@ -123,28 +123,13 @@ class DebugViewModelTest : CoroutineTest() {
      * never applied. Nothing looked broken — the wrong board simply appeared.
      */
     @Test
-    fun startingAForcedRunThrowsAwayTheEndlessSaveFirst() = runUnitTest {
+    fun startingAForcedRunThrowsAwayTheSaveFirst() = runUnitTest {
         val cache = StubAppCache(AppData(savedRun = "an endless run in progress"))
         val scenario = scenario(cache = cache)
 
         scenario.viewModel.takeAction(DebugAction.StartForcedRun)
 
         assertEquals(null, cache.value.savedRun)
-    }
-
-    /**
-     * And it leaves the Daily slot alone. A Daily attempt is spent and cannot be
-     * given back (SPEC 14), so deleting one to make room for a debug board would
-     * cost the tester's device a day it can never replay.
-     */
-    @Test
-    fun startingAForcedRunLeavesTheDailySaveAlone() = runUnitTest {
-        val cache = StubAppCache(AppData(savedDailyRun = "today's attempt"))
-        val scenario = scenario(cache = cache)
-
-        scenario.viewModel.takeAction(DebugAction.StartForcedRun)
-
-        assertEquals("today's attempt", cache.value.savedDailyRun)
     }
 
     @Test
@@ -160,18 +145,17 @@ class DebugViewModelTest : CoroutineTest() {
      * SPEC 19's "force show: rewarded video", through [AdGate] rather than
      * around it.
      *
-     * The assertion is on the placement, because the two rewarded slots are
-     * capped and reported separately and a button wired to the wrong one would
-     * be invisible: both draw the same ad.
+     * The assertion is on the placement, because a button wired to the wrong
+     * one would be invisible: every rewarded slot draws the same ad.
      */
     @Test
     fun forcingARewardedAdGoesThroughTheGateAndReportsWhatHappened() = runUnitTest {
         val adGate = StubAdGate(outcome = RewardOutcome.Dismissed)
         val scenario = scenario(adGate = adGate)
 
-        scenario.viewModel.takeAction(DebugAction.ShowRewardedNow(AdPlacement.DailyRetry))
+        scenario.viewModel.takeAction(DebugAction.ShowRewardedNow(AdPlacement.ContinueRun))
 
-        assertEquals(listOf(AdPlacement.DailyRetry), scenario.adGate.shown)
+        assertEquals(listOf(AdPlacement.ContinueRun), scenario.adGate.shown)
         assertEquals(RewardOutcome.Dismissed.toString(), scenario.viewModel.state.ads.lastResult)
     }
 
@@ -237,7 +221,6 @@ class DebugViewModelTest : CoroutineTest() {
                 diagnostics = InMemoryDiagnostics(),
                 gate = gate,
                 proGrant = InMemoryProGrant(),
-                daily = StubDailyRepository(),
                 adGate = adGate,
                 interstitials = interstitials,
                 adDiagnostics = diagnostics,

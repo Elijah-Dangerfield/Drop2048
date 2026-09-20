@@ -14,9 +14,9 @@ package com.dangerfield.drop2048.libraries.config
  * @Inject
  * @SingleIn(AppScope::class)
  * @ContributesBinding(AppScope::class, ConfiguredValue::class, multibinding = true)
- * class DailyChallengeEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
- *     override val name = "Daily challenge enabled"
- *     override val path = "daily.enabled"
+ * class AdsEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) {
+ *     override val name = "Ads enabled"
+ *     override val path = "ads.enabled"
  *     override val default = false
  * }
  *

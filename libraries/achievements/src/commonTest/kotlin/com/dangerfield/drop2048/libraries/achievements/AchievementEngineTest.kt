@@ -1,6 +1,5 @@
 package com.dangerfield.drop2048.libraries.achievements
 
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -56,7 +55,7 @@ class AchievementEngineTest {
         val history = listOf(
             outcome(merges = 3, endedAt = 1),
             outcome(merges = 20, highestTier = 64, endedAt = 2),
-            outcome(mode = GameMode.DAILY, dailyStreakDays = 7, endedAt = 3),
+            outcome(score = 900, endedAt = 3),
         )
         val live = history.fold(AchievementState.Empty) { state, run ->
             AchievementEngine.apply(state, run).state
@@ -115,9 +114,6 @@ class AchievementEngineTest {
         Stat.MostBlocksInARun -> listOf(outcome(blocksPlaced = target.toInt()))
         Stat.LongestDangerRun -> listOf(outcome(facts = RunFacts(longestDangerRun = target.toInt())))
         Stat.BestScore -> listOf(outcome(score = target))
-        Stat.BestDailyStreak ->
-            listOf(outcome(mode = GameMode.DAILY, dailyStreakDays = target.toInt()))
-
         Stat.MinutesPlayed -> listOf(outcome(durationMs = target * MinuteMs))
     }
 

@@ -780,9 +780,27 @@ independent layers:
    part of the design rather than belt and braces.
 3. A `BuildInfo.isDebug` guard at the selection point.
 
-**iOS only gets layer 3.** Kotlin/Native has no build-type source sets, so the module is in
-`iosMain` and linked into every iOS binary; the guard is `Platform.isDebugBinary`, an Xcode
-configuration fact. That is the weakest point in the chunk and it is written down as such.
+**iOS used to get layer 3 only**, and that was the weakest point in the chunk. Closed on 2026-09-16.
+Kotlin/Native still has no build-type source sets: `iosArm64CompileKlibraries` and
+`iosSimulatorArm64CompileKlibraries` are one configuration each, shared by the debug and release
+framework links, so there is no `debugImplementation` to reach for. **So the build type is read one
+level up.** `apps/compose/build.gradle.kts`'s `iosLinksHouseAds` reads Xcode's `CONFIGURATION`, the
+same signal the Kotlin plugin itself uses to pick a framework, and fails closed: anything not
+demonstrably a Debug Xcode build excludes the module.
+
+Measured before and after, on the linked release `ComposeApp` rather than from the build log, because
+a failed iOS link reports `BUILD SUCCEEDED` (L24). `HouseAdNetwork` 50 → 0, `HouseAdHost` 18 → 0,
+`com.dangerfield.drop2048.libraries.ads.fake` 83 → 0, and `NoHouseAds` 0 → 34, which is the Android
+release binding appearing on iOS for the first time.
+
+Both iOS guards were proved by making them fail, not by watching them pass. The graph check catches
+the module arriving **transitively**, which the flag cannot; the artifact check catches the flag
+itself reading wrong, which makes the graph check skip itself. The artifact check also asserts
+`NoHouseAds` is *present*, because a search for an absent string passes whether or not the search
+works.
+
+`:libraries:devfeedback:tester` keeps the same iOS gap on purpose (D23): a TestFlight build is a
+release binary and the FAB has to survive it. That one is deliberate, not unfinished.
 
 Also worth copying: `HouseAds.Surface()` is a `@Composable` **on the interface**, so `App` draws it
 without naming the module. An overlay keyed on a state flow would have put the drawing code back
@@ -868,6 +886,10 @@ measurement.
 `pages/privacy.html` states the app uses **no ad or analytics SDKs**. It ships AdMob and an OTLP
 pipe to Grafana. That page is already the compiled default for `legal.privacyUrl`, so the app
 currently points players at a false statement about itself.
+
+Both halves are closed. C13a rewrote the page to describe the app that exists, and on 2026-09-16 the
+`legal.termsUrl` / `legal.privacyUrl` defaults moved off the unpublished `drop2048.app` domain onto
+the live Pages URLs, so the page the app opens is now the page that was fixed.
 
 Four more of the same shape, all found by deriving the store forms from the code rather than from
 memory:

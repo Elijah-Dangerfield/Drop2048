@@ -14,6 +14,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.libraries.billing)
+            // `AdImpressions`: the stacked-out card claims "Tired of the ads?",
+            // so it may not be drawn before there have been any (D28). The api
+            // module only, because only `:apps:*` may depend on an impl.
+            implementation(projects.libraries.ads)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.flowroutines)
@@ -27,6 +31,7 @@ kotlin {
 
         commonTest.dependencies {
             implementation(projects.libraries.billing)
+            implementation(projects.libraries.ads)
             implementation(projects.libraries.core)
             implementation(projects.libraries.drop2048)
             implementation(projects.libraries.flowroutines)

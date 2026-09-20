@@ -122,7 +122,7 @@ class PresetBoardTest {
                 board = board,
                 falling = fresh.falling?.copy(
                     block = blockOf(BlockValue.V2),
-                    cell = Cell(config.spawnColumn, 0),
+                    cell = Cell(config.centreColumn, 0),
                 ),
             )
         }

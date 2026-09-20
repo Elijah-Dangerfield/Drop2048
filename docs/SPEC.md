@@ -18,9 +18,10 @@ against real play data. None of them are truths.**
 **Feature complete, 2026-09-11.** Every chunk in `BUILD-PLAN.md` has landed. The full gate is
 green: **1,017 tests, 0 failures, 0 skipped**, both platforms building, detekt clean, R8 validated.
 
-The game is playable end to end: tutorial, Endless, Daily Challenge, persistence with mid-cascade
-resume, stats, achievements, platform leaderboards, sharing, settings with the five palettes and
-the accessibility block, launch gates, remote config, telemetry, ads, Pro, and a debug menu.
+The game is playable end to end: tutorial, Endless, persistence with mid-cascade resume, stats,
+achievements, platform leaderboards, sharing, settings with the five palettes and the
+accessibility block, launch gates, remote config, telemetry, ads, Pro, and a debug menu. The Daily
+Challenge was built in C6 and removed on 2026-09-20 by owner ruling (**D27**).
 
 **What is not done, and none of it is code:**
 
@@ -45,7 +46,7 @@ Tetris skeleton, 2048 brain.
 ## 2. v1 scope
 
 **In.** Endless mode on one board. Every merge, cascade and burst rule. All three specials. The
-rising spawn floor. Tutorial. Stats. Daily Challenge. Achievements.
+rising spawn floor. Tutorial. Stats. Achievements.
 Platform leaderboards. Full settings including accessibility. Pro IAP. Rewarded continue and
 rewarded double-coins-equivalent. Interstitials under the section 12 gating. Debug menu.
 
@@ -60,10 +61,11 @@ rewarded double-coins-equivalent. Interstitials under the section 12 gating. Deb
 | Zen mode | It is a one-line change to the engine (never tick) and a Pro perk. Add it when Pro exists and someone asks. |
 | Goal levels | Already v2 in the original spec. |
 
-**The consequence for monetization.** With coins and powerups gone, Pro's value is: no ads, all
-palettes, two Daily attempts, two continues instead of one. That is thinner than the original
-spec's Pro and it needs to be priced honestly. $2.99, not $3.99, until Zen and the powerup
-economy land.
+**The consequence for monetization.** With coins and powerups gone — and the Daily's second
+attempt gone with the mode (**D27**) — Pro's value is: no ads, all palettes, two continues
+instead of one. That is thinner than the original spec's Pro and it needs to be priced honestly.
+$2.99, not $3.99, until Zen and the powerup economy land. **The price is worth another look now
+that Pro is three things rather than four**; D27 deliberately did not move it in passing.
 
 ## 3. Board
 
@@ -95,6 +97,25 @@ warning.
 `(col, row)`, `(0, 0)` top-left, row index increases downward, gravity pulls toward increasing
 row.
 
+### 3.3 Where a block enters
+
+**A uniform random column, always at row 0.** Owner ruling, 2026-09-20 (D26). It was the middle
+column until then.
+
+The column is drawn from the run's own RNG inside the spawn draw, not from anywhere else, because
+SPEC 4.1's seed-plus-inputs property is what undo, save/resume, replay and bug
+reports all stand on.
+
+Nothing constrains the draw against the board and nothing needs to: 3.1 ends the run when row 0 is
+occupied after a resolution, so row 0 is empty in every column by the time anything spawns. The
+engine keeps its `SPAWN_BLOCKED` fault as the guard on that reasoning rather than making the fault
+unreachable by re-drawing.
+
+Measured at 10,000 clocked runs per policy: the greedy policy's median level fell 19 to 18, its
+2048 rate 2.31% to 1.79%, and the share of drops that did **not** reach the column the policy asked
+for — the one clocked number 4.4 calls pressure rather than theatre — went 2.36% to 4.49%. Full
+numbers in `decisions.md` D26.
+
 ## 4. The engine
 
 This is the whole game and it is the part that has to be right before anything is drawn.
@@ -116,7 +137,6 @@ determines the entire run, byte for byte, on every platform.
 
 Six things fall out of that one decision, and they are why it is made:
 
-- **Daily Challenge** is a seed. No pregenerated content pipeline, no server.
 - **Undo** is `states[n - 1]`. No inverse operations, no restoring a burst by hand.
 - **Save and resume mid-run** is serializing one object.
 - **The balance harness** (4.4) can play a hundred thousand runs headless in seconds.
@@ -275,6 +295,17 @@ drop input, the share where the policy did not get the column it asked for, and 
 how long the policy sat with nothing to do while the block kept falling. The last of those is the
 only one that is not near zero in the opening, and it is what 5.5's early band was retuned on.
 
+**`--specials-from` is the fourth dial and the only one that the engine can see.** Added by D26 to
+answer whether 5.2's three specials arrive too late. `--decision-millis` and `--tap-millis` model
+the player and cannot move the determinism digest; this one is `special.firstLevel` and travels
+inside `EngineConfig`, so a run played under it is a run under a different config and its numbers
+compare to a default one's only through this harness.
+
+**Reading a level number off this harness after a `blocksPerLevel` change is a trap.** A cheaper
+level is not a lower difficulty, so the median level rises when the game gets harder. D26's sweep
+reads run length, tier ceiling and time-to-level instead, and it is the only honest way to read
+that table.
+
 **Every clocked number is conditional on `decisionMillis`, and that constant is unmeasured.** Swept
 from 150ms to 500ms it moves Greedy's median level by five and its 1024 rate by a factor of three —
 more than the clock itself and more than the spawn table. Until 17's telemetry answers it, no
@@ -305,6 +336,20 @@ Suppressed for the first three drops of a run, and never two specials back to ba
 
 A Wildcard next to a 1024 makes a 2048 and bursts the row. That is intentional and it is the
 moment people screenshot.
+
+**Asked whether they arrive too late, measured, and kept where they are** (D26, 2026-09-20). The
+sweep decomposes cleanly and the two halves point opposite ways:
+
+- **Wildcard and Bomb are not a difficulty lever.** Moving them to 3 and 5 changes nothing outside
+  noise, which is right for two blocks that are gifts.
+- **The Stone is the whole effect, and it is aimed at the wrong end of the run.** 12 to 10 halves
+  the 2048 rate (1.79% to 0.84%) and pushes the share of runs ending at 256 from 20% to 36%, while
+  buying **zero** seconds off time to level 4. It makes the late game harder; the complaint was
+  about the early game, which 3.3 and 5.5 answer instead.
+
+`special.stone.firstLevel` is a live remote key (10), so this is a console push whenever it is
+wanted, priced at roughly half the 2048 rate per two levels. Moving the compiled default would move
+`EngineConfig.Default` and the digest with it — a permanent cost for a dial that already turns.
 
 ### 5.3 Spawn values
 
@@ -366,8 +411,20 @@ drop, which is the same `Input.Lock` the engine has always had. See 6.
 
 ### 5.5 Level and speed
 
-Level increases every **20 blocks dropped**. No cap. Blocks dropped is the clock, not score:
+Level increases every **15 blocks dropped**. No cap. Blocks dropped is the clock, not score:
 score scales superlinearly with skill and would punish good players with runaway speed.
+
+**It was 20 until the owner's 2026-09-20 ruling** that the game does not get hard quickly enough
+(D26). 15 takes a hard-dropping player to level 4 in 27.1s against 36.1s, shortens the median
+greedy run from 355 drops to 317, and thins the 2048 rate from 1.79% to 1.29%. 12 was measured and
+rejected: it takes the Random policy's median to level 6, which 4.4 reads as the game being too
+easy. That reading would be wrong — a cheaper level is not a lower difficulty, and **every level
+number in this document became 25% cheaper on that date** — but a tripwire that has to be explained
+away every time it fires is one nobody reads.
+
+C1c measured this exact change and left it alone. What changed is not the numbers, which
+reproduced to the digit, but that the digest was moving for 3.3 anyway, so the cost C1c was
+weighing against was already being paid.
 
 | Level | ms per row |
 |---|---|
@@ -399,16 +456,19 @@ slack; the clocked harness in 4.4 then measured it, and the diagnosis and the fi
   clutter. The early curve is a pacing dial, not a difficulty dial.
 
 So this change is a feel change made on a measurement that says its risk is zero, and it is not
-claimed to make the game harder. **The lever that would is `blocksPerLevel`**, and it was measured
-and left alone: 20 to 15 took a hard-dropping player to level 4 in 26s instead of 34s, but it
-shortens runs by 11%, thins the tail past 1024, and — unlike the curve — it feeds level
-advancement, so it moves the pinned determinism digest and every score with it.
+claimed to make the game harder. **The lever that would is `blocksPerLevel`**, which was measured
+here, left alone here, and taken in D26 once the owner ruled and once the digest was moving anyway.
 
-**Three layered pressures, as amended.** Space (L1-18) and obstacles (L19+, where Stones appear
-and the burst becomes the only way to survive). Time is not one of them: on five columns with a
-centre spawn, a block is at most two columns from anywhere, which the measured player covers in
-370ms against a budget that never falls below about 780ms even at the speed floor. That is why
-6's drop control, not the curve, sets how fast a run actually goes.
+**Three layered pressures, as amended twice.** Space (L1-18) and obstacles (L19+, where Stones
+appear and the burst becomes the only way to survive).
+
+Time used to be explicitly not one of them, on the argument that "on five columns with a centre
+spawn, a block is at most two columns from anywhere, which the measured player covers in 370ms
+against a budget that never falls below about 780ms even at the speed floor". **3.3 made that
+sentence false on purpose.** The worst case is now four columns, which is 730ms of tapping and
+deciding against a budget that reaches 720ms at the floor, so time does bite late — and the
+measured share of drops that miss their column doubled. It is still true that 6's drop control, not
+the curve, sets how fast a run goes.
 
 **The curve was kept at 500ms through C1e and through D21, and the pacing column is hard drop's.**
 A level-1 drop takes **0.54s** for a player who uses ▼ against **4.15s** for one who never does,
@@ -434,14 +494,21 @@ drop that ended the run is refused: Continue exists for that.
 
 ## 6. Controls
 
-**Buttons ship first** and are the default, matching the mockups: fixed left, right and drop
-controls along the bottom, with a left-handed mirror option. They are the easiest scheme to drive
-from an automated test, which matters while the loop is still being tuned.
+**Drag is the default** (owner ruling, 2026-09-20). Touch anywhere on the board, slide
+horizontally, the falling block tracks your finger's column. The handoff makes it absolute from
+the grab point rather than incremental. A downward flick is the hard drop, measured from the
+highest point the finger has reached rather than from the touch — otherwise sliding the block over
+first, which is the gesture the game is built on, closes the window before the flick starts.
 
-**Drag** lands in the same phase once the loop is proven, and becomes the default at that point
-if it feels better on device. Touch anywhere on the board, slide horizontally, the falling block
-tracks your finger's column. The handoff makes it absolute from the grab point rather than
-incremental. A downward flick is the hard drop.
+**Buttons shipped first** and were the default until that ruling, matching the mockups: fixed
+left, right and drop controls along the bottom. They are the easiest scheme to drive from an
+automated test, which is what they were the default for while the loop was being tuned. They are
+one switch away — "Show arrow buttons" in Settings, which is `Drag` against `Both` and is worded
+as what appears on screen rather than as the name of a scheme. Nothing should be built that
+assumes the row is present.
+
+The arrow row had a **left-handed mirror** until the owner ruling of 2026-09-20 removed it, along
+with the setting it hung off. ◀ is on the left, always.
 
 **Tap Column** is v2 unless it is cheap once Drag exists.
 
@@ -547,7 +614,9 @@ on entry. Cleared automatically when row 1 empties.
 ### 8.4 Pause and stacked out
 
 Pause halts the drop timer and **blurs the board**, so the layout cannot be studied while paused,
-exactly as the mockup draws it. Options: Resume, Restart, Settings, How to Play, Quit. Auto-pauses
+exactly as the mockup draws it. Options: Resume, Restart, Settings, How to Play, Quit. Quit
+**always** asks first (owner ruling, 2026-09-20): it ends the run, there is no undo, and it sits a
+thumb-width from Restart. The setting that let a player skip the question is gone. Auto-pauses
 on backgrounding, calls and notification interaction. A cascade in progress when the app
 backgrounds is snapshotted and completes on resume before input is accepted.
 
@@ -594,7 +663,11 @@ step: one `.ogg` per `Sound`, named after its `key`, in a folder called `audio` 
 absent is logged by name at launch and leaves that one effect silent; nothing else changes. See
 `SoundBank`'s KDoc and `decisions.md`.
 
-The music track and its intensity layers are not built either, and are not a sample bank.
+The music track and its intensity layers are not built either, and are not a sample bank. **There
+is no music switch in Settings.** One was persisted and rendered from C11; nothing anywhere read
+it, because there is no music system for it to switch off. The owner removed it on 2026-09-20. A
+switch that changes nothing is worse than an absent feature, because the player believes they
+turned something off. If the track is ever built, the switch comes back with it and not before.
 
 ## 10. Remote config
 
@@ -614,8 +687,9 @@ Keys for v1:
 | `level.blocksPerLevel` | The clock. |
 | `ads.interstitial.*` | Every gate input in 12.3: session run count, cooldown, days-since-install suppression. |
 | `ads.enabled`, `ads.rewarded.caps` | Kill switch and per-placement caps. |
+| `ads.banner.enabled` | The banner under the board (D28), on its own key so killing it does not take the rewarded continue with it. Off gives the strip back to the board, which is also what a no-fill does. |
 | `pro.upsell.enabled` | The Settings entry and the stacked-out card. **`pro.price.tier` was here and is gone** (D25): the product id is a store operation, and a remote one could revoke a paid entitlement. |
-| `feature.dailyChallenge`, `feature.leaderboards` | Kill switches for anything with a server or platform dependency. |
+| `feature.leaderboards` | Kill switch for anything with a platform dependency. **`feature.dailyChallenge` was here and is gone** (D27), with the mode it switched. |
 
 **Never remote:** the merge priority order, the resolution algorithm, the burst rule, scoring
 formulas. Changing those mid-flight silently invalidates every high score on the board.
@@ -627,32 +701,45 @@ owning library per the template's rules.
 
 | Table | Holds |
 |---|---|
-| `run_record` | One row per completed run: score, level, blocks placed, duration, highest tier, cause of death, longest cascade, bursts, mode, seed. This table is the stats page and the analytics backup. |
-| `daily_result` | Date (UTC) as the primary key, seed, score, attempts used, completed, retries used. Drives the streak. The one table in the app that is updated in place, because a row is the running state of a day rather than a finished fact — see `decisions.md`. |
+| `run_record` | One row per completed run: score, level, blocks placed, duration, highest tier, cause of death, longest cascade, bursts, seed. This table is the stats page and the analytics backup. It carried a `mode` column until D27; schema 9 drops it, and the `'DAILY'` rows with it, in a hand-written migration. |
 | `achievement_fact` / `achievement_unlock` | One row per finished run, and one per badge already announced. The engine shape is Sodogku's; the columns are this game's. The facts overlap `run_record` on purpose and are not a join onto it — a badge's evidence must not disappear with a row it never owned. |
 
 In-progress run lives in `AppData` (the template's `AppCache`) as a serialized `GameState` plus
 the transcript-in-flight flag, not in Room. It is one value, it is overwritten constantly, and it
 is worthless once the run ends.
 
+**`SAVE_FORMAT_VERSION` is bumped when the blob changes shape *or* when the engine changes what it
+does with a blob of unchanged shape.** The second clause is D26's: the spawn column became random
+and not one byte moved, so a stale blob would have decoded perfectly into a run that finished under
+rules its first half never saw. A run restored into the wrong rules is worse than a run lost,
+because nothing on screen says so. The cost is one in-flight run per release that lands an engine
+change. Version 8 is D27's: `mode` and `dailyDate` left the blob, and a version 7 blob is refused
+rather than resumed because it may be a Daily run on a board this build no longer has.
+
 Best scores are derived from `run_record`, not stored separately. One source of truth.
 
 ## 12. Monetization
 
 **Pro, one-time IAP.** Removes all interstitial advertising permanently, unlocks every palette,
-two Daily attempts instead of one, two continues per run instead of one. $2.99 at v1 scope (see
-2). Rewarded video stays available to Pro holders as an opt-in, because removing it is taking
-something away.
+and gives two continues per run instead of one. $2.99 at v1 scope (see 2). It was four things
+until D27 removed the Daily's second attempt. Rewarded video stays available to Pro holders as an
+opt-in, because removing it is taking something away.
 
-Upsell surfaces: a small persistent entry in Settings, and one non-modal card on the stacked-out
-screen at most once per session. Never a full-screen popup on launch.
+Upsell surfaces: a small persistent entry in Settings, one non-modal card on the stacked-out screen
+at most once per session, and a quiet line beside the rewarded continue. Never a full-screen popup
+on launch.
+
+The card is additionally gated on this player having **actually been shown an ad** (2026-09-20,
+D28). Its copy is "Tired of the ads?", and 12.3's gates mean a new player reaches several
+stacked-out screens before the first interstitial, so without the gate the card's first appearance
+was reliably a lie. An interstitial that was shown or a banner that filled both count; a rewarded
+ad does not, because the player asked for it and Pro does not remove it.
 
 **Rewarded video**, all player-initiated:
 
 | Placement | Reward | Cap |
 |---|---|---|
 | Continue after stacked out | Clears the top three rows, drops level by one, resets the drop timer to the start of its interval, preserves score. | 1 free per run, a 2nd at higher friction, hard cap 2 |
-| Daily Challenge retry | One extra attempt | 1 per day |
 
 Double-coins and free-powerup placements are cut with the economy.
 
@@ -662,21 +749,38 @@ session; 180s minimum since the last one; never within 45s of a rewarded ad in e
 suppressed entirely for the first 3 days after install; preloaded, and skipped silently if not
 ready rather than showing a spinner.
 
-**Banners: none.** The board is tall and narrow, vertical space is what makes the danger row
-readable, and a banner that shifts layout mid-run reads as the game cheating. If one is ever
-added against this advice, its space is reserved from app launch so nothing moves.
+**Banners: one, conditional.** This section said "Banners: none" until 2026-09-20, when the owner
+overturned it deliberately. The reasoning behind the old rule is not discarded, it is answered, and
+D28 has the full trade including the principle that was spent to buy it. The rule now:
+
+- Below the board, and **only where the arrow row is not**. A player with `ControlScheme.Buttons`
+  or `Both` never sees one, because the strip the banner uses is the strip the arrows use.
+- **Remote-controlled** by `ads.banner.enabled` (SPEC 10), separately from `ads.enabled`, so it can
+  be killed without taking the rewarded continue with it.
+- **Removed by Pro**, consistent with Pro removing interstitials.
+- **The board takes the strip whenever the banner is absent, for every reason it can be absent.**
+  No fill, a network error, either key off, Pro, or a platform with no ad SDK. The slot occupies no
+  layout space at all until an ad is really on screen, so there is one rule rather than a list, and
+  no dead space is ever reserved for an ad that does not arrive. This reverses the old section's
+  "its space is reserved from app launch so nothing moves": reserving is what makes the absence
+  permanent.
+- Whether one may appear is decided at a **run boundary**, never mid-run, which is what is left of
+  the old rule's real objection: a banner that moves the board under a falling block reads as the
+  game cheating.
 
 **The governing principle:** the player never sees an ad they did not choose while a run is
-alive. Everything else here is negotiable. That is not.
+alive. Everything else here is negotiable. That is not. The banner is the closest thing to an
+exception the app has, and it is not one: it is chosen in the sense that matters, because it stands
+in the space the player told the game they were not using, it is off for anybody who turned the
+arrows on, and it never appears or disappears while a block is falling.
 
 **Built in C10.** Six rulings the section did not make, all in `decisions.md`. The load-bearing
 ones: there is now **one** `ProEntitlement` (`Entitlements` in `:libraries:billing`) because the
-two that existed could never agree and the debug grant silently failed to reach the Daily;
+two that existed could never agree and the debug grant silently failed to reach one of them;
 interstitials are their own type with one caller rather than a third placement, so the governing
-principle has no expressible call site to violate; a **Daily run is never offered a continue**,
-because a cleared board is a larger change than any config key and D18 pins the config to keep two
-players' runs comparable; and SPEC 12's "2nd at higher friction" is implemented as *not offered* —
-the sheet carries it and the player has to reach for it.
+principle has no expressible call site to violate; and SPEC 12's "2nd at higher friction" is
+implemented as *not offered* — the sheet carries it and the player has to reach for it. A third
+ruling, that a Daily run is never offered a continue, went with the mode in D27.
 
 Every gate in 12.3 is a branch of one pure function (`InterstitialPolicy`), with a test per rule
 against a positive baseline that does show. The 8-second countdown is a ViewModel rule rather than
@@ -703,23 +807,42 @@ call sites pay the player anyway because that is a deliberate rule applied to a 
 First launch drops straight into a scripted run. No menus, no video, no wall of text. The timer
 is frozen throughout.
 
-**The frozen timer is what teaches ▼, and that is the whole design.** With gravity switched off, ▼
-is the only thing that moves a block downward, so the player cannot reach the end of six drops
-without pressing it and never once watches a block come down on its own. C1c measured whether a
-player reaches for the drop control at 223 seconds against 33 to reach level 4 (L29) — a bigger
-lever on the opening than the drop clock, the spawn table and every speed-curve change combined. A
-tutorial that *mentions* ▼ teaches a fact; one that cannot be finished without it teaches a habit,
-and the habit is what the number is about. Built in C5.
+**The frozen timer is what teaches the drop control, and that is the whole design.** With gravity
+switched off, the player's own drop input is the only thing that moves a block downward, so they
+cannot reach the end of six drops without using it and never once watch a block come down on its
+own. C1c measured whether a player reaches for the drop control at 223 seconds against 33 to reach
+level 4 (L29) — a bigger lever on the opening than the drop clock, the spawn table and every
+speed-curve change combined. A tutorial that *mentions* the control teaches a fact; one that
+cannot be finished without it teaches a habit, and the habit is what the number is about. Built in
+C5.
 
-**Amended by D21: one tap per drop, not several.** ▼ is a hard drop, so drop 1's two ▼ beats
-collapsed into one — "press it again" is not something you can ask of a control that finishes the
-drop on the first press. The mechanism is untouched and the script is a beat shorter.
+**The mechanism is untouched by the control it names.** Since drag became the default (SPEC 6)
+the drop is a downward flick and there are no arrows on screen, so no line of the script names
+one. The three beats that name a control have a second version for a player who has switched the
+arrow row back on: under `Buttons` the board refuses drags outright, so telling that player to
+drag is telling them to do something the game ignores. The script itself — the drops, the boards,
+the order — is the same either way, because the habit is what is being taught and the habit is not
+a button. A beat's **focus** names a role rather than a widget for the same reason: "the drop
+control" is the ▼ button when there is one and the board when the drop is a gesture over it.
 
-1. One 2 spawns, one 2 is already placed. "Slide it over." They merge it — and the same drop
-   introduces ▼, because it is the only way to land it.
-2. Drops 2-4 are ▼ again, until it is a habit. They build to 16. **Amended in C5**: this step used
-   to introduce "the Next preview and hard drop", and D11 cut both. D21 put hard drop back, so the
-   slot now teaches exactly what SPEC 13 originally wanted it to.
+**Amended by D21: one input per drop, not several.** The drop is a hard drop, so drop 1's two drop
+beats collapsed into one — "do it again" is not something you can ask of a control that finishes
+the drop the first time. The mechanism is untouched and the script is a beat shorter.
+
+1. One 2 spawns at the far edge, one 2 is already placed, and **the cell the block has to reach is
+   outlined on the board**. "Put it on the outline." They steer it there and merge it — and the
+   same drop introduces the drop control, because it is the only way to land it.
+
+   **The block spawns somewhere it is not being asked to be, and the drop is refused until it is
+   there** (owner ruling, 2026-09-20). Until then the block spawned in the landing column and
+   every allowed column resolved identically, so the first instruction the game gives could be
+   satisfied by doing nothing — and the first thing the player learned was that the card can be
+   ignored. This is the one drop pinned to a single cell rather than to a range of equivalent
+   ones; the restriction belongs to the drop, not to the beat, so the beat that follows cannot
+   undo it.
+2. Drops 2-4 are the drop control again, until it is a habit. They build to 16. **Amended in
+   C5**: this step used to introduce "the Next preview and hard drop", and D11 cut both. D21 put
+   hard drop back, so the slot now teaches exactly what SPEC 13 originally wanted it to.
 3. Drop 5 is pre-seeded so a single placement triggers a 3-step cascade. Zero explanation. Let
    them watch it.
 4. Drop 6 is pre-seeded with a 1024 next to two 512s. They trigger a 2048 burst on their sixth
@@ -728,68 +851,74 @@ drop on the first press. The mechanism is untouched and the script is a beat sho
    never recorded and never written to the saved-run store.
 
 Skippable from drop 3. Replayable from `GameRoute(replayTutorial = true)`, which is Settings'
-entry point when C11 builds Settings. Powerups and specials each get one contextual tooltip the
-first time they become relevant, not during the tutorial. Hold is struck with D11.
+entry point when C11 builds Settings. Hold is struck with D11.
+
+**Specials get no contextual tooltip** (owner ruling, 2026-09-16, against this section's original
+"one contextual tooltip the first time they become relevant"): Wildcard, Bomb and Stone read for
+themselves, and a first-seen tooltip system is a lot of machinery for three faces. If a beat for
+them is ever cheap inside the script it can go there; it is not built as a separate mechanism.
 
 Because the engine is seeded and pure, the tutorial is a list of forced `GameState`s and asserted
 inputs, which makes it testable rather than a pile of UI flags. Each scripted drop also carries
 the **columns the block may occupy**, chosen so that every allowed placement resolves to the same
-board: without that, drop 5's showpiece cascade is one mis-steer away from never happening.
+board: without that, drop 5's showpiece cascade is one mis-steer away from never happening. Drop 1
+is the exception and carries a **target cell** instead — the range there is the path the block may
+travel, not a set of equivalent endings, because a lesson about aiming cannot be one you pass
+without aiming.
 
 There is no separate onboarding screen. C5 deleted `:features:onboarding` rather than renaming it
 — the tutorial is this screen with the clock off, so a welcome screen with a Play button in front
 of it was a second front door to one room.
 
-## 14. Daily Challenge
+## 14. Daily Challenge — struck (D27)
 
-One seed, identical worldwide, rotating at 00:00 UTC. One attempt per day, a rewarded ad buys one
-retry, Pro gets two free. Scored on final score, global and friends leaderboards, reset daily.
-Streak counter with rewards at 3, 7, 14 and 30 days.
+**Removed on 2026-09-20, by owner ruling.** One seed rotating at 00:00 UTC, one attempt a day, a
+rewarded ad for a retry, Pro getting two, a streak with milestones at 3, 7, 14 and 30 days. It was
+built in C6, shipped, and is gone.
 
-Powerups are disabled here. With none shipping in v1 that costs nothing now and is the correct
-rule when they arrive: same seed, same tools, pure skill.
+Nothing of it survives: `:features:daily`, the `daily_result` table, `dailySeedFor` and its stride
+and salt, `GameMode` itself, the `DailyRetry` rewarded placement, `feature.dailyChallenge`,
+`ads.rewarded.dailyRetriesPerDay`, the two streak achievements and the second Pro attempt. The
+sections it touched — 2, 10, 11, 12, 15, 17 — say so where it matters. `decisions.md` holds the
+full removal under **D27**, including the schema 9 migration and why two achievements were deleted
+rather than left unearnable.
 
-Cheap to build relative to what it buys, because the engine is already seeded. It ships in v1 for
-that reason.
+**What stays worth knowing, because the reasoning outlived the feature:**
 
-**Built in C6.** Five rulings the section did not make, each of them forced once the thing was
-real. All five are in `decisions.md` with their alternatives.
-
-**The day is UTC everywhere.** The seed, the row, the attempt allowance and the streak all key on
-the same UTC date. The player's own zone is used for one thing — rendering the countdown to the
-next board — because the fairness question the boundary raises is answered by making the boundary
-visible, not by adding a second clock.
-
-**A Daily run pins `EngineConfig.Default` and never reads remote config.** This is the single most
-consequential call in the mode and it overrides 10 for this one path. Section 10's keys are all
-remote; C7 ruled a fetched config is sampled at the start of a run and never during one, which is
-enough to keep a single run coherent and is *not* enough to make two players' runs comparable.
-Comparability wins. The consequence is that from the first recorded Daily score,
-`EngineConfig.Default` joins `PINNED_DIGEST` and `level.blocksPerLevel` on the list of things that
-cannot move without invalidating scores.
-
-**The attempt is spent when the run starts**, not when it ends, or force-quitting a bad board is a
-free reroll. Restart is refused for the same reason.
-
-**The day's score is the best of its attempts.** "Scored on final score" says the score a run ends
-on, not which of two attempts counts.
-
-**One column beyond 11's list.** `daily_result` also stores `retriesUsed`, because a rewarded-retry
-cap that is not on disk is a cap a force-quit resets.
+- **A shared seed does not make scores comparable.** D19 said a Daily score could not be ranked
+  against an Endless one; D24 found the harder half — two players who both play a shared seed
+  perfectly do not tie, they differ by spawn luck. That is why there was never a Daily board, and
+  it is the argument to reach for the next time a "same board for everyone" mode is proposed.
+- **A pinned `EngineConfig` is a permanent cost.** D18 pinned the Daily to `EngineConfig.Default`
+  so two players on the same day got the same board, which put the whole of that record on the
+  list of things a release cannot move. No Daily score was ever recorded, so the pin cost nothing
+  in the end — but it was a live constraint on the balance work for four chunks. A mode that
+  freezes the numbers is not cheap just because the engine is already seeded.
+- **The mode discriminator is what spreads, not the screen.** See D27.
 
 ## 15. Meta
 
-**Stats.** Runs played, best score, average, highest tier, total merges, total blocks placed,
-longest cascade, most bursts in a run, lifetime bursts, total playtime — all derived from
-`run_record`. Daily streak current and best are derived from `daily_result`, in their own section
-on the page rather than folded into Lifetime, because the two are folds over different tables and
-sitting them together would imply a relationship neither has. C6 added the row C4 deliberately
-left out.
+**Stats.** Runs played, high score, average, highest level reached, highest tier, total merges,
+total blocks placed, longest cascade, most bursts in a run, lifetime bursts, total playtime — all
+derived from `run_record`. C6 added a Daily streak section beside them, folded out of
+`daily_result` rather than out of `run_record` and kept apart for that reason; D27 deleted both
+the section and the table.
 
-**Achievements**, exactly 24, on the engine shape ported from Sodogku. First merge, reach 64,
+The high score is the page's headline. It was labelled "best endless run" to tell it from a Daily
+score and the owner asked for it back as "high score" on 2026-09-20, the Daily having gone. The
+**highest level reached** landed with it, and is a different quantity from the highest tier:
+levels advance on blocks dropped, so a level is a survival record and a tier is an achievement
+one, and a run can set either without setting the other.
+
+**Achievements**, exactly 22, on the engine shape ported from Sodogku. First merge, reach 64,
 first burst, two bursts in a run, 5-step cascade, 10-step cascade, clear the board, reach level 20,
 500 blocks in one run, burst a row with three Stones, Wildcard into a 2048, survive 10 drops in the
-danger state, 7-day and 30-day streaks, plus five score and five playtime milestones.
+danger state, plus five score and five playtime milestones.
+
+It was 24. The 7-day and 30-day streak badges counted `daily_result`, so D27 deleted them with the
+mode rather than leave two tiles nobody could ever move. Their Game Center ids were never created,
+which is the only reason deleting an id was affordable here — see D27, and drop the two lines from
+`OWNER-TODO.md`'s achievement list.
 
 The coin payouts attached to achievements in the original spec are cut with the economy. They
 unlock, they post to the platform, they do not pay. Posting to the platform is `AchievementPlatformSync`,
@@ -800,6 +929,11 @@ have banked by the time it reaches a given level — survival plus level-up bonu
 table — so they move with the coefficients instead of going stale behind them. C9 ruled it in
 `decisions.md`; Sodogku shipped the typed version and stranded three badges behind a rescale.
 
+D26 is the first thing to exercise that and it cost no edit: `blocksPerLevel` went 20 to 15, which
+feeds `floorScore`, so all five rungs re-priced themselves. The chosen **levels** — 5, 10, 15, 20,
+25 — still stand against the re-measured greedy median of 22 and p90 of 27, so the top rung is
+still a good run rather than a freak one.
+
 **Every badge is checked against the engine.** `AchievementReachabilityTest` either measures what
 the shipped engine produces over forty fixed-seed greedy runs or poses a board and locks a block
 into it. A badge nobody can earn is worse than no badge, because it looks exactly like a working
@@ -807,22 +941,23 @@ one. Two of them were only provable the second way: a 10-step cascade turns up f
 three-quarters of a million drops, and a row holding three Stones is not a board a random run
 builds.
 
+**It cannot catch a badge whose counter has no source**, and D27 is the proof: the two streak
+badges were `Reach.OffTheBoard`, the arm that says a clock or a calendar decides this and the
+engine has no opinion. Removing the thing that moved the counter left them permanently at zero and
+this test green. That arm is now only `MinutesPlayed`, and a new stat put on it should be looked at
+twice.
+
 **Leaderboards.** Game Center and Play Games, plus the platform's own dashboard as the in-app view.
 Two boards: all-time high score, which is the one this feature is for, and weekly high score on the
 platform's own recurring window. Sodogku shipped a Game Center implementation and then had zero
 production call sites for `submit` for a while; do not repeat that. The submit call site is part of
 the same chunk as the integration, and a test asserts it fires on run end.
 
-**There is no Daily board. D24 cut the third one.** A board over a single seed with a capped attempt
-count ranks the luck of the spawns rather than the player, so a Daily score now posts nowhere.
-D19 was right that it cannot be compared to an Endless score and wrong that it could therefore be
-compared to another Daily one. The Daily's streak badges are what reward playing it.
-
-**Which board depends on the mode, and it is not a preference.** An Endless score goes to the
-all-time and weekly boards; a Daily score goes to neither (D19, D24). Nothing below the ViewModel
-knows what mode a value came from, so the call site is the only place that rule can live, and it
-holds an exhaustive `when` rather than an `else` so the next mode cannot fall onto a board by
-default.
+**Two boards, and every finished run goes to both.** SPEC 15 asked for a third over the Daily and
+D24 cut it: a board over one seed with a capped attempt count ranks the luck of the spawns rather
+than the player. That left a routing rule at the `GameViewModel` call site — an exhaustive `when`
+over `GameMode` with an empty `DAILY` arm, so the next mode could not fall onto a board by
+default. D27 removed the mode, so there is one kind of score and nothing left to route.
 
 **A recurring board is never deduplicated locally.** The platform resets the weekly window on its
 own clock and the app cannot see the reset, so the "do not resend a value the platform already has"
@@ -855,7 +990,11 @@ Not an afterthought and not a settings-screen checkbox exercise.
 - Larger block numbers toggle.
 - **Reduce motion** disables screen shake, cuts particle density, and shortens cascade animation.
   The engine is unaffected: the transcript still plays, it plays faster. Nothing about the game
-  changes, only its rendering.
+  changes, only its rendering. It is **the phone's setting and not the game's** since the owner
+  ruling of 2026-09-20: `isOsReduceMotionEnabled` is read in `AppThemeProvider` and published on
+  `LocalReduceMotion`. There was an in-app toggle ORed with it; a player who has told their phone
+  once should not have to tell the game again, and a second switch is a second thing that can
+  disagree.
 - Screen reader labels on every menu element, and a spoken description of the falling block, its
   column, and its landing cell.
 - Minimum touch targets on every control. The three bottom buttons are the primary interaction
@@ -901,13 +1040,13 @@ reaches its target so the case does not exist offline; live it is common. `drops
 beside `drops_steered` and no time is recorded, so the median can be quoted with its censoring
 rate rather than silently biased by it.
 
-**The seed is Endless-only.** A Daily `run.end` ships the moment the attempt ends, which can be
-nineteen hours before the day is over, and 14's seed is the board everybody plays. Endless carries
-its seed; Daily carries the date instead, which was public already.
+**Every `run.end` carries its seed.** It was withheld on a Daily run, because that seed was the
+board everybody would play that day and the event shipped the moment the attempt ended. D27
+removed the mode, so there is no shared board a seed could leak ahead of.
 
 **`debug_session` is stamped by the export tree, not by the call sites.** L63's latch reaches every
 record through `GrafanaLogTree`, so no event can be missing it. `run.end` carries a second,
-narrower flag — `recorded` — saying whether the four writes that claim a player did something
+narrower flag — `recorded` — saying whether the three writes that claim a player did something
 actually happened, because "no row was written" and "no row reached us" are otherwise identical
 downstream.
 

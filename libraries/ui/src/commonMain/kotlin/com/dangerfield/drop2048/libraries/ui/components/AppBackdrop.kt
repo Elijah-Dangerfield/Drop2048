@@ -11,7 +11,7 @@ import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
  * `radial-gradient(120% 70% at 50% -10%, …)`, sized to whatever it is drawn into.
  *
  * Written for the board and applied to everything since. [Screen] draws it, so
- * settings, stats and the Daily fall away from the same point above the top edge
+ * settings and stats fall away from the same point above the top edge
  * that the board does; a flat fill beside a gradient is a seam even when both are
  * the same dark violet.
  *

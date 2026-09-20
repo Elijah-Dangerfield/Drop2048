@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.settings.PlayerSettings
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.system.HapticsSetting
@@ -64,6 +65,9 @@ class SettingsScreenshotTest {
     /**
      * The same screen for a player who uses it, and the reason the palette rows
      * carry a swatch: five names for five ramps say nothing on their own.
+     *
+     * It turns the arrow row on because that switch is the one thing on this
+     * screen a golden of the defaults cannot show in its other position.
      */
     @Test
     @Config(sdk = [ROBOLECTRIC_SDK], qualifiers = TALL_QUALIFIERS)
@@ -72,10 +76,9 @@ class SettingsScreenshotTest {
             state = SettingsState(
                 settings = PlayerSettings(
                     palette = BlockPaletteChoice.HighContrast,
-                    reduceMotion = true,
                     largeNumbers = true,
                     haptics = HapticsSetting.Strong,
-                    leftHanded = true,
+                    controlScheme = ControlScheme.Both,
                 ),
                 appVersion = Version,
             ),

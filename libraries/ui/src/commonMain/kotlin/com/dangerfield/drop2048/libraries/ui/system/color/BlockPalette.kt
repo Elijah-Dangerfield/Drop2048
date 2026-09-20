@@ -234,25 +234,68 @@ object BlockPalettes {
     )
 
     /**
-     * High contrast: the numeral is the thing being protected here, not the hue.
+     * High contrast: separate on **lightness** first and hue second, so the ramp
+     * holds up for a player who cannot use the hue.
      *
-     * Every face is light, which is what buys the widest ink-to-face margin of
-     * the five. That means the set reads as pale rather than as loud, which is
-     * the opposite of what "high contrast" sounds like and the right answer
-     * anyway: contrast is between the numeral and its face, and between the face
-     * and the deep board behind it, not between the blocks and the idea of a
-     * bright colour.
+     * ### It used to be eleven pastels, and that was the bug
      *
-     * Hue still rotates a full turn across the eleven so the ramp is not eleven
-     * shades of one thing.
+     * The original ramp put every face in a narrow light band and let hue do all
+     * the work between tiers. It measured beautifully in normal vision — ΔE 29
+     * between the closest neighbours — and it fell apart the moment a cone was
+     * missing, because hue is exactly what a dichromat loses. Its 512 and its
+     * 1024 sat **ΔE 1.6 apart under protanopia** and 8.7 under deuteranopia; its
+     * 2 and its 4 sat 6.7 apart under tritanopia. Those are neighbouring tiers,
+     * which is the one pair a player genuinely has to separate, and 1.6 is the
+     * same colour.
+     *
+     * Nothing caught it because `BlockPaletteTest` paired each ramp with the one
+     * deficiency it was authored for, and this ramp is authored for none — so it
+     * was the only accessibility palette never put through a simulation at all.
+     * `theHighContrastRampSurvivesAllThreeDeficiencies` is the test that now does.
+     *
+     * ### What changed, and what it cost
+     *
+     * The eleven hues are **untouched**, and the 2048 is still the near-white
+     * capstone every palette in here ends on. The full turn is what makes the
+     * ramp read as a set rather than as a gradient, and every 15° rotation of it
+     * was measured: all twenty-three cost more separation under the three
+     * deficiencies than they buy anywhere else.
+     *
+     * What moved is lightness and chroma. The ramp now alternates between a pale
+     * band around `L 0.80–0.95` and a deep one around `L 0.48–0.56`, so every
+     * adjacent pair differs by a lightness step no deficiency can take away. The
+     * worst neighbouring pair is now ΔE 30.2 under protanopia, against 1.6.
+     *
+     * **The cost is the pastel character, and it is worth naming rather than
+     * glossing.** Eleven light faces separated by hue and a ramp that survives
+     * dichromacy are contradictory requirements, not a tuning problem: one asks
+     * hue to carry eleven steps, the other says hue carries nothing. Half the
+     * board is now dark tiles with light numerals. Every one of them still clears
+     * 3:1 against the well behind it, which is the constraint that kept the deep
+     * band from going darker still.
+     *
+     * "High contrast" is now true of the blocks against each other — ΔE 38.2
+     * between the closest neighbours, against 29.0 — rather than only of the
+     * numerals against their blocks.
+     *
+     * ### What is still not true of it
+     *
+     * It does **not** have the widest ink-to-face margin of the five. The design
+     * ramp does, at 7.2 against this one's 5.1. The old KDoc claimed it did and
+     * was already wrong before this retune.
+     *
+     * It is also still the accessibility ramp nearest the shipped one (mean
+     * ΔE 40.9 against 69–74 for the other three), because it is built on the same
+     * hue wheel. `theAccessibilityRampsSitWhereTheyDoFromTheShippedOne` records
+     * that rather than hiding it.
      */
     val HighContrast: BlockPalette = paletteOf(
-        0.8988f, 0.1379f, 103.9f, 0.8751f, 0.0563f, 55.5f,
-        0.6941f, 0.1571f, 13.8f, 0.8393f, 0.0923f, 340.3f,
-        0.6999f, 0.2010f, 318.4f, 0.8235f, 0.0796f, 290.2f,
-        0.6884f, 0.1482f, 257.7f, 0.9026f, 0.0670f, 199.5f,
-        0.8977f, 0.1618f, 161.5f, 0.9248f, 0.0927f, 139.8f,
-        0.9257f, 0.0032f, 197.1f,
+        0.8948f, 0.1220f, 103.9f, 0.4924f, 0.0739f, 55.5f,
+        0.7271f, 0.1208f, 13.8f, 0.5555f, 0.2410f, 340.3f,
+        0.7956f, 0.1634f, 318.4f, 0.5087f, 0.1749f, 290.2f,
+        0.8130f, 0.0533f, 257.7f, 0.4777f, 0.0803f, 199.5f,
+        0.8842f, 0.1951f, 161.5f, 0.6882f, 0.1956f, 139.8f,
+        0.9500f, 0.0180f, 197.1f,
     )
 
     /** Every palette, in the order the settings screen offers them. */

@@ -197,6 +197,92 @@ class BlockPaletteTest {
     }
 
     /**
+     * The same claim for [BlockPalettes.HighContrast], which is the one palette
+     * that has to hold it against **all three** deficiencies rather than one.
+     *
+     * **It used not to hold it against any of them, and nothing was watching.**
+     * [eachColourVisionPaletteSurvivesItsOwnDeficiency] pairs each ramp with its
+     * own deficiency, and high contrast has no own deficiency, so it was the only
+     * accessibility palette never put through the simulation at all. Measured, its
+     * 512 and its 1024 — *neighbouring tiers* — collapsed to ΔE 1.6 under
+     * protanopia, 8.7 under deuteranopia; its 2 and its 4 to 6.7 under tritanopia.
+     * Adjacent tiers at ΔE 1.4 are the same colour, on a palette a player reaches
+     * for because the default is not working for them.
+     *
+     * **The any-pair floor here is lower than [SimulatedCollisionFloor] on
+     * purpose.** The three targeted ramps each spend their whole budget on one
+     * deficiency and can hold 16 under it. This one is asked to hold all three at
+     * once, which is a strictly harder problem — a dichromat loses a different
+     * axis in each — and the ramp that clears the *neighbour* floor under every
+     * one of them lands at ΔE 14.2 for its worst non-adjacent pair, under
+     * deuteranopia. Neighbours are the pair a player has to separate; a 4 against
+     * a 512 is not.
+     */
+    @Test
+    fun theHighContrastRampSurvivesAllThreeDeficiencies() {
+        ColorVision.entries.forEach { vision ->
+            val seen = BlockPalettes.HighContrast.seenBy(vision)
+
+            val neighbours = seen.closestNeighbours()
+            assertTrue(
+                neighbours.distance >= NeighbourSeparationFloor,
+                "under $vision, high contrast's ${neighbours.description} collapse to " +
+                    "${neighbours.distance}, under $NeighbourSeparationFloor",
+            )
+
+            val pair = seen.closestPair()
+            assertTrue(
+                pair.distance >= HighContrastSimulatedFloor,
+                "under $vision, high contrast's ${pair.description} collapse to " +
+                    "${pair.distance}, under $HighContrastSimulatedFloor",
+            )
+        }
+    }
+
+    /**
+     * How far each accessibility ramp sits from the shipped one, pinned rather
+     * than floored.
+     *
+     * The owner's report was that the options "use colors that are all very
+     * similar", and the settings screen is where that is seen: each row carries a
+     * five-tier swatch of its ramp, and two rows that look alike make the choice
+     * meaningless. High contrast is the one that reads as a tint of the default
+     * rather than as another board, and this is why: it is built on the **same
+     * hue wheel**, one hue per tier in the same order, so tier for tier the two
+     * are in the same colour family and only lightness and chroma separate them.
+     * The other three swap the wheel for a two-axis ramp and land three times
+     * further away.
+     *
+     * Retuning high contrast for colour vision moved it from 34.0 to 40.9 and it
+     * is still the closest of the four. Pulling it past the others means changing
+     * its hues, and every rotation of that wheel was measured: all 23 of them cost
+     * more separation under the three deficiencies than they buy here. So the
+     * number is recorded instead of floored — there is no floor to set that this
+     * ramp could pass and that would still mean anything.
+     *
+     * **Deuteranopia and protanopia sit ΔE 16 from each other and that is not a
+     * defect.** Both deficiencies leave the same blue/gold axis intact, so both
+     * ramps are built on it. A player picks the one for their own eyes and never
+     * sees the other.
+     */
+    @Test
+    fun theAccessibilityRampsSitWhereTheyDoFromTheShippedOne() {
+        val default = BlockPalettes.Default.styles.map { it.face }
+        mapOf(
+            BlockPaletteChoice.Deuteranopia to DeuteranopiaFromDefault,
+            BlockPaletteChoice.Protanopia to ProtanopiaFromDefault,
+            BlockPaletteChoice.Tritanopia to TritanopiaFromDefault,
+            BlockPaletteChoice.HighContrast to HighContrastFromDefault,
+        ).forEach { (choice, expected) ->
+            val mean = BlockPalettes[choice].styles
+                .mapIndexed { tier, style -> perceptualDistance(style.face, default[tier]) }
+                .average()
+                .toFloat()
+            assertNear(expected, mean, "$choice's mean distance from the shipped ramp", MeanPinTolerance)
+        }
+    }
+
+    /**
      * **The design ramp, measured, including where it misses.**
      *
      * The handoff replaced C2's hill-climbed default ramp with an authored one,
@@ -472,6 +558,14 @@ class BlockPaletteTest {
          */
         const val SimulatedCollisionFloor = 16f
 
+        /**
+         * Below [SimulatedCollisionFloor], and argued in
+         * [theHighContrastRampSurvivesAllThreeDeficiencies] rather than conceded:
+         * holding one ramp against all three deficiencies at once costs more than
+         * holding three ramps against one each.
+         */
+        const val HighContrastSimulatedFloor = 14f
+
         const val LuminanceSpanFloor = 0.45f
 
         /**
@@ -489,6 +583,14 @@ class BlockPaletteTest {
 
         /** Luminance runs 0..1, so it needs a tolerance two orders tighter. */
         const val LuminancePinTolerance = 0.005f
+
+        /** A mean over eleven ΔE values moves less than any one of them, but not by much. */
+        const val MeanPinTolerance = 0.5f
+
+        const val DeuteranopiaFromDefault = 71.5f
+        const val ProtanopiaFromDefault = 73.6f
+        const val TritanopiaFromDefault = 68.6f
+        const val HighContrastFromDefault = 40.9f
 
         const val DesignRampClosestNeighbours = 22.62f
         const val DesignRampClosestPair = 14.64f

@@ -45,8 +45,6 @@ import drop2048.libraries.resources.generated.resources.paywall_perk_ads
 import drop2048.libraries.resources.generated.resources.paywall_perk_ads_detail
 import drop2048.libraries.resources.generated.resources.paywall_perk_continues
 import drop2048.libraries.resources.generated.resources.paywall_perk_continues_detail
-import drop2048.libraries.resources.generated.resources.paywall_perk_daily
-import drop2048.libraries.resources.generated.resources.paywall_perk_daily_detail
 import drop2048.libraries.resources.generated.resources.paywall_perk_palettes
 import drop2048.libraries.resources.generated.resources.paywall_perk_palettes_detail
 import drop2048.libraries.resources.generated.resources.paywall_restore
@@ -102,16 +100,17 @@ fun PaywallSheet(
  *
  * Split out because Material's modal sheet draws into its own window, which a
  * screenshot harness capturing a tagged node in the composition cannot see. The
- * goldens capture this; the wrapper above is what ships.
+ * per-state goldens capture this; the wrapper above is what ships, and is pinned
+ * as a whole frame by `PaywallSheetWindowScreenshotTest`.
  *
  * ### What it sells is exactly what v1 has
  *
- * SPEC 2 cut coins and the five powerups, which makes Pro thinner than the
- * original spec's — no interstitials, every palette, two Daily attempts, two
- * continues — and the honest response is to describe those four plainly rather
- * than to dress four things up as eight. There are no coins, no powerups, no Zen
- * mode and no board variants to promise, and nothing on this sheet promises
- * them. There is also no countdown, no crossed-out price, no "most popular"
+ * SPEC 2 cut coins and the five powerups, and D27 cut the Daily Challenge's
+ * second attempt with the mode, which makes Pro thinner than the original
+ * spec's — no interstitials, every palette, two continues — and the honest
+ * response is to describe those three plainly rather than to dress three things
+ * up as eight. There are no coins, no powerups, no Zen mode and no board
+ * variants to promise, and nothing on this sheet promises them. There is also no countdown, no crossed-out price, no "most popular"
  * badge and no second tier to make this one look cheaper. There is one product.
  *
  * **Rewarded video is named as something Pro keeps.** It is the one item on the
@@ -229,10 +228,6 @@ private fun Perks() {
         Perk(
             title = stringResource(Res.string.paywall_perk_palettes),
             detail = stringResource(Res.string.paywall_perk_palettes_detail),
-        )
-        Perk(
-            title = stringResource(Res.string.paywall_perk_daily),
-            detail = stringResource(Res.string.paywall_perk_daily_detail),
         )
         Perk(
             title = stringResource(Res.string.paywall_perk_continues),

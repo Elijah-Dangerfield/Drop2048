@@ -351,15 +351,6 @@ private fun EconomySection(state: DebugState, onAction: (DebugAction) -> Unit) {
                 headlineText = DebugCopy.ResetPurchases,
                 onClick = { onAction(DebugAction.ResetPurchases) },
             ),
-            ListSectionItem(
-                headlineText = DebugCopy.DailyStreak,
-                accessory = ListItemAccessory.Text(text = state.dailyStreak.toString()),
-            ),
-            ListSectionItem(
-                headlineText = DebugCopy.ClearDaily,
-                supportingText = DebugCopy.ClearDailyHint,
-                onClick = { onAction(DebugAction.ClearDailyToday) },
-            ),
         ),
     )
 }

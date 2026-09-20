@@ -10,11 +10,13 @@ import androidx.compose.runtime.Composable
  * Settings → Accessibility → Remove animations, or a system animation scale of
  * zero).
  *
- * This is one half of what [com.dangerfield.drop2048.libraries.ui.system.LocalReduceMotion]
- * carries — the in-app toggle is the other, and they are ORed. A player who has
- * already told the phone once should not have to tell the game again, and a
- * player who wants calm from this game only should not have to change a system
- * setting to get it.
+ * **This is the whole of what [com.dangerfield.drop2048.libraries.ui.system.LocalReduceMotion]
+ * carries in the app** (owner ruling, 2026-09-20). There was an in-app toggle
+ * ORed with this; it is gone, because a player who has already told the phone
+ * once should not have to tell the game again, and a second switch that could
+ * disagree with the system one is a second thing to keep in step. Previews and
+ * screenshot goldens still force the reduced state through
+ * `AppThemeProvider(reduceMotion = true)` — they have no OS setting to read.
  *
  * Composable so it observes the live setting where the platform exposes a
  * reactive source; desktop has no such signal and answers `false`.

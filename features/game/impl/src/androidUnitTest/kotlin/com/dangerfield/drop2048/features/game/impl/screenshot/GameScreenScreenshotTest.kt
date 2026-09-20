@@ -27,7 +27,6 @@ import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.Special
 import com.dangerfield.drop2048.libraries.cascade.SpecialBlock
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -116,12 +115,15 @@ class GameScreenScreenshotTest {
 
     /**
      * SPEC 6's `Drag` scheme, which persisted and displayed from C11 and changed
-     * nothing at all until C3c.
+     * nothing at all until C3c — and which the owner made the default on
+     * 2026-09-20.
      *
      * The control row is gone and the board takes the height back. That is the
      * whole visible difference, and it is exactly the kind of branch that gets
      * written, believed and never drawn — which is how the setting managed to
-     * ship inert in the first place.
+     * ship inert in the first place. It is now also the frame of the game as it
+     * is actually handed to a new player, which is why every other frame in this
+     * file names its scheme rather than inheriting one.
      */
     @Test
     fun dragOnly() = compose.captureScreen("game-drag-only") {
@@ -141,15 +143,28 @@ class GameScreenScreenshotTest {
     }
 
     /**
-     * SPEC 11's confirm-before-quit, which the settings screen can switch off.
-     * The only golden in this set that is a dialog rather than an overlay, and
-     * the one that says the two are not the same thing.
+     * The confirm every Quit now raises (owner ruling, 2026-09-20). The only
+     * golden in this set that is a dialog rather than an overlay, and the one
+     * that says the two are not the same thing.
      */
     @Test
     fun confirmingQuit() = compose.captureScreen("game-quit-confirm") {
         playingState().copy(phase = GamePhase.Paused, confirmingQuit = true)
     }
 
+    /**
+     * The results sheet over a board that really did stack out, which means
+     * `inDanger` is true.
+     *
+     * It was false here until 2026-09-20, and that omission is why nobody saw
+     * the defect the owner reported: a run cannot end without the stack reaching
+     * the danger row, so every real stacked-out screen has the danger treatment
+     * on it and the only one that did not was this golden. `BoardWell` draws the
+     * ring and its glow *outside* the board's bounds so the warning reaches
+     * peripheral vision, and every overlay is clipped to the board's own corner,
+     * so the alarm was the one thing no scrim and no blur could cover. This
+     * frame is what stops it coming back.
+     */
     @Test
     fun stackedOut() = compose.captureScreen("game-stacked-out") {
         playingState().copy(
@@ -157,29 +172,9 @@ class GameScreenScreenshotTest {
             board = dangerBoard(),
             falling = null,
             ghost = null,
+            inDanger = true,
             biggestTier = 512,
             newBest = true,
-        )
-    }
-
-    /**
-     * The same sheet after a Daily run (SPEC 14).
-     *
-     * Its own golden because the two differences are exactly the ones a
-     * refactor collapses by accident: the primary button is "Done" and leaves
-     * rather than "Drop again" and restarting, and the Daily Challenge option is
-     * gone because the player is already in it.
-     */
-    @Test
-    fun stackedOutDaily() = compose.captureScreen("game-stacked-out-daily") {
-        playingState().copy(
-            phase = GamePhase.StackedOut,
-            board = dangerBoard(),
-            falling = null,
-            ghost = null,
-            biggestTier = 512,
-            newBest = true,
-            mode = GameMode.DAILY,
         )
     }
 
@@ -201,8 +196,16 @@ class GameScreenScreenshotTest {
             board = dangerBoard(),
             falling = null,
             ghost = null,
+            // Still true here, and that is the distinction rather than an
+            // inconsistency with `game-stacked-out`: the run is alive, the board
+            // is deliberately unblurred because it is the argument for taking
+            // the offer, and how close to the top the stack is *is* the
+            // argument. It is also this frame's job to show that the red ring
+            // survives on the one screen that should keep it.
+            inDanger = true,
             biggestTier = 512,
             continueSecondsLeft = 5,
+            proOnContinue = true,
         )
     }
 
@@ -221,6 +224,7 @@ class GameScreenScreenshotTest {
             board = dangerBoard(),
             falling = null,
             ghost = null,
+            inDanger = true,
             biggestTier = 512,
             continueAvailable = true,
             showUpsell = true,
@@ -256,18 +260,19 @@ class GameScreenScreenshotTest {
         ghostState(SpecialBlock(Special.BOMB))
     }
 
-    @Test
-    fun leftHanded() = compose.captureScreen("game-left-handed") {
-        playingState().copy(leftHanded = true)
-    }
-
     /**
-     * The guided run (SPEC 13), in the two shapes its scrim has.
+     * The guided run (SPEC 13), in the three shapes its scrim has.
      *
-     * The spotlight one is the more valuable of the two. Its hole is punched with
-     * `BlendMode.Clear` into an offscreen layer, which is the kind of drawing
-     * that fails by producing a plausible-looking rectangle in the wrong place,
-     * and no test that is not a picture can tell.
+     * The hole is punched with `BlendMode.Clear` into an offscreen layer, which
+     * is the kind of drawing that fails by producing a plausible-looking
+     * rectangle in the wrong place, and no test that is not a picture can tell.
+     *
+     * The drop beat is captured twice, and the pair is the picture of the bug
+     * this round fixed. On the default scheme there is no ▼ to light, so the
+     * beat lights the board and the card hangs off it; with the arrow row back
+     * on, the row is lit and the card hangs off ▼. Before the fix the drag frame
+     * was a uniformly dimmed screen with the card jammed in the top-left corner,
+     * hanging off a rectangle that had never been registered.
      */
     @Test
     fun tutorialCoachMark() = compose.captureScreen("tutorial-coach") {
@@ -275,11 +280,26 @@ class GameScreenScreenshotTest {
     }
 
     @Test
+    fun tutorialCoachMarkWithArrows() = compose.captureScreen("tutorial-coach-arrows") {
+        tutorialState(TutorialStep.FirstDrop, TutorialFocus.Drop, awaitsTap = false)
+            .copy(controlScheme = ControlScheme.Both)
+    }
+
+    /**
+     * The opening beat: the block at the far edge, the cell it has to reach
+     * outlined, and the card saying so.
+     *
+     * The outline is the half of the fix that only a picture can check. It sits
+     * on the same grid as the landing ghost and has to be *unmistakably* not the
+     * ghost — the two are on the board at once and they mean opposite things
+     * until the player has done what was asked.
+     */
+    @Test
     fun tutorialSpotlight() = compose.captureScreen("tutorial-spotlight") {
-        tutorialState(TutorialStep.Steer, TutorialFocus.Board, awaitsTap = false).copy(
+        tutorialState(TutorialStep.Steer, TutorialFocus.Target, awaitsTap = false).copy(
             board = Board.empty(COLS, ROWS).with(Cell(1, 7), NumberBlock(BlockValue.V2)),
-            falling = FallingBlock(NumberBlock(BlockValue.V2), Cell(2, 0)),
-            ghost = Cell(2, 7),
+            falling = FallingBlock(NumberBlock(BlockValue.V2), Cell(4, 0)),
+            ghost = Cell(4, 7),
             score = 0,
             level = 1,
             levelFraction = 0f,
@@ -343,6 +363,9 @@ private fun tutorialState(
     focus: TutorialFocus,
     awaitsTap: Boolean,
 ) = playingState().copy(
+    // The scheme a first launch is actually on, which is the whole reason these
+    // two frames are interesting: the guided run's first player has no arrows.
+    controlScheme = ControlScheme.Drag,
     board = Board.empty(COLS, ROWS).with(Cell(1, 7), NumberBlock(BlockValue.V4)),
     falling = FallingBlock(NumberBlock(BlockValue.V4), Cell(2, 2)),
     ghost = Cell(2, 7),
@@ -357,10 +380,23 @@ private fun tutorialState(
         speaks = true,
         awaitsTap = awaitsTap,
         canSkip = false,
+        target = if (step == TutorialStep.Steer) Cell(2, ROWS - 1) else null,
     ),
 )
 
+/**
+ * The resting board, with the arrow row on.
+ *
+ * Explicit, and not the shipping default since the owner's 2026-09-20 ruling
+ * made that `Drag`. These frames are the ones that pin the *arrangement* — the
+ * header, the well, the short-phone height bound — and the control row is part
+ * of every one of those. Dropping it from the base
+ * state would delete that coverage from a dozen goldens to say a second time
+ * what `game-drag-only` already says. The default scheme has its own frame, and
+ * so does the tutorial beat that behaves differently under it.
+ */
 private fun playingState() = GameUiState(
+    controlScheme = ControlScheme.Both,
     board = restingBoard(),
     falling = FallingBlock(NumberBlock(BlockValue.V4), Cell(2, 2)),
     ghost = Cell(2, 5),

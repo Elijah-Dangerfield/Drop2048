@@ -85,6 +85,37 @@ class DiagnosticsOptInTest : CoroutineTest() {
     }
 
     /**
+     * **The feedback form is where this choice lives now** (owner ruling,
+     * 2026-09-20). It was offered twice — here and as a row in Settings — and
+     * the settings copy went. So the control on this screen is no longer a
+     * convenience: it is the only place a player can answer the question, and
+     * losing it would take the opt-in with it and leave a preference nobody can
+     * set.
+     */
+    @Test
+    fun `the feedback form can still turn diagnostics on, and it sticks`() = runUnitTest {
+        val cache = FakeAppCache(AppData(diagnosticsOptIn = false))
+        val repository = RecordingFeedbackRepository()
+        val viewModel = FeedbackViewModel(repository, NoRouter(), cache)
+        runCurrent()
+        assertFalse(viewModel.state.diagnosticsOptIn)
+
+        viewModel.takeAction(FeedbackAction.ToggleDiagnostics)
+        runCurrent()
+
+        assertTrue(viewModel.state.diagnosticsOptIn)
+        // Written through, not held on the screen: a player who turns it on and
+        // backs out without sending has still answered the question.
+        assertTrue(cache.get().diagnosticsOptIn)
+
+        viewModel.takeAction(FeedbackAction.MessageChanged("the board flickers"))
+        viewModel.takeAction(FeedbackAction.Submit)
+        runCurrent()
+
+        assertTrue(repository.submissions.single().attachSessionLog)
+    }
+
+    /**
      * The copy names two things. The build number was already there; the device
      * model was the half that had never been implemented.
      */

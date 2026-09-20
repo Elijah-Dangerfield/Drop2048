@@ -3,7 +3,6 @@ package com.dangerfield.drop2048.libraries.storage.impl.db
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementFactEntity
 import com.dangerfield.drop2048.libraries.achievements.db.AchievementUnlockEntity
 import com.dangerfield.drop2048.libraries.drop2048.storage.db.ClearableDao
-import com.dangerfield.drop2048.libraries.progress.db.DailyResultEntity
 import com.dangerfield.drop2048.libraries.progress.db.RunRecordEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -50,24 +49,12 @@ class ClearableDaoTest {
                 longestCascade = 0,
                 bursts = 0,
                 merges = 0,
-                mode = "ENDLESS",
                 seed = 1,
-            )
-        )
-        db.dailyResultDao().insertIfAbsent(
-            DailyResultEntity(
-                date = "2026-09-09",
-                seed = 1,
-                score = 0,
-                attemptsUsed = 0,
-                completed = false,
-                retriesUsed = 0,
             )
         )
         db.achievementDao().insertFact(
             AchievementFactEntity(
                 key = "run-1",
-                mode = "ENDLESS",
                 score = 10,
                 level = 1,
                 blocksPlaced = 1,
@@ -80,7 +67,6 @@ class ClearableDaoTest {
                 stoneBursts = 0,
                 wildcardBursts = 0,
                 longestDangerRun = 0,
-                dailyStreakDays = 0,
                 endedAt = 1,
             )
         )
@@ -90,14 +76,12 @@ class ClearableDaoTest {
 
         val clearables: Set<ClearableDao> = setOf(
             ProvideRunRecordDao(provider),
-            ProvideDailyResultDao(provider),
             ProvideAchievementDao(provider),
             ProvideExampleUserDataDao(provider),
         )
         clearables.forEach { it.deleteAll() }
 
         assertEquals(emptyList(), db.runRecordDao().all())
-        assertEquals(emptyList(), db.dailyResultDao().all())
         assertEquals(emptyList(), db.achievementDao().facts())
         assertEquals(emptyList(), db.achievementDao().unlocks())
     }

@@ -114,14 +114,14 @@ quantile_over_time(
   {service_name="drop2048-client", deployment_environment="prod"}
     | event_name="run.end"
     | debug_session="false"
-    | mode="ENDLESS"
     | unwrap level [1d]
 ) by (platform)
 ```
 
-**Endless only.** A Daily run is one seeded board that everybody plays and its
-level distribution is a property of that day's seed, not of the balance. Mixing
-the two puts a spike in the curve every time a day happens to be generous.
+This filtered on `mode="ENDLESS"` until D27, because a Daily run was one seeded
+board everybody played and its level distribution was a property of that day's
+seed rather than of the balance. There is one kind of run now, and `run.end`
+carries no `mode`.
 
 Second panel, same query at `0.9`, because a median that holds while p90
 collapses is a different finding from both of them moving.

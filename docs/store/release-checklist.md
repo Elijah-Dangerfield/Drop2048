@@ -164,14 +164,17 @@ on the parts of the app the one journey does not cover.
 
 `BenchmarkJourney` walks the tutorial — steer, hard-drop, acknowledge the card,
 hard-drop — takes "Skip tutorial" when it appears at drop 3, pauses the run it
-lands in, and visits Stats, Daily Challenge and Settings. The destination is the
-**pause** overlay and not the start overlay, because `finishTutorial` starts a
-live run rather than returning to a menu. Five emulator runs went into learning
-that and the three anchoring rules that came out of them are in `decisions.md`.
+lands in, and visits Stats and Settings. The destination is the **pause** overlay
+and not the start overlay, because `finishTutorial` starts a live run rather than
+returning to a menu. Five emulator runs went into learning that and the three
+anchoring rules that came out of them are in `decisions.md`.
 
-Achievements is deliberately not on the journey: it is reachable only from the
-fourth of eight Settings sections, and the scroll-then-tap proved unreliable
-across two runs. It has no profile and no R8 coverage as a result.
+It used to visit the Daily Challenge as a third screen, and D27 deleted it. That
+leaves one gap rather than two. Achievements is still deliberately not on the
+journey: it is reachable only from the fourth of eight Settings sections, and the
+scroll-then-tap proved unreliable across two runs. So the achievements grid has
+no profile and no R8 coverage, and the Daily screen that used to stand in for a
+deep push is not there to replace it.
 
 ### 5.3 Before you cut a release
 
@@ -254,8 +257,10 @@ or a file.
    answer is fully true rather than nearly. `data-safety.md` §7.1.
 5. **The support email**, `pages/privacy.html` currently says `contact@nightjarlabs.llc`. Confirm
    or replace.
-6. **Confirm `drop2048.app` is yours.** It is the share footer and the compiled default for
-   `legal.termsUrl` and `legal.privacyUrl`.
+6. **Confirm `drop2048.app` is yours.** It is the share footer (`share_footer` in `strings.xml`).
+   It is no longer a legal URL: `legal.termsUrl` and `legal.privacyUrl` compile to the live
+   GitHub Pages copies at `https://elijah-dangerfield.github.io/Drop2048/`. Buying the domain
+   later is a config push, not a release.
 7. **Whether Play Games is in v1**, SPEC 15 says no and Android binds an inert seam. Saying yes
    means a Play Games project, a second id per board, and re-answering the IARC "users interact"
    question (`age-rating.md` §3.1).
@@ -273,11 +278,12 @@ or a file.
     stores.
 15. **Game Center leaderboard ids**, exactly as typed in `Leaderboard.kt`:
     `com.dangerfield.drop2048.leaderboard.score_alltime` (classic) and `…score_weekly`
-    (recurring weekly). There is no Daily board; D24 cut it.
-15b. **Game Center achievement ids**, all 24, one per `AchievementId` entry under the
-    `com.dangerfield.drop2048.achievement.` prefix. The full list is in `OWNER-TODO.md`. Each is
-    one-step and not hidden. An id changed after a player earns it orphans that badge on their
-    profile, so treat these as permanent once the first build ships.
+    (recurring weekly). There is no Daily board; D24 cut it and D27 cut the mode.
+15b. **Game Center achievement ids**, all 22, one per `AchievementId` entry under the
+    `com.dangerfield.drop2048.achievement.` prefix. The full list is in `OWNER-TODO.md`, **and that
+    list is two lines too long**: D27 deleted `SevenDays` and `ThirtyDays`, so do not type those
+    two. Each id is one-step and not hidden. An id changed after a player earns it orphans that
+    badge on their profile, so treat these as permanent once the first build ships.
 16. **Sentry DSN** per environment, and **Grafana OTLP endpoint, instance id and write token**.
     Without them both telemetry pipes are off in any build, and every analytics row in
     `data-safety.md` describes a build that does not exist yet.
@@ -291,14 +297,14 @@ or a file.
     App Store review rejects placeholder icons outright. Sizes and file locations are in
     `icons.md`; the art must also not read as a children's app, for the reason in `age-rating.md`
     §2.
-18. **Badge art**, the 24 achievement glyphs are placeholder emoji, and two of them (🩸 and 🃏)
+18. **Badge art**, the 22 achievement glyphs are placeholder emoji, and two of them (🩸 and 🃏)
     are the ones a content-rating reviewer would look twice at (`age-rating.md` §1).
 19. **Host the privacy policy and terms, and bump the legal version.** `pages/privacy.html` was
     rewritten in C13a from `data-safety.md` §2 and no longer denies the ad and analytics SDKs the
     app ships; what is left is an owner job, not a writing one. Confirm the support address
-    (item 5), publish the page at the URL `legal.privacyUrl` compiles to (item 6), and **bump the
-    legal version**, because the launch gate re-asks for acceptance on the version and not on the
-    text. `pages/terms.html` was not touched and should be read once before it goes up.
+    (item 5) and **bump the legal version**, because the launch gate re-asks for acceptance on the
+    version and not on the text. Hosting is done: both pages are live on GitHub Pages and are what
+    `legal.privacyUrl` and `legal.termsUrl` now compile to. `pages/terms.html` was not touched and should be read once before it goes up.
 20. **Store screenshots.** Play: the goldens are admissible but soft, see `screenshots.md` §2.
     iOS: blocked on item 21.
 

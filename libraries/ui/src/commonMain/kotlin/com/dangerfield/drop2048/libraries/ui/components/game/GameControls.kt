@@ -40,9 +40,10 @@ import com.dangerfield.drop2048.system.typography.FredokaFontFamily
  * `:libraries:resources`. The content descriptions are not, which is why they are
  * parameters.
  *
- * @param mirrored swaps ◀ and ▶ for the left-handed setting. A reversal rather
- *   than a second layout, so the two arrangements cannot drift apart and a fourth
- *   control would only have to be added once.
+ * The row had a `mirrored` flag for the left-handed setting until the owner
+ * ruling of 2026-09-20 removed that setting. ◀ is on the left, always; there is
+ * no second arrangement for the two to drift apart into.
+ *
  * @param dropModifier hangs on the centre button alone, so the tutorial can
  *   spotlight it. It carries no gesture: since decision D21 ▼ is a plain click
  *   with no hold, no timeout and no mode, which is exactly what deleted the
@@ -59,19 +60,13 @@ fun GameControlRow(
     rightDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    mirrored: Boolean = false,
     dropModifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth().widthIn(max = ControlRowMaxWidth),
         horizontalArrangement = Arrangement.spacedBy(ControlGap),
     ) {
-        val leading = if (mirrored) RightGlyph to rightDescription else LeftGlyph to leftDescription
-        val trailing = if (mirrored) LeftGlyph to leftDescription else RightGlyph to rightDescription
-        val onLeading = if (mirrored) onRight else onLeft
-        val onTrailing = if (mirrored) onLeft else onRight
-
-        ControlButton(leading.first, leading.second, onLeading, enabled, ControlKind.Primary)
+        ControlButton(LeftGlyph, leftDescription, onLeft, enabled, ControlKind.Primary)
         ControlButton(
             glyph = DropGlyph,
             contentDescription = dropDescription,
@@ -80,7 +75,7 @@ fun GameControlRow(
             kind = ControlKind.Quiet,
             modifier = dropModifier,
         )
-        ControlButton(trailing.first, trailing.second, onTrailing, enabled, ControlKind.Primary)
+        ControlButton(RightGlyph, rightDescription, onRight, enabled, ControlKind.Primary)
     }
 }
 

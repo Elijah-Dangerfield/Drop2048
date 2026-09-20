@@ -35,6 +35,11 @@ import com.dangerfield.drop2048.system.AppThemeProvider
  * from the app, exactly as the accessibility settings were. It is the one place
  * in the app that asks for the platform's bank, so `soundEnabled` is honoured
  * everywhere for free.
+ *
+ * **Reduce motion is not passed and must not be.** The owner ruling of
+ * 2026-09-20 removed the in-app toggle, so `AppThemeProvider` reads the phone's
+ * own accessibility setting and publishes that. Passing a stored value here
+ * again is how the app ends up with two answers to one question.
  */
 @Composable
 fun PlayerThemeProvider(
@@ -44,7 +49,6 @@ fun PlayerThemeProvider(
     val settings by store.settings.collectAsState()
     AppThemeProvider(
         palette = settings.palette,
-        reduceMotion = settings.reduceMotion,
         largeNumbers = settings.largeNumbers,
         haptics = settings.haptics,
         sounds = rememberPlatformSoundPlayer(enabled = settings.soundEnabled),

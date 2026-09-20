@@ -17,23 +17,25 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
  * Until C10 there were **two** of these. `:features:settings` owned a
  * `StateFlow`-shaped `ProEntitlement` for the settings row, and
  * `:libraries:progress` owned a synchronous `fun interface` of the same name for
- * SPEC 14's second Daily attempt. They were never the same object, so the debug
- * menu's "grant Pro" — folded into the settings one — could not reach the Daily
- * at all, and a library impl may not read a feature's api to fix it. Two types
- * for one fact meant one of them was always going to be wrong, and it was
+ * the Daily Challenge's second attempt. They were never the same object, so the
+ * debug menu's "grant Pro" — folded into the settings one — could not reach the
+ * library at all, and a library impl may not read a feature's api to fix it. Two
+ * types for one fact meant one of them was always going to be wrong, and it was
  * silently wrong: granting Pro looked like it worked everywhere except the one
- * place a tester would not think to check.
+ * place a tester would not think to check. (D27 has since deleted the Daily, and
+ * with it the second caller; the shape is kept because the reason is general.)
  *
  * Both are now this. It lives in a leaf library so a feature *and* a library impl
  * can both depend on it, which is the shape the problem always wanted.
  *
- * ### The Daily reads `isPro.value`, deliberately
+ * ### A synchronous read is still the right shape
  *
- * The old `fun interface` was synchronous on purpose, and the reason survives:
- * the question is asked once, at the moment an attempt is requested, and an
- * entitlement that changed mid-run must not retroactively change how many
- * attempts the day had. A `StateFlow` read at that instant is the same answer;
- * what it also buys is a settings row that updates without polling.
+ * The old `fun interface` was synchronous on purpose, and the reason survives
+ * the caller that needed it: an allowance is asked for once, at the moment it is
+ * requested, and an entitlement that changed mid-run must not retroactively
+ * change what the player was allowed. A `StateFlow` read at that instant is the
+ * same answer; what it also buys is a settings row that updates without
+ * polling.
  */
 interface Entitlements {
     val isPro: StateFlow<Boolean>
@@ -101,7 +103,7 @@ enum class RestoreOutcome {
  * QA's "grant Pro" switch (SPEC 19), as a type a library can read.
  *
  * The flag used to live in `:features:debug` and be folded in by a binding in
- * `:features:settings:impl`, which is why the Daily never saw it. It is here so
+ * `:features:settings:impl`, which is why a library consumer never saw it. It is here so
  * the fold happens once, in [RealEntitlements][com.dangerfield.drop2048.libraries.billing.impl.RealEntitlements],
  * above everything that asks. `:features:debug` drives it from the other side;
  * a feature depending on a library is the direction that is allowed.

@@ -49,7 +49,7 @@ class NeverRemoteTest {
     }
 
     @Test
-    fun `no remote path reaches the cascade caps, the column count, the cap floor or the continue reward`() {
+    fun `no remote path reaches the cascade caps or the column count or the cap floor or the continue reward`() {
         val config = remoteEngineConfig(TestAppConfigMap(backDoorAttempts)).current()
 
         assertEquals(EngineConfig.DEFAULT_STEP_CAP, config.cascadeStepCap)

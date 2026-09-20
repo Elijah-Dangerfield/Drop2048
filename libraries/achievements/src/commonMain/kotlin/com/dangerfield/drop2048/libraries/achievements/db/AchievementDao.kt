@@ -38,8 +38,6 @@ import kotlinx.coroutines.flow.Flow
 data class AchievementFactEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val key: String,
-    /** [com.dangerfield.drop2048.libraries.progress.GameMode] name, never its ordinal. */
-    val mode: String,
     val score: Long,
     val level: Int,
     val blocksPlaced: Int,
@@ -52,7 +50,6 @@ data class AchievementFactEntity(
     val stoneBursts: Int,
     val wildcardBursts: Int,
     val longestDangerRun: Int,
-    val dailyStreakDays: Int,
     val endedAt: Long,
 )
 

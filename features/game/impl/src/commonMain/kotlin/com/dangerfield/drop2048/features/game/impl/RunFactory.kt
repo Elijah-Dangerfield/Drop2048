@@ -6,7 +6,6 @@ import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.GameState
 import com.dangerfield.drop2048.libraries.gameconfig.RemoteEngineConfig
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import kotlin.random.Random
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
@@ -16,27 +15,16 @@ import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
  * Where a run comes from.
  *
  * A seam rather than a `Cascade.newGame(Random.nextLong())` inlined in the
- * ViewModel, because three later chunks need to hand the same screen a
- * different starting state and none of them should have to fork it: C5's
- * tutorial is a list of forced `GameState`s (SPEC 13), C6's Daily Challenge is
- * one shared seed (SPEC 14), and C12's debug menu replays a recorded one.
- * A scenario test is the fourth, and it is the one that keeps the seam honest
- * today.
+ * ViewModel, because later chunks need to hand the same screen a different
+ * starting state and none of them should have to fork it: C5's tutorial is a
+ * list of forced `GameState`s (SPEC 13), and C12's debug menu replays a recorded
+ * one. A scenario test is the third, and it is the one that keeps the seam
+ * honest today.
  */
 interface RunFactory {
 
-    /** A fresh Endless run on a seed nobody has seen (SPEC 2). */
+    /** A fresh run on a seed nobody has seen (SPEC 2). */
     fun newRun(): StartedRun
-
-    /**
-     * The Daily Challenge for [seed] (SPEC 14).
-     *
-     * The seed is handed in rather than derived here because spending the day's
-     * attempt and choosing the day's board are one decision, and it is
-     * `DailyRepository`'s. A factory that computed the date itself could hand out
-     * a board for a day the ledger has not opened.
-     */
-    fun dailyRun(seed: Long): StartedRun
 }
 
 /**
@@ -46,19 +34,17 @@ interface RunFactory {
  * The RNG carried inside the state has already advanced past [seed] by the time
  * the first block is drawn, so a run that does not record its seed at the start
  * can never record it at all — and `run_record` keeps it precisely so a
- * surprising score can be replayed (SPEC 11, SPEC 4.1). [mode] is here for the
- * same reason: it is a property of how the run was *started*.
+ * surprising score can be replayed (SPEC 11, SPEC 4.1).
  */
 data class StartedRun(
     val state: GameState,
     val seed: Long,
-    val mode: GameMode,
     /**
      * Whether this run was started in a session that has opened the debug menu
      * (SPEC 19).
      *
-     * True means the run writes no `run_record`, banks no `daily_result` and
-     * posts no leaderboard score. It is a property of the run rather than a
+     * True means the run writes no `run_record` and posts no leaderboard score.
+     * It is a property of the run rather than a
      * question asked at the end so that a menu opened *mid-run* cannot
      * retroactively delete a legitimate run's record — the flag is read once,
      * here, and travels with the run it describes.
@@ -67,9 +53,7 @@ data class StartedRun(
 )
 
 /**
- * Both modes, and the one difference between them that matters.
- *
- * ### Endless: a fresh seed, on today's numbers
+ * A fresh seed, on today's numbers.
  *
  * **[RemoteEngineConfig.current] is called here and nowhere else, and that is the
  * mechanism by which a fetched config takes effect at the start of the next run
@@ -83,49 +67,11 @@ data class StartedRun(
  * the binary is fully playable. That default is **eight rows**, settled on device
  * in C3. See SPEC 3.
  *
- * ### Daily: the day's seed, on numbers no server can move
- *
- * [dailyRun] does **not** read [RemoteEngineConfig]. It pins
- * [EngineConfig.Default] — the numbers compiled into this binary — and that is
- * the single most consequential decision in C6.
- *
- * The mode's whole promise is that everyone played the same game. C7 ruled that a
- * fetched config is sampled once at the start of a run and never changes under
- * one, which is enough to keep a *single* run coherent and is not enough here:
- * two players starting the same day's seed ten minutes apart, one before a config
- * push and one after, would each get an internally coherent run and a different
- * board. The seed would match, the scores would not be comparable, and nothing
- * anywhere would say so. That is the expensive kind of wrong — the kind that
- * looks right.
- *
- * The cost is real and is accepted: the Daily plays on whatever balance the
- * binary shipped with, so it does not benefit from a live spawn-table fix until
- * the next release. That is the correct trade. A remote push is invisible,
- * instant and per-device-segment; a release is versioned, staged and something
- * the owner decides to do. Comparability wants the boundary at the thing you can
- * see.
- *
- * **What this makes immovable.** From the first recorded Daily score,
- * [EngineConfig.Default] is a leaderboard-visible constant. Moving any field of
- * it in a release splits that day's board between app versions exactly the way a
- * remote push would have — the difference is only that a release is visible. The
- * pinned determinism digest and `level.blocksPerLevel` are in the same position
- * for the same reason. See `docs/decisions.md`.
- *
- * `DailyConfigPinningTest` is the enforcement: it moves every remote key it can
- * and asserts the Daily's block sequence does not budge.
- *
- * ### The Daily also ignores the debug menu
- *
- * [newRun] hands its fresh state through `DebugOverrides.applyTo`; [dailyRun]
- * does not, and that is the same ruling as the config pin. A forced board or a
- * forced seed on a shared day is a score nobody else could have set, and the
- * player has no way to tell.
- *
- * The debug menu deliberately has no `EngineConfig` override at all, so there is
- * no config here that *could* leak into a Daily — see `DebugOverrides`. This
- * omission covers the rest: the board, the seed and the starting level.
- * `DebugRunFactoryTest` pins it.
+ * There was a second factory method, `dailyRun`, which pinned
+ * [EngineConfig.Default] against remote config so two players on the same day's
+ * seed got the same board (the old D18). D27 deleted the mode, and the pin with
+ * it — nothing in the game now needs a run that ignores the config the rest of
+ * them read.
  */
 @ContributesBinding(AppScope::class)
 @Inject
@@ -141,15 +87,7 @@ class RealRunFactory(
         return StartedRun(
             state = overrides.applyTo(fresh, forcedBlock = debug.takeForcedBlock()),
             seed = seed,
-            mode = GameMode.ENDLESS,
             debug = debug.isDebugSession.value,
         )
     }
-
-    override fun dailyRun(seed: Long): StartedRun = StartedRun(
-        state = Cascade.newGame(seed = seed, config = EngineConfig.Default),
-        seed = seed,
-        mode = GameMode.DAILY,
-        debug = debug.isDebugSession.value,
-    )
 }

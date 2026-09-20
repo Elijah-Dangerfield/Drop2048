@@ -69,6 +69,10 @@ kotlin {
         commonTest.dependencies {
             implementation(projects.libraries.devfeedback)
             implementation(projects.libraries.core)
+            // The reporter's whole job is choosing a FeedbackKind, so a test of
+            // it has to be able to name one. A commonMain `implementation` does
+            // not reach this source set.
+            implementation(projects.libraries.drop2048)
             implementation(projects.libraries.flowroutines.testing)
             implementation(compose.ui)
             implementation(libs.kotlin.test)

@@ -212,8 +212,8 @@ private fun FlagDetail(
     if (row.path in DIGEST_MOVING_PATHS) {
         P(attrs = { classes("modal-warning"); style { property("margin", "4px 0 8px") } }) {
             Text(
-                "Changing this moves the determinism digest: every Daily Challenge score and every " +
-                    "seed-attached bug report recorded under the old value replays as a different run. " +
+                "Changing this moves the determinism digest: every seed-attached bug report " +
+                    "recorded under the old value replays as a different run. " +
                     "The speed curve and the spawn table were both measured safe to change live — " +
                     "this one was measured not to be.",
             )

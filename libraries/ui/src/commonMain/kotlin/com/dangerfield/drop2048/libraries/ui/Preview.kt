@@ -79,6 +79,10 @@ sealed class PreviewBottomBar(val render: @Composable () -> Unit) {
  * of a screen **under an accessibility setting** rather than only under the
  * defaults. That is the only way to prove those settings reach what is drawn,
  * which is what they had not been doing for six chunks.
+ *
+ * [reduceMotion] is the one with no player-facing switch behind it any more: in
+ * the app it comes from the OS alone (see `isOsReduceMotionEnabled`), and this
+ * parameter is how a preview reaches a state a preview has no OS to ask about.
  */
 @Composable
 fun PreviewContent(

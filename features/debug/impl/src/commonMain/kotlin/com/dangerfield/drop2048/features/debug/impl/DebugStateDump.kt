@@ -57,7 +57,6 @@ object DebugStateDump {
         return JsonObject(
             encoded.toMutableMap().apply {
                 put("savedRun", JsonPrimitive(sizeOf(data.savedRun)))
-                put("savedDailyRun", JsonPrimitive(sizeOf(data.savedDailyRun)))
             }
         )
     }

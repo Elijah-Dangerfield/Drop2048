@@ -1,6 +1,5 @@
 package com.dangerfield.drop2048.libraries.achievements
 
-import com.dangerfield.drop2048.libraries.progress.GameMode
 
 /**
  * Every number an achievement can be earned against.
@@ -47,18 +46,13 @@ enum class Stat {
     MostBlocksInARun,
 
     /**
-     * The best score, **Endless only** (decision D19).
+     * The best score of any run.
      *
-     * A Daily run still feeds every other counter here, because a merge is a
-     * merge. It cannot own the headline number, for the reason `bestScore()`
-     * cannot: a score set on a seed everybody else also played is not comparable
-     * to an Endless one, and a score ladder that a shared seed could climb would
-     * be measuring the seed.
+     * It was Endless-only while the Daily existed (D19), because a score set on
+     * a seed everybody else also played would have been a ladder measuring the
+     * seed. D27 removed the mode, so there is one kind of run and one best.
      */
     BestScore,
-
-    /** The longest Daily streak reached, as the Daily feature reported it. */
-    BestDailyStreak,
 
     /**
      * Whole minutes spent playing, summed over every recorded run.
@@ -116,9 +110,7 @@ data class AchievementCounters(
         setMax(Stat.LongestDangerRun, outcome.facts.longestDangerRun.toLong())
         setMax(Stat.HighestLevel, outcome.level.toLong())
         setMax(Stat.MostBlocksInARun, outcome.blocksPlaced.toLong())
-        setMax(Stat.BestDailyStreak, outcome.dailyStreakDays.toLong())
-
-        if (outcome.mode == GameMode.ENDLESS) setMax(Stat.BestScore, outcome.score)
+        setMax(Stat.BestScore, outcome.score)
 
         return AchievementCounters(next, played)
     }

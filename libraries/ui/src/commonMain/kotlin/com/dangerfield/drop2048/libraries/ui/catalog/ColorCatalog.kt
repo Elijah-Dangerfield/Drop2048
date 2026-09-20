@@ -23,6 +23,7 @@ internal fun ColorSurfacesContent() {
             ColorRow("surfacePrimary", c.surfacePrimary, c.onSurfacePrimary, "The default container — Card, sheets, menus, list rows.")
             ColorRow("surfaceSecondary", c.surfaceSecondary, c.onSurfaceSecondary, "A thing ON a surface — text inputs, nested containers, selected rows.")
             ColorRow("surfaceTertiary", c.surfaceTertiary, c.onSurfaceTertiary, "The highest layer — pressed states, floating menus, tooltips.")
+            ColorRow("surfaceElevated", c.surfaceElevated, c.onSurfaceElevated, "A control sitting ON surfacePrimary — a filled secondary button on a dialog.")
             ColorRow("surfaceDisabled", c.surfaceDisabled, c.onSurfaceDisabled, "Fill for a disabled control (e.g. a disabled filled button).")
             ColorRow("backgroundOverlay", c.backgroundOverlay, null, "Dims the screen behind a modal or bottom sheet.")
             ColorRow("shadow", c.shadow, null, "Drop-shadow color cast by elevated surfaces.")

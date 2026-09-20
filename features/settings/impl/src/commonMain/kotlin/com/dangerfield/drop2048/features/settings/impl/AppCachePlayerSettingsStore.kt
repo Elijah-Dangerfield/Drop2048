@@ -68,30 +68,20 @@ class AppCachePlayerSettingsStore(
 
 private fun AppData.toPlayerSettings() = PlayerSettings(
     palette = blockPalette.asEnumOr(BlockPaletteChoice.Default),
-    reduceMotion = reduceMotion,
     largeNumbers = largeBlockNumbers,
     haptics = hapticsSetting.asEnumOr(HapticsSetting.Light),
     soundEnabled = soundEnabled,
-    musicEnabled = musicEnabled,
-    controlScheme = controlScheme.asEnumOr(ControlScheme.Both),
-    leftHanded = leftHandedControls,
+    controlScheme = controlScheme.asEnumOr(ControlScheme.Drag),
     ghostEnabled = ghostEnabled,
-    confirmBeforeQuit = confirmBeforeQuit,
-    diagnosticsOptIn = diagnosticsOptIn,
     debugMenuUnlocked = debugMenuUnlocked,
 )
 
 private fun AppData.merge(settings: PlayerSettings) = copy(
     blockPalette = settings.palette.name,
-    reduceMotion = settings.reduceMotion,
     largeBlockNumbers = settings.largeNumbers,
     hapticsSetting = settings.haptics.name,
     soundEnabled = settings.soundEnabled,
-    musicEnabled = settings.musicEnabled,
     controlScheme = settings.controlScheme.name,
-    leftHandedControls = settings.leftHanded,
     ghostEnabled = settings.ghostEnabled,
-    confirmBeforeQuit = settings.confirmBeforeQuit,
-    diagnosticsOptIn = settings.diagnosticsOptIn,
     debugMenuUnlocked = settings.debugMenuUnlocked,
 )

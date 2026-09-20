@@ -10,6 +10,7 @@ import com.dangerfield.drop2048.libraries.navigation.impl.DelegatingRouter
 import com.dangerfield.drop2048.libraries.telemetry.impl.JankMonitor
 import com.dangerfield.drop2048.libraries.telemetry.impl.StartupReporter
 import com.dangerfield.drop2048.libraries.drop2048.Telemetry
+import com.dangerfield.drop2048.libraries.ads.BannerSurface
 import com.dangerfield.drop2048.libraries.ads.HouseAds
 import com.dangerfield.drop2048.libraries.devfeedback.DevFeedback
 import com.dangerfield.drop2048.libraries.navigation.FeatureEntryPoint
@@ -54,6 +55,18 @@ interface AppComponent {
      * composable.
      */
     val houseAds: HouseAds
+
+    /**
+     * The platform's banner view, provided into `LocalBannerSurface` at the root
+     * (D28).
+     *
+     * On the component for the same reason `houseAds` is: the binding that
+     * answers it is platform-specific, it is `NoBannerSurface` wherever no ad
+     * SDK exists, and `:features:game:impl` may not name either. A composition
+     * local rather than a parameter because `GameScreen` is several levels down
+     * and nothing between here and there has any business carrying an ad.
+     */
+    val bannerSurface: BannerSurface
 
     /**
      * The owner's directive channel, wrapped around the entire app.

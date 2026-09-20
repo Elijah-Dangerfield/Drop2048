@@ -99,7 +99,7 @@ class RemoteEngineConfigTest {
     fun `a remote row count leaves the five columns and the centre spawn alone`() {
         val config = remoteEngineConfig(TestAppConfigMap(mapOf("board.rows" to 6))).current()
         assertEquals(EngineConfig.DEFAULT_COLS, config.cols)
-        assertEquals(EngineConfig.DEFAULT_COLS / 2, config.spawnColumn)
+        assertEquals(EngineConfig.DEFAULT_COLS / 2, config.centreColumn)
     }
 
     @Test

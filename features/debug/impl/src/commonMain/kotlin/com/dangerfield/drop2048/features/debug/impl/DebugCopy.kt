@@ -24,7 +24,7 @@ object DebugCopy {
 
     const val SessionBannerTitle = "Debug session"
     const val SessionBannerBody =
-        "Nothing this launch will be recorded: no run history, no Daily result, " +
+        "Nothing this launch will be recorded: no run history, no badges, " +
             "no leaderboard score. Relaunch the app to record again."
 
     const val PassphraseTitle = "Release build"
@@ -74,9 +74,6 @@ object DebugCopy {
     const val ProGranted = "Pro granted"
     const val ProGrantedHint = "Every Pro perk behaves as it will for a buyer, until you relaunch"
     const val ResetPurchases = "Reset IAP state"
-    const val ClearDaily = "Clear the Daily ledger"
-    const val ClearDailyHint = "Every day's result, and the streak with it"
-    const val DailyStreak = "Daily streak"
 
     const val ShowFrameRate = "Frame rate"
     const val ShowTick = "Actual vs intended tick"
@@ -109,7 +106,6 @@ object DebugCopy {
     const val ShowInterstitial = "Force show: interstitial"
     const val ShowInterstitialHint = "Through every gate in SPEC 12.3, so a refusal is the point"
     const val ShowRewardedContinue = "Force show: rewarded (continue)"
-    const val ShowRewardedDailyRetry = "Force show: rewarded (Daily retry)"
     const val AdShowing = "Showing..."
     const val AdShown = "shown"
     const val AdNotShown = "not shown"
@@ -140,7 +136,6 @@ object DebugCopy {
     const val MessageConfigNotParseable = "That is not a value this key can hold."
 
     const val MessageOverridesCleared = "Overrides cleared."
-    const val MessageDailyCleared = "Daily ledger cleared."
     const val MessageTutorialReset = "Tutorial reset."
     const val MessageLocalDataReset = "Local data reset."
 
@@ -156,7 +151,6 @@ object DebugCopy {
 
     fun placementLabel(placement: AdPlacement): String = when (placement) {
         AdPlacement.ContinueRun -> ShowRewardedContinue
-        AdPlacement.DailyRetry -> ShowRewardedDailyRetry
     }
 
     /**

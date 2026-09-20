@@ -36,14 +36,11 @@ import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import drop2048.libraries.resources.generated.resources.Res
 import drop2048.libraries.resources.generated.resources.settings_ad_consent
-import drop2048.libraries.resources.generated.resources.settings_confirm_quit
-import drop2048.libraries.resources.generated.resources.settings_confirm_quit_hint
-import drop2048.libraries.resources.generated.resources.settings_control_scheme
+import drop2048.libraries.resources.generated.resources.settings_arrow_buttons
+import drop2048.libraries.resources.generated.resources.settings_arrow_buttons_hint
 import drop2048.libraries.resources.generated.resources.settings_credits
 import drop2048.libraries.resources.generated.resources.settings_delete_data
 import drop2048.libraries.resources.generated.resources.settings_delete_data_hint
-import drop2048.libraries.resources.generated.resources.settings_diagnostics
-import drop2048.libraries.resources.generated.resources.settings_diagnostics_hint
 import drop2048.libraries.resources.generated.resources.settings_feedback
 import drop2048.libraries.resources.generated.resources.settings_ghost
 import drop2048.libraries.resources.generated.resources.settings_ghost_hint
@@ -53,10 +50,7 @@ import drop2048.libraries.resources.generated.resources.settings_haptics_off
 import drop2048.libraries.resources.generated.resources.settings_haptics_strong
 import drop2048.libraries.resources.generated.resources.settings_large_numbers
 import drop2048.libraries.resources.generated.resources.settings_large_numbers_hint
-import drop2048.libraries.resources.generated.resources.settings_left_handed
-import drop2048.libraries.resources.generated.resources.settings_left_handed_hint
 import drop2048.libraries.resources.generated.resources.settings_licenses
-import drop2048.libraries.resources.generated.resources.settings_music
 import drop2048.libraries.resources.generated.resources.settings_palette
 import drop2048.libraries.resources.generated.resources.settings_palette_default
 import drop2048.libraries.resources.generated.resources.settings_palette_deuteranopia
@@ -67,8 +61,6 @@ import drop2048.libraries.resources.generated.resources.settings_privacy_policy
 import drop2048.libraries.resources.generated.resources.settings_pro_active
 import drop2048.libraries.resources.generated.resources.settings_pro_inactive
 import drop2048.libraries.resources.generated.resources.settings_pro_status
-import drop2048.libraries.resources.generated.resources.settings_reduce_motion
-import drop2048.libraries.resources.generated.resources.settings_reduce_motion_hint
 import drop2048.libraries.resources.generated.resources.settings_replay_tutorial
 import drop2048.libraries.resources.generated.resources.settings_replay_tutorial_hint
 import drop2048.libraries.resources.generated.resources.settings_reset_progress
@@ -80,9 +72,6 @@ import drop2048.libraries.resources.generated.resources.settings_restore_nothing
 import drop2048.libraries.resources.generated.resources.settings_restore_restored
 import drop2048.libraries.resources.generated.resources.settings_restore_unavailable
 import drop2048.libraries.resources.generated.resources.settings_restore_working
-import drop2048.libraries.resources.generated.resources.settings_scheme_both
-import drop2048.libraries.resources.generated.resources.settings_scheme_buttons
-import drop2048.libraries.resources.generated.resources.settings_scheme_drag
 import drop2048.libraries.resources.generated.resources.settings_achievements
 import drop2048.libraries.resources.generated.resources.settings_achievements_hint
 import drop2048.libraries.resources.generated.resources.settings_section_about
@@ -191,14 +180,6 @@ private fun SoundSection(settings: PlayerSettings, onAction: (SettingsAction) ->
                 ),
                 onClick = { onAction(SettingsAction.ToggleSound) },
             ),
-            ListSectionItem(
-                headlineText = stringResource(Res.string.settings_music),
-                accessory = ListItemAccessory.Switch(
-                    checked = settings.musicEnabled,
-                    onCheckedChange = { onAction(SettingsAction.ToggleMusic) },
-                ),
-                onClick = { onAction(SettingsAction.ToggleMusic) },
-            ),
         ),
     )
     VerticalSpacerD500()
@@ -211,27 +192,43 @@ private fun SoundSection(settings: PlayerSettings, onAction: (SettingsAction) ->
     )
 }
 
+/**
+ * SPEC 6, as one switch rather than as three named schemes.
+ *
+ * Owner ruling, 2026-09-20: the game ships with no arrows and a way to bring
+ * them back. [ControlScheme] already says all of that — `Drag` is the default
+ * and `Both` is the arrows restored — so this is a presentation change and not a
+ * fourth state. What the player is choosing is whether a row of buttons is on
+ * their screen, which is a yes-or-no question and reads terribly as a list of
+ * three nouns two of which are "drag the board" and "both".
+ *
+ * [ControlScheme.Buttons] has no control of its own and is deliberately still
+ * honoured: it is drag *off*, it is the one scheme a player cannot get back to
+ * by accident, and a stored one keeps working and shows this switch on. Adding a
+ * second switch to reach it would put "turn dragging off" in front of every
+ * player to serve the ones who have already stopped using it.
+ *
+ * The left-handed mirror used to hang off this switch and went with the owner
+ * ruling of 2026-09-20. So did "ask before quitting" — quitting a run now always
+ * confirms, which is a behaviour rather than a preference.
+ */
 @Composable
 private fun ControlsSection(settings: PlayerSettings, onAction: (SettingsAction) -> Unit) {
-    ChoiceSection(
-        title = stringResource(Res.string.settings_section_controls),
-        supportingText = stringResource(Res.string.settings_control_scheme),
-        options = ControlScheme.entries,
-        selected = settings.controlScheme,
-        label = { schemeLabel(it) },
-        onSelect = { onAction(SettingsAction.SetControlScheme(it)) },
-    )
-    VerticalSpacerD500()
+    val arrowsShown = settings.controlScheme != ControlScheme.Drag
+    val setArrows = { shown: Boolean ->
+        onAction(SettingsAction.SetControlScheme(schemeWithArrows(shown, settings.controlScheme)))
+    }
     ListSection(
+        title = stringResource(Res.string.settings_section_controls),
         items = listOf(
             ListSectionItem(
-                headlineText = stringResource(Res.string.settings_left_handed),
-                supportingText = stringResource(Res.string.settings_left_handed_hint),
+                headlineText = stringResource(Res.string.settings_arrow_buttons),
+                supportingText = stringResource(Res.string.settings_arrow_buttons_hint),
                 accessory = ListItemAccessory.Switch(
-                    checked = settings.leftHanded,
-                    onCheckedChange = { onAction(SettingsAction.ToggleLeftHanded) },
+                    checked = arrowsShown,
+                    onCheckedChange = setArrows,
                 ),
-                onClick = { onAction(SettingsAction.ToggleLeftHanded) },
+                onClick = { setArrows(!arrowsShown) },
             ),
             ListSectionItem(
                 headlineText = stringResource(Res.string.settings_ghost),
@@ -242,17 +239,22 @@ private fun ControlsSection(settings: PlayerSettings, onAction: (SettingsAction)
                 ),
                 onClick = { onAction(SettingsAction.ToggleGhost) },
             ),
-            ListSectionItem(
-                headlineText = stringResource(Res.string.settings_confirm_quit),
-                supportingText = stringResource(Res.string.settings_confirm_quit_hint),
-                accessory = ListItemAccessory.Switch(
-                    checked = settings.confirmBeforeQuit,
-                    onCheckedChange = { onAction(SettingsAction.ToggleConfirmQuit) },
-                ),
-                onClick = { onAction(SettingsAction.ToggleConfirmQuit) },
-            ),
         ),
     )
+}
+
+/**
+ * Which scheme "arrows on screen" means, keeping [ControlScheme.Buttons] intact.
+ *
+ * A player who has drag switched off entirely is not told they have it back by a
+ * switch that says "arrow buttons", so turning arrows on from `Buttons` leaves
+ * `Buttons` alone. Turning them off is always `Drag`, because that is the one
+ * scheme with no arrows in it.
+ */
+private fun schemeWithArrows(shown: Boolean, current: ControlScheme): ControlScheme = when {
+    !shown -> ControlScheme.Drag
+    current == ControlScheme.Buttons -> ControlScheme.Buttons
+    else -> ControlScheme.Both
 }
 
 /**
@@ -286,15 +288,6 @@ private fun AccessibilitySection(settings: PlayerSettings, onAction: (SettingsAc
     VerticalSpacerD500()
     ListSection(
         items = listOf(
-            ListSectionItem(
-                headlineText = stringResource(Res.string.settings_reduce_motion),
-                supportingText = stringResource(Res.string.settings_reduce_motion_hint),
-                accessory = ListItemAccessory.Switch(
-                    checked = settings.reduceMotion,
-                    onCheckedChange = { onAction(SettingsAction.ToggleReduceMotion) },
-                ),
-                onClick = { onAction(SettingsAction.ToggleReduceMotion) },
-            ),
             ListSectionItem(
                 headlineText = stringResource(Res.string.settings_large_numbers),
                 supportingText = stringResource(Res.string.settings_large_numbers_hint),
@@ -370,6 +363,18 @@ private fun ProSection(state: SettingsState, onAction: (SettingsAction) -> Unit)
     )
 }
 
+/**
+ * The paperwork.
+ *
+ * **Open source licences stay** (owner ruling, 2026-09-20). The app ships
+ * Apache-2.0, MIT, BSD, MPL and EPL dependencies, and MIT and BSD both require
+ * the notice to travel with the binary — so this row is a licence obligation
+ * rather than a courtesy.
+ *
+ * The diagnostics switch used to sit here and now lives on the feedback form,
+ * which is the screen a player is on when the question is live. It is the same
+ * stored preference either way; see `FeedbackViewModel`.
+ */
 @Composable
 private fun LegalSection(state: SettingsState, onAction: (SettingsAction) -> Unit) {
     ListSection(
@@ -402,17 +407,6 @@ private fun LegalSection(state: SettingsState, onAction: (SettingsAction) -> Uni
                 ListSectionItem(
                     headlineText = stringResource(Res.string.settings_licenses),
                     onClick = { onAction(SettingsAction.OpenLicenses) },
-                ),
-            )
-            add(
-                ListSectionItem(
-                    headlineText = stringResource(Res.string.settings_diagnostics),
-                    supportingText = stringResource(Res.string.settings_diagnostics_hint),
-                    accessory = ListItemAccessory.Switch(
-                        checked = state.settings.diagnosticsOptIn,
-                        onCheckedChange = { onAction(SettingsAction.ToggleDiagnostics) },
-                    ),
-                    onClick = { onAction(SettingsAction.ToggleDiagnostics) },
                 ),
             )
         },
@@ -584,13 +578,6 @@ private fun hapticsLabel(setting: HapticsSetting): String = when (setting) {
 }
 
 @Composable
-private fun schemeLabel(scheme: ControlScheme): String = when (scheme) {
-    ControlScheme.Buttons -> stringResource(Res.string.settings_scheme_buttons)
-    ControlScheme.Drag -> stringResource(Res.string.settings_scheme_drag)
-    ControlScheme.Both -> stringResource(Res.string.settings_scheme_both)
-}
-
-@Composable
 private fun restoreLabel(message: RestoreMessage): String = when (message) {
     RestoreMessage.Working -> stringResource(Res.string.settings_restore_working)
     RestoreMessage.Restored -> stringResource(Res.string.settings_restore_restored)
@@ -614,7 +601,6 @@ private fun SettingsScreenAccessiblePreview() {
             mutableStateOf(
                 PlayerSettings(
                     palette = BlockPaletteChoice.HighContrast,
-                    reduceMotion = true,
                     largeNumbers = true,
                     haptics = HapticsSetting.Strong,
                 ),

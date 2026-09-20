@@ -174,7 +174,8 @@ inline fun <reified T : Route> NavGraphBuilder.bottomSheet(
         ) { backStackEntry ->
             BottomSheetDestination(backStackEntry, content)
         }
-    ).apply {
-        deepLinks.forEach { deepLink -> deepLink(deepLink) }
-    }
+            .apply {
+                deepLinks.forEach { deepLink -> deepLink(deepLink) }
+            }
+    )
 }

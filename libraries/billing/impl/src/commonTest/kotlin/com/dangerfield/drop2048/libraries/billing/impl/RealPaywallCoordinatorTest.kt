@@ -2,6 +2,7 @@ package com.dangerfield.drop2048.libraries.billing.impl
 
 import com.dangerfield.drop2048.libraries.billing.InMemoryProGrant
 import com.dangerfield.drop2048.libraries.billing.PaywallRequest
+import com.dangerfield.drop2048.libraries.ads.AdImpressions
 import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
 import com.dangerfield.drop2048.libraries.billing.StoreOwnership
 import com.dangerfield.drop2048.libraries.drop2048.AppEvents
@@ -73,6 +74,54 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
     }
 
     /**
+     * D28's ads-seen gate, and the bug it exists for.
+     *
+     * The card says "Tired of the ads?". SPEC 12.3 suppresses interstitials for
+     * three days after install and until the fourth run of a session, so the
+     * first stacked-out screen a new player ever sees is one where they have
+     * been shown nothing at all, and the card claimed on it was selling the
+     * removal of an experience they had not had.
+     *
+     * This pair is the whole rule: refused with nothing shown, granted after.
+     * Against the pre-D28 coordinator, which took the card on the session cap
+     * alone, the first of the two fails.
+     */
+    @Test
+    fun `the card is refused until an ad has actually been shown`() = runUnitTest {
+        val coordinator = coordinator(adSeen = false)
+
+        assertFalse(
+            coordinator.claimStackedOutCard(),
+            "\"Tired of the ads?\" before this player has been shown one",
+        )
+    }
+
+    @Test
+    fun `the card is available once an ad has been shown`() = runUnitTest {
+        val coordinator = coordinator(adSeen = true)
+
+        assertTrue(coordinator.claimStackedOutCard())
+    }
+
+    /**
+     * The refusal must not spend the session's one card. A player who stacks
+     * out twice, and sees their first interstitial in between, has to get the
+     * card on the second sheet rather than have it eaten by the first.
+     */
+    @Test
+    fun `a refused card is not a spent card`() = runUnitTest {
+        val sessions = FakeSessionTracker()
+        val impressions = MutableAdImpressions(seen = false)
+        val coordinator = coordinatorWith(sessions, impressions)
+
+        assertFalse(coordinator.claimStackedOutCard())
+
+        impressions.seen = true
+
+        assertTrue(coordinator.claimStackedOutCard())
+    }
+
+    /**
      * The kill switch takes the offers away and leaves the shop open. Turning
      * `pro.upsell.enabled` off is a decision about how much the app asks, not
      * about whether it will sell to someone who came looking.
@@ -103,11 +152,13 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
     private fun TestScope.coordinator(
         pro: Boolean = false,
         upsellEnabled: Boolean = true,
-    ) = scenarioWithSessions(pro, upsellEnabled).coordinator
+        adSeen: Boolean = true,
+    ) = scenarioWithSessions(pro, upsellEnabled, adSeen).coordinator
 
     private fun TestScope.scenarioWithSessions(
         pro: Boolean = false,
         upsellEnabled: Boolean = true,
+        adSeen: Boolean = true,
     ): Scenario {
         val sessions = FakeSessionTracker()
         val entitlements = RealEntitlements(
@@ -126,12 +177,44 @@ class RealPaywallCoordinatorTest : CoroutineTest() {
             upsellEnabled = ProUpsellEnabled(
                 TestBillingConfigMap(mapOf("pro.upsell.enabled" to upsellEnabled)),
             ),
+            impressions = MutableAdImpressions(adSeen),
         )
         return Scenario(coordinator, sessions)
+    }
+
+    private fun TestScope.coordinatorWith(
+        sessions: FakeSessionTracker,
+        impressions: AdImpressions,
+    ): RealPaywallCoordinator {
+        val entitlements = RealEntitlements(
+            store = FakeStoreBilling(ownership = StoreOwnership.NotOwned),
+            appCache = FakeAppCache(),
+            appScope = AppCoroutineScope(dispatchers),
+            proGrant = InMemoryProGrant(),
+            appEventsProvider = { AppEvents(FakeAppEventBus()) },
+        )
+        runCurrent()
+        return RealPaywallCoordinator(
+            entitlements = entitlements,
+            sessionTracker = sessions,
+            upsellEnabled = ProUpsellEnabled(
+                TestBillingConfigMap(mapOf("pro.upsell.enabled" to true)),
+            ),
+            impressions = impressions,
+        )
     }
 
     private class Scenario(
         val coordinator: RealPaywallCoordinator,
         val sessions: FakeSessionTracker,
     )
+
+    /**
+     * Whether this player has ever been shown an ad (D28). Defaults to *yes*
+     * everywhere it is not the subject, so the tests that predate the gate keep
+     * asking the question they were written to ask.
+     */
+    private class MutableAdImpressions(var seen: Boolean) : AdImpressions {
+        override suspend fun anyAdShown(): Boolean = seen
+    }
 }

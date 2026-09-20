@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dangerfield.drop2048.features.settings.ControlScheme
+import com.dangerfield.drop2048.libraries.ads.LocalBannerSurface
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
@@ -88,6 +89,8 @@ import drop2048.libraries.resources.generated.resources.continue_body
 import drop2048.libraries.resources.generated.resources.continue_body_second
 import drop2048.libraries.resources.generated.resources.continue_countdown_description
 import drop2048.libraries.resources.generated.resources.continue_decline
+import drop2048.libraries.resources.generated.resources.continue_from_results
+import drop2048.libraries.resources.generated.resources.continue_pro
 import drop2048.libraries.resources.generated.resources.continue_title
 import drop2048.libraries.resources.generated.resources.continue_watch
 import drop2048.libraries.resources.generated.resources.game_best_score
@@ -99,9 +102,6 @@ import drop2048.libraries.resources.generated.resources.game_callout_level
 import drop2048.libraries.resources.generated.resources.game_callout_row_bust
 import drop2048.libraries.resources.generated.resources.game_callout_wildcard
 import drop2048.libraries.resources.generated.resources.game_chain
-import com.dangerfield.drop2048.libraries.progress.GameMode
-import drop2048.libraries.resources.generated.resources.daily_title
-import drop2048.libraries.resources.generated.resources.game_daily_done
 import drop2048.libraries.resources.generated.resources.game_drop_again
 import drop2048.libraries.resources.generated.resources.game_falling_block
 import drop2048.libraries.resources.generated.resources.game_quit_confirm_action
@@ -122,6 +122,7 @@ import drop2048.libraries.resources.generated.resources.game_quit
 import drop2048.libraries.resources.generated.resources.game_restart
 import drop2048.libraries.resources.generated.resources.game_score
 import drop2048.libraries.resources.generated.resources.game_stacked_out
+import drop2048.libraries.resources.generated.resources.game_target_cell
 import drop2048.libraries.resources.generated.resources.game_start_body
 import drop2048.libraries.resources.generated.resources.game_stats
 import drop2048.libraries.resources.generated.resources.share_run
@@ -134,16 +135,19 @@ import drop2048.libraries.resources.generated.resources.tutorial_burst_body
 import drop2048.libraries.resources.generated.resources.tutorial_burst_title
 import drop2048.libraries.resources.generated.resources.tutorial_first_merge_body
 import drop2048.libraries.resources.generated.resources.tutorial_first_merge_title
-import drop2048.libraries.resources.generated.resources.tutorial_first_drop_body
+import drop2048.libraries.resources.generated.resources.tutorial_first_drop_body_arrows
+import drop2048.libraries.resources.generated.resources.tutorial_first_drop_body_drag
 import drop2048.libraries.resources.generated.resources.tutorial_first_drop_title
 import drop2048.libraries.resources.generated.resources.tutorial_got_it
 import drop2048.libraries.resources.generated.resources.tutorial_handoff_body
 import drop2048.libraries.resources.generated.resources.tutorial_handoff_title
 import drop2048.libraries.resources.generated.resources.tutorial_ok
-import drop2048.libraries.resources.generated.resources.tutorial_second_body
+import drop2048.libraries.resources.generated.resources.tutorial_second_body_arrows
+import drop2048.libraries.resources.generated.resources.tutorial_second_body_drag
 import drop2048.libraries.resources.generated.resources.tutorial_second_title
 import drop2048.libraries.resources.generated.resources.tutorial_skip
-import drop2048.libraries.resources.generated.resources.tutorial_steer_body
+import drop2048.libraries.resources.generated.resources.tutorial_steer_body_arrows
+import drop2048.libraries.resources.generated.resources.tutorial_steer_body_drag
 import drop2048.libraries.resources.generated.resources.tutorial_steer_title
 import drop2048.libraries.resources.generated.resources.tutorial_third_body
 import drop2048.libraries.resources.generated.resources.tutorial_third_title
@@ -180,22 +184,23 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * tap-anywhere-to-resume still works everywhere else on the overlay.
  *
  * **The start and paused overlays are the app's menu.** C5 deleted the home
- * screen, so this is the launch destination and there is nowhere else for Daily,
- * Stats and Settings to be reached from. Until C11 they were reachable *only*
- * from the stacked-out sheet, which meant a player had to lose a run to open the
- * Daily.
+ * screen, so this is the launch destination and there is nowhere else for Stats
+ * and Settings to be reached from. Until C11 they were reachable *only* from the
+ * stacked-out sheet, which meant a player had to lose a run to open either.
  *
  * **[ControlScheme] is honoured here rather than only stored.** `Drag` hides the
- * control row, `Buttons` stops [GameBoard] accepting a drag, `Both` is what the
- * game has shipped with. Decision D11 makes drag primary and the buttons the
- * secondary path, and since D21 `Drag` loses **nothing at all**: the downward
- * flick is the same hard drop the ▼ button fires, and there is no held mode left
- * that a gesture cannot express.
+ * control row and is the default since the owner's 2026-09-20 ruling, `Buttons`
+ * stops [GameBoard] accepting a drag, `Both` is what the game shipped with until
+ * then and is what the settings switch turns back on. Decision D11 made drag
+ * primary and the buttons the secondary path, and since D21 `Drag` loses
+ * **nothing at all**: the downward flick is the same hard drop the ▼ button
+ * fires, and there is no held mode left that a gesture cannot express.
  */
 @Composable
 fun GameScreen(
     state: GameUiState,
     onAction: (GameAction) -> Unit,
+    focusRegistry: FocusRegistry = remember { FocusRegistry() },
 ) {
     val reduceMotion = LocalReduceMotion.current
     LaunchedEffect(reduceMotion) { onAction(GameAction.SetReduceMotion(reduceMotion)) }
@@ -211,11 +216,9 @@ fun GameScreen(
     // would shave the well's ring off three sides.
     val blurred = covered && state.phase != GamePhase.ContinueOffer
 
-    val registry = remember { FocusRegistry() }
-
     GameBackHandler(phase = state.phase, onAction = onAction)
 
-    CompositionLocalProvider(LocalFocusRegistry provides registry) {
+    CompositionLocalProvider(LocalFocusRegistry provides focusRegistry) {
         Box(modifier = Modifier.fillMaxSize()) {
             Screen(contentWindowInsets = WindowInsets.systemBars) { padding ->
                 Column(
@@ -238,7 +241,7 @@ fun GameScreen(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 
-                    if (state.controlScheme != ControlScheme.Drag) {
+                    if (state.arrowsOnScreen) {
                         GameControlRow(
                             onLeft = { onAction(GameAction.MoveLeft) },
                             onDrop = { onAction(GameAction.HardDrop) },
@@ -247,10 +250,11 @@ fun GameScreen(
                             dropDescription = stringResource(Res.string.game_hard_drop),
                             rightDescription = stringResource(Res.string.game_move_right),
                             enabled = live,
-                            mirrored = state.leftHanded,
                             dropModifier = Modifier.focusTarget(DropFocusKey),
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
+                    } else if (state.bannerAllowed) {
+                        BannerStrip(onAction = onAction)
                     }
                 }
             }
@@ -373,13 +377,14 @@ private fun BoxScope.TutorialLayer(state: GameUiState, onAction: (GameAction) ->
     val frame = state.tutorial
         ?.takeIf { state.phase == GamePhase.Playing || state.phase == GamePhase.Resolving }
         ?.takeIf { it.speaks }
+    val arrows = state.arrowsOnScreen
 
-    FocusScrim(spotlight = frame?.spotlight()) { anchor ->
+    FocusScrim(spotlight = frame?.spotlight(arrows)) { anchor ->
         if (frame != null) {
             CoachMark(
                 anchor = anchor,
                 title = tutorialTitle(frame.step),
-                body = tutorialBody(frame.step),
+                body = tutorialBody(frame.step, arrows),
                 confirmLabel = if (frame.awaitsTap) tutorialConfirm(frame.step) else null,
                 onConfirm = { onAction(GameAction.TutorialAdvance) },
                 skipLabel = if (frame.canSkip) stringResource(Res.string.tutorial_skip) else null,
@@ -390,16 +395,49 @@ private fun BoxScope.TutorialLayer(state: GameUiState, onAction: (GameAction) ->
 }
 
 /**
- * The board is lit alongside ▼, not instead of it.
+ * The board is lit alongside the drop control, not instead of it.
  *
  * A beat that lit the control alone would dim the one thing the player has to
- * aim at while asking them to aim — every ▼ beat here also asks for a placement.
- * The card still hangs off ▼, which is what `Spotlight.anchor` is for.
+ * aim at while asking them to aim — every drop beat here also asks for a
+ * placement. The card still hangs off the control, which is what
+ * `Spotlight.anchor` is for.
+ *
+ * ### [arrows] is the fix for a beat that pointed at nothing
+ *
+ * `TutorialFocus.Drop` resolved to `DropFocusKey` unconditionally, and that key
+ * is registered by [GameControlRow] alone. Under `ControlScheme.Drag` there is
+ * no control row, so nothing ever reported a rectangle for it: the scrim punched
+ * no hole, the card anchored on `Rect.Zero` in the top-left corner, and the one
+ * beat whose whole job is to point at the drop control pointed at the corner of
+ * the screen. It was reachable before drag became the default — switch the
+ * scheme, replay the tutorial — and nothing failed, because the downward flick
+ * still works and the run still completes.
+ *
+ * With no arrows there is no rectangle to light: a flick is a gesture over the
+ * board, so the board is what the beat lights and what the card hangs off.
  */
-private fun TutorialFrame.spotlight(): Spotlight = when (focus) {
-    TutorialFocus.None -> Spotlight(emptySet())
-    TutorialFocus.Board -> Spotlight(setOf(BoardFocusKey), anchor = BoardFocusKey)
-    TutorialFocus.Drop -> Spotlight(setOf(BoardFocusKey, DropFocusKey), anchor = DropFocusKey)
+private fun TutorialFrame.spotlight(arrows: Boolean): Spotlight {
+    val keys = focus.spotlightKeys(arrows)
+    return Spotlight(keys, anchor = keys.lastOrNull())
+}
+
+/**
+ * The things a [TutorialFocus] lights, given whether the arrow row is on screen.
+ *
+ * Ordered, and the last one is the anchor: a card hangs off the most specific
+ * thing lit, which is the control when there is one and the board when the
+ * control is a gesture.
+ *
+ * Internal so `TutorialFocusKeysTest` can ask the script what it wants and check
+ * it against what the screen actually registers, for every scheme. That test is
+ * the general form of the bug above — any future focus that resolves to a key
+ * some scheme never draws fails it.
+ */
+internal fun TutorialFocus.spotlightKeys(arrows: Boolean): Set<FocusTargetKey> = when (this) {
+    TutorialFocus.None -> emptySet()
+    TutorialFocus.Board -> setOf(BoardFocusKey)
+    TutorialFocus.Target -> setOf(BoardFocusKey, TargetFocusKey)
+    TutorialFocus.Drop -> if (arrows) setOf(BoardFocusKey, DropFocusKey) else setOf(BoardFocusKey)
 }
 
 @Composable
@@ -415,17 +453,42 @@ private fun tutorialTitle(step: TutorialStep): String? = when (step) {
     else -> null
 }
 
+/**
+ * The beat's copy, in the control scheme the player is actually holding.
+ *
+ * Three beats name a control and therefore have two versions. The script is one
+ * script — the drops, the boards and the order are the same however the game is
+ * driven — because what SPEC 13 teaches is a *habit*, and the habit is "you are
+ * the one who puts the block down", not a button. Only the sentence that names
+ * the input changes.
+ *
+ * Adapting rather than writing it once for drag is not a nicety. Under
+ * `ControlScheme.Buttons` the board refuses drags outright ([GameBoard]), so
+ * "drag anywhere on the board" there is an instruction to do something the game
+ * will ignore, on the one beat that cannot be finished any other way. Under
+ * `Both` the arrows are on screen and the flick still works, so naming the
+ * visible control is the safe half of a true statement.
+ */
 @Composable
-private fun tutorialBody(step: TutorialStep): String = when (step) {
-    TutorialStep.Steer -> stringResource(Res.string.tutorial_steer_body)
-    TutorialStep.FirstDrop -> stringResource(Res.string.tutorial_first_drop_body)
+private fun tutorialBody(step: TutorialStep, arrows: Boolean): String = when (step) {
+    TutorialStep.Steer -> stringResource(
+        if (arrows) Res.string.tutorial_steer_body_arrows else Res.string.tutorial_steer_body_drag,
+    )
+
+    TutorialStep.FirstDrop -> stringResource(
+        if (arrows) Res.string.tutorial_first_drop_body_arrows else Res.string.tutorial_first_drop_body_drag,
+    )
+
+    TutorialStep.SecondDrop -> stringResource(
+        if (arrows) Res.string.tutorial_second_body_arrows else Res.string.tutorial_second_body_drag,
+    )
+
     TutorialStep.FirstMerge -> stringResource(Res.string.tutorial_first_merge_body)
-    TutorialStep.SecondDrop -> stringResource(Res.string.tutorial_second_body)
     TutorialStep.ThirdDrop -> stringResource(Res.string.tutorial_third_body)
     TutorialStep.WatchThis -> stringResource(Res.string.tutorial_watch_body)
     TutorialStep.BurstIntro -> stringResource(Res.string.tutorial_burst_body)
     TutorialStep.Handoff -> stringResource(Res.string.tutorial_handoff_body)
-    else -> stringResource(Res.string.tutorial_first_drop_body)
+    else -> stringResource(Res.string.tutorial_watch_body)
 }
 
 @Composable
@@ -440,18 +503,63 @@ private fun tutorialConfirm(step: TutorialStep): String = when (step) {
  *
  * Minted here rather than in `:libraries:ui` on purpose: the design system knows
  * how to light a rectangle and nothing about what a board or a ▼ button is.
+ *
+ * [DropFocusKey] is registered by the arrow row and therefore exists only under
+ * the schemes that draw one, which is the asymmetry [spotlightKeys] is for.
  */
-private val BoardFocusKey = FocusTargetKey("game-board")
-private val DropFocusKey = FocusTargetKey("game-drop")
+internal val BoardFocusKey = FocusTargetKey("game-board")
+internal val DropFocusKey = FocusTargetKey("game-drop")
 
 /**
- * The board, the flex spacer under it, and whichever overlay is up.
+ * The outlined cell, which is a rectangle inside the board rather than a
+ * control.
  *
- * The overlay is a sibling of the board at exactly the board's size rather than a
- * full-screen scrim, which is the design decision most easily lost in a port: a
- * paused game still shows its score and its controls, dimmed, and "tap to resume"
- * has an obvious target. The board itself is blurred underneath rather than a
- * second copy of it being drawn behind the scrim.
+ * Registered by [GameBoard] whenever a beat is outlining a cell. Lighting it
+ * inside an already-lit board changes nothing on the scrim — what it is for is
+ * the *anchor*, so the card sits above the cell instead of on top of it.
+ */
+internal val TargetFocusKey = FocusTargetKey("game-target-cell")
+
+/**
+ * Whether the player has the arrow row on screen.
+ *
+ * One reading of the scheme, because three things branch on it — the copy, the
+ * spotlight and the row itself — and a tutorial that names a control the screen
+ * is not drawing is the bug this whole change is about.
+ */
+internal val GameUiState.arrowsOnScreen: Boolean get() = controlScheme != ControlScheme.Drag
+
+/**
+ * The board and whichever overlay is up, in whatever space the column has left.
+ *
+ * ### One sizing rule, and the board is centred in what it does not use
+ *
+ * The board is the largest 5:8 rectangle that fits: the narrower of the width it
+ * is given, the width its height allows, and [BoardMaxWidth]. It is then
+ * **centred** in the space, which is the whole of the owner's 2026-09-20 "it
+ * should have a GONE behaviour, not INVISIBLE".
+ *
+ * It already behaved like GONE in one sense: hiding the arrow row does hand this
+ * composable the row's height, and the board does grow into it until one of the
+ * other two bounds binds. What it did next is where the complaint came from. The
+ * board was top-aligned under a `Spacer(weight(1f))`, so every dp of height the
+ * board could not use became a gutter *at the bottom*, under the board, in
+ * exactly the place the player had just been told the arrows were not. On a tall
+ * phone that is over 100dp of nothing.
+ *
+ * Centring cannot be avoided by making the board bigger, and that is worth
+ * writing down because it looks like it should be: a 5x8 board is 0.625 wide per
+ * tall and a phone is nearer 0.45, so on any phone the board is width-bound and
+ * there is *always* height left over. The leftover is real and the only question
+ * is where it goes. Split evenly it reads as the board sitting in the screen;
+ * all at the bottom it reads as something missing.
+ *
+ * ### The overlay is a sibling at exactly the board's size
+ *
+ * The design decision most easily lost in a port: a paused game still shows its
+ * score and its controls, dimmed, and "tap to resume" has an obvious target. The
+ * board itself is blurred underneath rather than a second copy of it being drawn
+ * behind the scrim.
  */
 @Composable
 private fun BoardArea(
@@ -463,68 +571,91 @@ private fun BoardArea(
     val cols = state.board.cols
     val rows = state.board.rows
 
-    Column(modifier = modifier) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val fromHeight = (maxHeight - WellPadding * 2) * cols / rows + WellPadding * 2
-            val width = minOf(maxWidth, BoardMaxWidth, fromHeight)
+    BoxWithConstraints(modifier = modifier) {
+        val fromHeight = (maxHeight - WellPadding * 2) * cols / rows + WellPadding * 2
+        val width = minOf(maxWidth, BoardMaxWidth, fromHeight)
 
-            Box(
+        Box(
+            modifier = Modifier
+                .width(width)
+                .align(Alignment.Center)
+                .focusTarget(BoardFocusKey),
+        ) {
+            GameBoard(
+                state = state,
+                boardDescription = stringResource(Res.string.game_board, cols, rows),
+                fallingDescription = state.falling?.let { falling ->
+                    stringResource(
+                        Res.string.game_falling_block,
+                        falling.block.spoken(),
+                        falling.cell.col + 1,
+                        (state.ghost?.row ?: falling.cell.row) + 1,
+                    )
+                },
+                targetDescription = state.tutorial?.target?.let {
+                    stringResource(Res.string.game_target_cell, it.col + 1)
+                },
+                calloutText = state.callout?.let { calloutText(it) },
+                onSteerTo = { col -> onAction(GameAction.SteerTo(col)) },
+                onFlickDown = { onAction(GameAction.HardDrop) },
                 modifier = Modifier
-                    .width(width)
-                    .align(Alignment.TopCenter)
-                    .focusTarget(BoardFocusKey),
-            ) {
-                GameBoard(
-                    state = state,
-                    boardDescription = stringResource(Res.string.game_board, cols, rows),
-                    fallingDescription = state.falling?.let { falling ->
-                        stringResource(
-                            Res.string.game_falling_block,
-                            falling.block.spoken(),
-                            falling.cell.col + 1,
-                            (state.ghost?.row ?: falling.cell.row) + 1,
-                        )
-                    },
-                    calloutText = state.callout?.let { calloutText(it) },
-                    onSteerTo = { col -> onAction(GameAction.SteerTo(col)) },
-                    onFlickDown = { onAction(GameAction.HardDrop) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .thenIf(blurred) { blur(OverlayBlur) },
+                    .fillMaxWidth()
+                    .thenIf(blurred) { blur(OverlayBlur) },
+            )
+
+            when (state.phase) {
+                GamePhase.Ready -> StartOverlay(
+                    onPlay = { onAction(GameAction.Start) },
+                    onAction = onAction,
+                    modifier = Modifier.matchParentSize(),
                 )
 
-                when (state.phase) {
-                    GamePhase.Ready -> StartOverlay(
-                        onPlay = { onAction(GameAction.Start) },
-                        onAction = onAction,
-                        modifier = Modifier.matchParentSize(),
-                    )
+                GamePhase.Paused -> PauseOverlay(
+                    onAction = onAction,
+                    modifier = Modifier.matchParentSize(),
+                )
 
-                    GamePhase.Paused -> PauseOverlay(
-                        daily = state.mode == GameMode.DAILY,
-                        onAction = onAction,
-                        modifier = Modifier.matchParentSize(),
-                    )
+                GamePhase.ContinueOffer -> ContinueOverlay(
+                    state = state,
+                    onAction = onAction,
+                    modifier = Modifier.matchParentSize(),
+                )
 
-                    GamePhase.ContinueOffer -> ContinueOverlay(
-                        state = state,
-                        onAction = onAction,
-                        modifier = Modifier.matchParentSize(),
-                    )
+                GamePhase.StackedOut -> StackedOutOverlay(
+                    state = state,
+                    onAction = onAction,
+                    modifier = Modifier.matchParentSize(),
+                )
 
-                    GamePhase.StackedOut -> StackedOutOverlay(
-                        state = state,
-                        onAction = onAction,
-                        modifier = Modifier.matchParentSize(),
-                    )
-
-                    GamePhase.Playing, GamePhase.Resolving -> Unit
-                }
+                GamePhase.Playing, GamePhase.Resolving -> Unit
             }
         }
-
-        Spacer(modifier = Modifier.weight(1f).heightIn(min = SpacerMin))
     }
+}
+
+/**
+ * The strip under the board, when the player is not using it for arrows (D28).
+ *
+ * ### It is one rule, and the rule is "whatever is really there"
+ *
+ * The board above has `weight(1f)` and this has none, so the board is sized from
+ * what is left after this has measured. [com.dangerfield.drop2048.libraries.ads.BannerSurface]
+ * emits **nothing at all** until an ad is on screen, which means every reason the
+ * banner can be absent produces the identical layout without any of them being
+ * enumerated here: no fill, a network error, `ads.banner.enabled` off, ads off,
+ * Pro, or iOS, where nothing binds a surface at all. There is no `if` to keep in
+ * step with a list of failure modes, because there is no list.
+ *
+ * `state.bannerAllowed` is not that list either. It is the policy half, decided
+ * at a run boundary, and switching it off is only a way to stop the slot asking
+ * the network in the first place. The board's size does not depend on it.
+ */
+@Composable
+private fun ColumnScope.BannerStrip(onAction: (GameAction) -> Unit) {
+    LocalBannerSurface.current.Banner(
+        onFilled = { filled -> onAction(GameAction.BannerFilled(filled)) },
+        modifier = Modifier.align(Alignment.CenterHorizontally),
+    )
 }
 
 /**
@@ -621,12 +752,12 @@ private fun StartOverlay(
         Wordmark()
         OverlayBody(stringResource(Res.string.game_start_body))
         GamePrimaryButton(label = stringResource(Res.string.game_play), onClick = onPlay)
-        MenuOptions(daily = true, onAction = onAction)
+        MenuOptions(onAction = onAction)
     }
 }
 
 /**
- * Daily, Stats and Settings, drawn wherever the player is not mid-drop.
+ * Stats and Settings, drawn wherever the player is not mid-drop.
  *
  * One composable rather than three call sites because the set is the app's whole
  * navigation surface and it must not drift between the overlays that offer it: a
@@ -641,7 +772,6 @@ private fun StartOverlay(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MenuOptions(
-    daily: Boolean,
     onAction: (GameAction) -> Unit,
     share: Boolean = false,
 ) {
@@ -652,9 +782,6 @@ private fun MenuOptions(
     ) {
         if (share) {
             OverlayOption(stringResource(Res.string.share_run)) { onAction(GameAction.Share) }
-        }
-        if (daily) {
-            OverlayOption(stringResource(Res.string.daily_title)) { onAction(GameAction.ShowDaily) }
         }
         OverlayOption(stringResource(Res.string.game_stats)) { onAction(GameAction.ShowStats) }
         OverlayOption(stringResource(Res.string.game_settings)) { onAction(GameAction.OpenSettings) }
@@ -725,6 +852,16 @@ private fun ContinueOverlay(
             OverlayOption(stringResource(Res.string.continue_decline)) {
                 onAction(GameAction.ContinueDecline)
             }
+            // SPEC 12's third paywall surface (`PaywallTrigger.Continue`, D28).
+            // Under "No thanks" rather than beside it: the question on this
+            // screen is whether to save the run, and Pro is a different
+            // conversation the player may or may not want to have. Drawn only
+            // when the coordinator would accept the tap.
+            if (state.proOnContinue) {
+                OverlayOption(stringResource(Res.string.continue_pro)) {
+                    onAction(GameAction.OpenProFromContinue)
+                }
+            }
         }
     }
 }
@@ -737,14 +874,15 @@ private fun ContinueOverlay(
  * "tap to resume" and are their own tap targets, so reaching for Quit cannot
  * resume the game by accident.
  *
- * Restart is absent in the Daily (SPEC 14). The day's attempt was spent when the
- * run began, so a restart there is a free reroll of a board everyone else gets
- * one shot at. `GameViewModel` refuses it as well as hiding it, because a route
- * can be reached without going through this screen's pause menu.
+ * That last sentence was a claim rather than a fact until the dismiss tap moved
+ * off the container that holds them (see [GameOverlay]). The options were their
+ * own targets to a finger and to nothing else, so all five of them were one
+ * "resume" button to a screen reader. `OverlayMenuTapTest` is what keeps the
+ * sentence true.
+ *
  */
 @Composable
 private fun PauseOverlay(
-    daily: Boolean,
     onAction: (GameAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -752,16 +890,15 @@ private fun PauseOverlay(
         kind = OverlayKind.Paused,
         modifier = modifier,
         onTap = { onAction(GameAction.Resume) },
+        onTapLabel = stringResource(Res.string.game_tap_to_resume),
     ) {
         OverlayHeadline(stringResource(Res.string.game_paused))
         OverlayHint(stringResource(Res.string.game_tap_to_resume))
         Row(horizontalArrangement = Arrangement.spacedBy(OptionGap)) {
-            if (!daily) {
-                OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
-            }
+            OverlayOption(stringResource(Res.string.game_restart)) { onAction(GameAction.Restart) }
             OverlayOption(stringResource(Res.string.game_quit)) { onAction(GameAction.Quit) }
         }
-        MenuOptions(daily = !daily, onAction = onAction)
+        MenuOptions(onAction = onAction)
     }
 }
 
@@ -807,10 +944,9 @@ private fun StackedOutOverlay(
                 ),
             )
         }
-        val daily = state.mode == GameMode.DAILY
         GamePrimaryButton(
-            label = stringResource(if (daily) Res.string.game_daily_done else Res.string.game_drop_again),
-            onClick = { onAction(if (daily) GameAction.Quit else GameAction.Restart) },
+            label = stringResource(Res.string.game_drop_again),
+            onClick = { onAction(GameAction.Restart) },
             fontSize = DropAgainSize,
             horizontalPadding = DropAgainPaddingX,
             verticalPadding = DropAgainPaddingY,
@@ -818,12 +954,26 @@ private fun StackedOutOverlay(
         // SPEC 8.4: continue and any ad offer sit below the primary button,
         // never above. Both of these are that, and the order is the order of how
         // much they are worth to a player who has just lost a board.
-        if (state.continueAvailable && !daily) {
-            OverlayOption(stringResource(Res.string.continue_watch)) {
+        //
+        // The label is not the offer's own "Watch an ad, keep this run" (owner,
+        // 2026-09-20). On the offer, the countdown, the headline and two lines
+        // of body have already said what an ad buys; here the player is looking
+        // at a results sheet with a final score on it, and a bare "watch and
+        // continue" reads as an advertisement for an advertisement. So this one
+        // says the thing the screen has not: the run is not actually over.
+        //
+        // The terms are deliberately *not* repeated under it. This option can
+        // only be drawn when a continue is still available, and a continue is
+        // only still available on a sheet the player reached through the offer,
+        // which spent four lines saying exactly what an ad buys. Saying it twice
+        // costs a line of a sheet that already overflows a short phone when the
+        // Pro card is up.
+        if (state.continueAvailable) {
+            OverlayOption(stringResource(Res.string.continue_from_results)) {
                 onAction(GameAction.ContinueAgain)
             }
         }
-        MenuOptions(daily = !daily, onAction = onAction, share = true)
+        MenuOptions(onAction = onAction, share = true)
         if (state.showUpsell) {
             ProUpsellCard(
                 title = stringResource(Res.string.upsell_card_title),
@@ -921,10 +1071,29 @@ private fun OverlayHint(text: String) {
  * a scrim over the board, where a ghost button's border and its role-based ink
  * would be the loudest thing in the frame. The primary button is the only
  * saturated object an overlay is allowed.
+ *
+ * ### Why the touch area is capped at half [OptionGap]
+ *
+ * [GameQuietButton] grows its touch area toward 48dp without taking any layout
+ * space, which is only safe as long as it does not grow into the option beside
+ * it. On an overlay the options are the tightest-packed things in the app:
+ * [OptionGap] horizontally in both the `Row` and the `FlowRow`, the same again
+ * between the `FlowRow`'s lines when it wraps, and the overlay column's own 16dp
+ * between the two rows. Half of the smallest of those is the most any one option
+ * may take, and it makes adjacent targets meet rather than overlap.
+ *
+ * It buys the full 48dp horizontally. `Quit`, the narrowest label, is 34dp
+ * drawn and 7dp a side is exactly the 14dp it is short. Vertically it does not:
+ * the options are 25.5dp tall, so they land at 39.5dp against a floor of 48dp.
+ * Closing that last 8.5dp means giving the overlay more room between its option
+ * rows, which is a design change and not this component's to make. Overlapping
+ * them instead is not the trade: overlapping targets are settled by draw order,
+ * not by which label is nearer, so the row drawn second would take the whole
+ * contested band and a tap just under `Quit` would open `Stats`.
  */
 @Composable
 private fun OverlayOption(text: String, onClick: () -> Unit) {
-    GameQuietButton(text = text, onClick = onClick)
+    GameQuietButton(text = text, onClick = onClick, maxTouchExpansion = OptionGap / 2)
 }
 
 @Composable
@@ -961,11 +1130,23 @@ private val RootGap: Dp = 12.dp
  */
 private val HeaderHeight: Dp = 60.dp
 
-/** The design's 370px board, which is a ceiling and no longer the only bound. */
-private val BoardMaxWidth: Dp = 370.dp
-
-/** The handoff's `flex: 1; min-height: 8px`. */
-private val SpacerMin: Dp = 8.dp
+/**
+ * A ceiling that is meant never to bind on a phone, which is the opposite of
+ * what the number it replaces did.
+ *
+ * It was 370dp, which is the handoff's `max-width: 370px`: a CSS number for a
+ * 5x7 board, not a measurement of anything. On a 412dp phone the usable width is
+ * 380dp, so 370 clipped 10dp off the board for no reason anyone could state, and
+ * it did it while more than 100dp of height sat unused below (owner ruling,
+ * 2026-09-20).
+ *
+ * 480dp is wider than the usable width of any phone this ships to, so on a phone
+ * the board is bounded by the screen and by the height it is given, and never by
+ * this. What it is still for is a tablet or a desktop window, where those two
+ * bounds are both enormous and a board allowed to follow them would be a 700dp
+ * grid of tiny numbers in the middle of a wall of backdrop.
+ */
+private val BoardMaxWidth: Dp = 480.dp
 
 /**
  * The overlay's own `backdrop-filter: blur(6px)`, applied to the board it covers.

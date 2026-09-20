@@ -10,11 +10,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.features.stats.impl.StatsScreen
 import com.dangerfield.drop2048.features.stats.impl.StatsState
 import com.dangerfield.drop2048.libraries.progress.RunStats
-import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -29,13 +29,16 @@ import java.io.File
  * The stats page, which until C3c had no goldens at all and was the other half of
  * "the app looks like two products".
  *
- * Three frames, each the only one that would move for its own concern. The
+ * Four frames, each the only one that would move for its own concern. The
  * populated page catches the headline counter, the bar chart and both cards; the
  * empty page catches the one-line state a fresh install actually sees and is the
- * frame most likely to be forgotten in a refactor; the Daily-only page is
- * decision D19 rendered — fourteen runs played, a real Daily history, and a best
- * score of zero, which is a combination that has to look deliberate rather than
- * broken.
+ * frame most likely to be forgotten in a refactor; the after-one-run page is the
+ * version most people will ever see; the tall one is an inventory of every
+ * figure, because the page is longer than the phone it is judged on.
+ *
+ * There was another, `stats-daily-only`, which drew D19's rule: a player whose
+ * only runs were Dailies saw fourteen runs played beside a best score of zero.
+ * D27 removed the mode, so there is no longer a combination to draw.
  *
  * [GraphicsMode.Mode.NATIVE] is required rather than preferred: Robolectric's
  * legacy graphics stack draws nothing at all, so every golden would be a
@@ -51,7 +54,7 @@ class StatsScreenScreenshotTest {
 
     @Test
     fun populated() = compose.captureScreen("stats-populated") {
-        StatsState(loading = false, stats = Played, streak = DailyStreak(current = 4, best = 11))
+        StatsState(loading = false, stats = Played)
     }
 
     @Test
@@ -60,18 +63,19 @@ class StatsScreenScreenshotTest {
     }
 
     /**
-     * A player whose only finished runs are Dailies. `bestScore` is zero because
-     * a Daily cannot own it (D19) while every lifetime total beside it counts
-     * those runs, so the page has to read as a rule rather than as a missing
-     * number.
+     * Every figure on the page in one frame, the way `SettingsScreenshotTest`
+     * inventories its list.
+     *
+     * The populated capture above is 640dp and judges the layout at the
+     * tightest frame the app ships to (L45); the page is longer than that, so
+     * everything from "Bests" down never appeared in a golden at all. The high
+     * score and the highest level the owner asked for on 2026-09-20 sit at
+     * opposite ends of the page, and this is the only frame that holds both.
      */
     @Test
-    fun dailyRunsOnly() = compose.captureScreen("stats-daily-only") {
-        StatsState(
-            loading = false,
-            stats = Played.copy(bestScore = 0),
-            streak = DailyStreak(current = 7, best = 7),
-        )
+    @Config(sdk = [ROBOLECTRIC_SDK], qualifiers = TALL_QUALIFIERS)
+    fun wholePage() = compose.captureScreen("stats-full", height = FullPageHeight) {
+        StatsState(loading = false, stats = Played)
     }
 
     /**
@@ -92,6 +96,7 @@ class StatsScreenScreenshotTest {
                 runsPlayed = 1,
                 bestScore = 2_410,
                 averageScore = 2_410,
+                highestLevel = 4,
                 highestTier = 64,
                 totalMerges = 47,
                 totalBlocksPlaced = 62,
@@ -107,6 +112,7 @@ class StatsScreenScreenshotTest {
             runsPlayed = 14,
             bestScore = 18_240,
             averageScore = 6_112,
+            highestLevel = 11,
             highestTier = 1024,
             totalMerges = 1_284,
             totalBlocksPlaced = 2_610,
@@ -121,6 +127,7 @@ class StatsScreenScreenshotTest {
 
 private fun ComposeContentTestRule.captureScreen(
     name: String,
+    height: Dp = ShortPhoneHeight,
     state: () -> StatsState,
 ) {
     setContent {
@@ -129,7 +136,7 @@ private fun ComposeContentTestRule.captureScreen(
                 Box(
                     modifier = Modifier
                         .width(ShortPhoneWidth)
-                        .height(ShortPhoneHeight)
+                        .height(height)
                         .testTag(CaptureTag),
                 ) {
                     StatsScreen(state = state(), onAction = {})
@@ -153,6 +160,9 @@ private const val CaptureTag = "capture"
 private val ShortPhoneWidth = 360.dp
 private val ShortPhoneHeight = 640.dp
 
+/** Tall enough for the whole page. Not a device size, and not pretending to be. */
+private val FullPageHeight = 1100.dp
+
 /**
  * The SDK Robolectric renders against, pinned rather than tracking `compileSdk`.
  * A golden is a pixel comparison and a platform bump moves text metrics, so the
@@ -162,3 +172,10 @@ internal const val ROBOLECTRIC_SDK = 34
 
 /** A fixed density, for the same reason. `xhdpi` is a whole number of pixels per dp. */
 internal const val ROBOLECTRIC_QUALIFIERS = "w360dp-h640dp-xhdpi"
+
+/**
+ * The inventory frame, matching `SettingsScreenshotTest`'s. Taller than any
+ * device on purpose: it is a list of everything on the page rather than a
+ * judgement of a layout, and every golden that judges layout stays at 360x640.
+ */
+internal const val TALL_QUALIFIERS = "w360dp-h1100dp-xhdpi"

@@ -6,131 +6,68 @@ chunk that found them.
 Not a changelog. **Delete entries as they land** rather than ticking them off, so this stays a
 queue. Human-only items go in `OWNER-TODO.md`.
 
-Audited 2026-09-11 — thirteen entries had landed chunks ago and were removed. A stale queue is
-worse than no queue: an agent reading it redoes finished work.
+Audited 2026-09-20 against the working tree, entry by entry. Two landed and were deleted, eleven
+were rewritten because a path, a constant or a premise had moved under them, and five shapes found
+that day were added to the Watch list. A stale queue is worse than no queue: an agent reading it
+redoes finished work.
 
 ---
 
 ## Now
 
-### Template port candidate: let the init script ask whether the app has a backend
+### The overlay options are 14dp apart, which caps their finger target at 39.5dp
 
-Both server deploy workflows were disabled on 2026-09-16 because they fire on every push to main
-and fail without a Fly app. A generated app should not have to discover that.
+Left behind by the `GameQuietButton` fix, and it is a design question rather than a bug. The
+assistive-tech target is a full 48×48 now, because the framework inflates semantics bounds once a
+click action exists and resolves overlaps by distance. The **pointer** target cannot get there:
+option rows sit 14dp apart, two overlapping pointer targets are settled by draw order rather than by
+which label is nearer, so growth is capped at half the gap and the rows land at 39.5dp tall.
 
-`scripts/init_project.main.kts` in `../KMPTemplate` should ask, and on "no backend" drop
-`:apps:server`, `:apps:admin`, `:apps:integration`, the two deploy workflows and the Fly config.
-Goes in that repo's `docs/PORT-CANDIDATES.md`, which is currently empty.
+Closing the last 8.5dp means more room between the option rows on the paused overlay, which moves
+copy and moves goldens. Worth doing if the rows are being touched anyway; not worth a change on its
+own.
 
-**Note Drop 2048 does have a backend** and the workflows are disabled only until a Fly app exists.
-See the correction below before anyone acts on this.
+### Two iOS *test* binaries do not link, and nobody had noticed
 
+Found on 2026-09-16, the first time `./gradlew iosSimulatorArm64Test` compiled repo-wide. Both are
+test-executable-only. `:apps:compose:linkDebugFrameworkIosSimulatorArm64`, the real app framework,
+links fine, so iOS dev builds are unaffected.
 
-### Point the legal config keys at the real Pages URLs
+- **`:libraries:networking:impl:linkDebugTestIosSimulatorArm64`** — `Undefined symbols:
+  __swift_FORCE_LOAD_$_swiftCompatibility56`, `…Concurrency`, from Wiretap's Swift cinterop
+  (`WiretapShakeDetector.swift.o`). The libraries are present under
+  `XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator/`; Kotlin/Native just does not put that
+  directory on the test executable's link path. `-Pdrop2048.wiretap.ios=false` links clean, which
+  pins it exactly. The fix means teaching `build-logic` Xcode's internal library layout, and the
+  Wiretap variant selection already carries a warning about a `-P` flag on one of two Gradle
+  invocations silently re-linking the inspector into release. Read that before touching it.
+- **`:apps:compose:linkDebugTestIosSimulatorArm64`** — `ld: framework 'Sentry' not found`,
+  independent of the above. Xcode supplies the Sentry Cocoa framework when it embeds the app
+  framework; it is not on the Kotlin test executable's search path. What it blocks is currently
+  nothing: `:apps:compose`'s whole Native test payload is the template placeholder asserting
+  `1 + 2 == 3`.
 
-`legal.privacyUrl` and `legal.termsUrl` default to `https://drop2048.app/terms` and `/privacy`,
-which have never existed. The pages are now live and serving:
+Excluding those two, Native is **866 tests, 0 skipped, 0 failures across 35 modules**, including
+`:libraries:networking:impl`'s 14 that had never run. Until they are fixed, the honest Native command
+is `./gradlew iosSimulatorArm64Test -Pdrop2048.wiretap.ios=false -x :apps:compose:iosSimulatorArm64Test`.
 
-- `https://elijah-dangerfield.github.io/Drop2048/privacy.html`
-- `https://elijah-dangerfield.github.io/Drop2048/terms.html`
+### Achievements has a baseline profile hole, and it is not one screen
 
-Both returned HTTP 200. Change the compiled defaults in `:libraries:gameconfig`. Both are
-remote-overridable, so a custom domain later is a config push rather than a release.
+`BenchmarkJourney` leaves it out and D27 took away the stand-in: the Daily Challenge used to cover
+the same shape from the same menu, one tap away, and it is gone. What is left is the one screen a
+player can only reach through Settings, in the fourth of eight sections, so reaching it means
+scrolling a list.
 
-Note C13a rewrote `privacy.html` to describe the app that actually exists (AdMob, Grafana, the
-install id), so what is being served is accurate — it was just unreachable.
+The R8 half is closed. `MinifiedReleaseSurfacesTest.theMinifiedAppDrawsTheAchievementsGrid` covers
+the grid on the minified release variant, and `SurfaceJourney`'s KDoc names the three reasons the
+naive swipe fails: a row under the translucent `TopBar` is still `hasObject`, a swipe down the middle
+of the column grabs a text field, and `waitForIdle` returns while the list is still flinging. Those
+verbs are deliberately kept out of `BenchmarkJourney`, because a verb added there changes what gets
+AOT-compiled.
 
-
-### C16 · The owner-directive channel, the debug FAB, and a QA menu
-
-Owner request, 2026-09-11: port Sodogku's system wholesale. Four pieces, and the
-point of the whole thing is that the round trip from "this bothers me while playing" to "it is on
-the list" is one swipe.
-
-**1. `FeedbackKind` as a Sentry tag.** `Sodogku/libraries/sodogku/src/.../FeedbackKind.kt`. Three
-kinds — `feedback`, `bug_report`, `owner_directive` — riding as the `feedback_kind` **tag**, not a
-message prefix, because a carrier event's message is also its issue title and titles get grouped,
-AI-resummarised and edited. A tag is indexed and queryable.
-
-**2. The carrier + twin in Sentry.** `Sodogku/libraries/sodogku/impl/.../AppTelemetry.kt` around
-lines 200-265. A `captureMessage` carrier holds the tags, breadcrumbs and attachments
-(`feedback.txt`, `session-log.txt`, `screenshot-N.jpg`); Sentry's own user-feedback record holds the
-words. **Each report is fingerprinted to its own issue** (`["feedback", uuid]`), set on a *local*
-scope so nothing leaks onto later events, at `INFO` level so it does not sort with crashes.
-
-The message is deliberately duplicated onto the carrier as an extra **and** an attachment: the
-legacy feedback API's comments render wherever the org's settings decide, and a real report arrived
-with the log and screenshot visible and the typed text nowhere.
-
-**3. The draggable FAB.** `Sodogku/apps/compose/src/.../devfeedback/` — `DevFeedbackFab` (48dp,
-position stored as *fractions* so it survives rotation and a different device, clamped so it can
-never be parked off-screen), `DevFeedbackHost` (records the content into a `GraphicsLayer` so a
-screenshot needs no platform API or permission, **tester builds only** — a player's build gets one
-bare `Box`), `DevFeedbackPanel`, `DevFeedbackViewModel`, `DevFeedbackFabCache`.
-
-Read `DevFeedbackFab`'s KDoc before touching the gesture: `clickable` and `detectDragGestures`
-coexist on purpose, and getting the order wrong means a dragged button also files a directive.
-
-**4. The QA menu.** `Sodogku/apps/compose/src/.../qa/QaToolsScreen.kt` + `QaToolsRoute`. Its
-feedback switch is the reason it exists, and it is deliberately **the one screen reachable without
-the button it switches off**. Note its split: the FAB toggle shows on any tester build, everything
-destructive is `isDebug` only, because a TestFlight tester needs to hide the button but must not be
-handed irreversible tools.
-
-**Also port `.claude/skills/feedback-triage/`** and its `docs/feedback-log.md` ledger. The ledger is
-what makes triage idempotent — the TODO queue is not a record of what was seen, because items are
-deleted when they ship, so without it every run after a fix re-files the same report.
-
-**Adapt, do not copy blind.** Drop 2048 already has: a debug menu behind seven taps with a
-`debugMenuUnlocked` flag (C12), `ShakeDialog`, and a feedback path whose session-log attachment C13a
-made **opt-in** with breadcrumbs cleared, because every report was leaking scores. An owner
-directive from the owner's own build wants the log unconditionally — that is a different kind, not a
-reason to undo C13a's fix. `BuildInfo.isTesterBuild` needs checking; Sodogku's is
-`isDebug || isTestFlight`.
-
-
-### The Settings row on the Home and pause overlays swallows taps
-
-Found repeatedly by C15 while navigating (~25 minutes lost). The overlay's own click — "tap to
-resume" — wins over the `Settings` text row. Reproduces on a stock debug build and predates the ads
-work.
-
-### `:libraries:ads:fake` is linked into iOS release binaries
-
-Kotlin/Native has no build-type source sets, so the house ad network ships in every iOS binary and
-is held out only by a runtime `Platform.isDebugBinary` check (L78, layer 3). If iOS ever gains a real
-ad SDK, this wants a Gradle-level exclusion or an `expect`/`actual` no-op so iOS gets layer 1 too.
-
-### `GameQuietButton` has no button semantics and no minimum touch target
-
-A raw `pointerInput` with no `Role.Button` and no 48dp floor. Inherited from `GameScreen`'s private
-`OverlayOption` and **now used on the paywall's Restore**, so it has spread. C11's accessibility
-pass did not cover it because it did not exist yet.
-
-### No harness exercises a `bottomSheet<>` destination
-
-The paywall is the app's first one. Its conversion is verified on Android by hand only, and
-Material draws the sheet in its own window so the goldens pin the content and not the scrim or the
-drag handle. iOS has never rendered it at all.
-
-### A haptic can be cancelled by the next one a millisecond later
-
-Observed in `dumpsys`: a `Move` and the `Merge` behind it landed 1ms apart and the first came back
-`cancelled_superseded`. The `Cues` throttle covers Move→Move and **not** Move→Merge. Needs a
-priority or a queue, not a longer gate.
-
-### Extend the R8 smoke test past one journey
-
-C13a proved R8 needs **zero keep rules** for the tutorial, a cascade, three routes and a Room
-screen. Untouched and all carrying `@Serializable` models: ads, billing, paywall, sharing,
-leaderboards, achievements, launch gates, remote config.
-
-Also unexplained: 15 `R8: An error occurred when parsing kotlin metadata` warnings, consistent with
-R8 being older than this Kotlin version. Nobody has checked which classes.
-
-### Restore Achievements to the benchmark journey
-
-It has no baseline profile coverage and no R8 coverage. Same journey, one more screen.
+So this is a judgement and not a chore: either accept that the grid is not on the cold-start path and
+say so in `BenchmarkJourney`'s KDoc, or lift `aboveReach` / `scrollContent` / `awaitStill` into the
+shared journey and pay the profile cost.
 
 ### Widen `AnimatedStateReadInComposition` to raw `Animatable.value` reads
 
@@ -140,8 +77,19 @@ in the app and nothing enforces it there.
 
 ### A second metric for permanent obstructions
 
-D8 deferred it. Stones arrive at level 12 and clocked runs reach 19-22, so board congestion is real
-and `clutter` deliberately cannot see it. A second count, not a change to `clutter`.
+D8 deferred it and D26 re-confirmed the premise rather than removing it. Stones still arrive at level
+12, measured and deliberately left there, and `special.stone.firstLevel` is a live remote key priced
+at roughly half the 2048 rate per two levels, so the one dial that moves board congestion can be
+turned from a console with nothing measuring what it does.
+
+**The numbers this entry used to quote were measured at `blocksPerLevel` 20 and should not be
+reused.** D26 took it to 15, so level 12 now arrives at 180 drops rather than 240, against a median
+greedy run of 317 rather than 355. Congestion starts earlier in a shorter run, and by how much is
+exactly what nothing counts. SPEC 4.4's warning applies to whatever replaces them: a cheaper level is
+not a lower difficulty, so read run length and tier ceiling, never the level number.
+
+A second count, not a change to `clutter`. D8's binding constraint still holds: the harness and SPEC
+17's live telemetry must compute it from the same function in `:libraries:cascade`.
 
 ### Delete the iOS camera bridge
 
@@ -153,39 +101,13 @@ who can build the Xcode target.
 ### `FuseReach` could come up ~10%
 
 The bomb fuse is legible at real cell size and is the smallest of the three special marks. One
-constant in `BlockFace.kt`.
+constant: `FuseReach = 0.34f` at the bottom of `:libraries:ui`'s `Tile.kt`. This entry said
+`BlockFace.kt` until the audit of 2026-09-20; that file was renamed during the game screen rebuild.
 
 ### Decide whether a step-1 merge should pop the score louder
 
 With C3a's per-step pacing (L58) the chain steps read well, and the single merge is now the one beat
 that looks plain by comparison.
-
-### Drag becomes the default control scheme, and the tutorial is rewritten for it
-
-**Owner ruling, 2026-09-16.** `PlayerSettings.controlScheme` defaults to `ControlScheme.Both`
-today. It becomes `Drag`. Not urgent, but it is a decision, not an experiment, so nothing should be
-built that assumes the button row is present.
-
-The tutorial is the load-bearing half and it is currently written entirely around the button:
-
-- Every string names the control as a button. `tutorial_first_drop_body` is "Nothing falls on its
-  own. Tap ▼ and it goes straight to the bottom", `tutorial_third_title` is "You will use ▼ a lot".
-  Under `Drag` there is no ▼ on screen and the hard drop is a downward flick.
-- `TutorialFocus.Drop` spotlights `DropFocusKey`, which is only registered by `GameControlRow`
-  (`GameScreen.kt`). Under `Drag` the key never registers, so the beat that exists to point at the
-  drop control points at nothing.
-- **This is already reachable today**, before any default changes: set `Drag` in Settings, then
-  Replay tutorial. The flick still works so the run completes, which is why it has not been noticed.
-
-SPEC 13's mechanism is untouched by any of this. The frozen timer still means the drop control is
-the only thing that moves a block downward, and the habit is still the thing being taught. What
-changes is the verb and the thing being lit. The flick thresholds (30dp, 450ms) are unvalidated
-guesses and a tutorial that teaches the flick is the first thing that will find out.
-
-While the script is open: the owner has ruled the specials **do not** need contextual tooltips
-(2026-09-16, against SPEC 13's "one contextual tooltip the first time they become relevant") on the
-grounds that Wildcard, Bomb and Stone read for themselves. If a beat for them is cheap inside the
-rewritten script, take it there; do not build a separate first-seen tooltip system for it.
 
 ### The level-up callout overwrites the chain callout it lands on
 
@@ -210,18 +132,20 @@ change wearing a reward's clothes, and it is the only signal the player gets tha
 harder.
 
 It is also the *wrong* signal for most players. C1e pinned
-`theDropControlChangesTheWallClockAndNothingElse`: the drop control moves the wall clock by a factor
-of four and moves no outcome column at all, and C1c measured three opening curves with every outcome
-column identical to the digit. **The difficulty is the rising spawn floor, not the speed**, so a
-player who uses the drop control (which the tutorial exists to make habitual) never experiences the
-speed change at all. What they experience is a 32 landing on a board of 4s, with nothing anywhere
-saying that was the game and not bad luck.
+`theDropControlChangesTheWallClockAndNothingElse` in `:tools:balance`'s `HarnessTest`: the drop
+control moves the wall clock by a factor of four and moves no outcome column at all, and C1c measured
+three opening curves with every outcome column identical to the digit. D26 measured the curve a third
+time and changed nothing. **The difficulty is the rising spawn floor, not the speed**, so a player who
+ends the drop early never experiences the speed change at all. Under `ControlScheme.Drag`, now the
+default, that control is the downward flick, and the rewritten tutorial teaches it on drop one. What
+the player experiences is a 32 landing on a board of 4s, with nothing anywhere saying that was the
+game and not bad luck.
 
-The level meter is the surface with room to say it. `game-danger.png` is the model for what a
-legible state change looks like in this app.
+The level meter is the surface with room to say it, and today it is a bare `fraction`.
+`game-danger.png` is the model for what a legible state change looks like in this app.
 
-Note the start overlay copy has the same problem from the other side: "Blocks fall on their own" is
-true of a player who never presses the drop control and of nobody else.
+Note `game_start_body`, "Blocks fall on their own…", has the same problem from the other side: it is
+true of a player who never ends a drop early and of nobody else.
 
 ## Soon
 
@@ -242,10 +166,18 @@ classpath. There is already a `path == ":libraries:core"` special case to mirror
 The transcript gives from/to cells, which is enough to animate. A stable id makes "this specific
 tile travelled" trivial rather than inferred. **Cheap now, invasive later.**
 
-### `dragAcrossCells` and the steer gesture have no test
+### `dragAcrossCells` has no test *and* no call site
 
-Neither gesture is unit-testable; `BoardGeometry` underneath them is, thoroughly. Wants a Compose UI
-test.
+The steer half is closed. `BoardFlickTest` in `:features:game:impl` drives the real board through
+`performTouchInput` and covers a straight flick, a slide-then-flick with no lift, and a slow drag
+that must not drop, the three cases the flick-origin fix turned on.
+
+What is left is stranger. `Modifier.dragAcrossCells` and `BoardGeometry`, in `:libraries:ui`'s
+`components/board/BoardDrag.kt`, have **no production call site at all**: `GameBoard` rolls its own
+`pointerInput` for `onSteerTo` / `onFlickDown` and never touches either. `BoardGeometryTest` covers
+`BoardGeometry` thoroughly, which is the Watch list's "an API with no production call site looks like
+coverage" sitting in the repo rather than in a learning. Decide whether `dragAcrossCells` is the
+gesture the board should have been built on or dead weight, and delete one of the two.
 
 ### Measure the two things no policy has ever done
 
@@ -260,15 +192,21 @@ Once a week of telemetry exists, replace the modelled 250ms `decisionMillis` and
 with real ones and update SPEC 4.4's numbers with error bars. This is the whole point of C8's
 instrument (L41).
 
-### `:tools:balance:test` is not in the standard gate
+### `:tools:balance:test` never runs in CI
 
-It runs under `check` but not `testDebugUnitTest`, so the harness's own guard tests do not run in the
-normal loop.
+It is a plain JVM module, so its guard tests hang off `test`, and CI runs `testDebugUnitTest`,
+`:apps:server:test` and `:apps:integration:testDebugUnitTest` and never `check`. `HarnessTest` and
+`ClutterParityTest` have therefore only ever been enforced by somebody running them by hand, which is
+precisely the failure they were written to catch: a harness that quietly stopped measuring anything
+looks exactly like one that found nothing. D26 rested three difficulty rulings on this module.
 
 ### Add `--csv` to the balance harness
 
-The text report is right for a one-off read and wrong for trends. Worth doing at the second
-measurement, not the first.
+The text report is right for a one-off read and wrong for trends. This entry used to say it was worth
+doing at the second measurement rather than the first. D26 was that measurement: three sweeps
+(`blocksPerLevel`, `--curve`, `--specials-from`) were hand-transcribed into `decisions.md` tables
+because there was no other way to carry them out of the harness. The next sweep should not be typed
+out again.
 
 ### Sweep the last 8 `VerifyStrings` baseline entries
 
@@ -281,10 +219,15 @@ Both survived C0 because they are welded to `NetworkClientImpl`'s 401 path and `
 **Nothing can trigger either one** — the server's ban gate went with the auth stack. The server
 surface is final now, so this is answerable.
 
-### Check `:libraries:review` is still wanted
+### `:libraries:review` has no consumer at all
 
-The template ships in-app review. SPEC 15 wants the rate prompt only after a run that set a personal
-best, which is a real trigger — but confirm the library is wired rather than assuming.
+Answered rather than assumed: nothing outside `:libraries:review` and `:libraries:review:impl`
+references `ReviewPromptCoordinator`, `ReviewTrigger` or `ReviewLauncher`. Two modules are built,
+wired into DI, and asked for nothing.
+
+SPEC 15 wants the rate prompt only after a run that set a personal best, which is a real trigger, and
+`GameUiState.newBest` already computes exactly that. So the choice is one call site in
+`GameViewModel` or two modules deleted.
 
 ### `docs/PORT-CANDIDATES.md` writeback
 
@@ -293,37 +236,20 @@ best, which is a real trigger — but confirm the library is wired rather than a
 with its verification trap, the palette property test, the transcript playback architecture, the
 Room migration test, the debug session latch. Collect and write back in one pass.
 
-### The board stops growing before it runs out of vertical space
+### Whether the board should have a ninth row
 
-**Owner, 2026-09-16: the board should grow vertically when the control row is gone.** It does grow,
-and then it stops early, and the reason is worth reading before anyone changes a constant.
+Options 1 and 2 of this entry landed in D28. `BoardMaxWidth` went from the handoff's 370dp to 480dp,
+wider than the usable width of any phone, so a phone board is bounded by the screen and by its own
+height and never by a number from a stylesheet; and the board is centred in whatever height is left
+rather than top-aligned over a gutter. Measured on 412×915 under `ControlScheme.Drag`: 370dp wide to
+380dp, cell pitch 70.8dp to 72.8dp, bottom edge 675.5dp to 770dp.
 
-`GameScreen` sizes the well as `min(maxWidth, BoardMaxWidth, fromHeight)` where `fromHeight` is the
-width a `rows/cols` box would have at the available height. Hiding the control row under
-`ControlScheme.Drag` raises `fromHeight`, so the board does get bigger: comparing
-`game-playing.png` to `game-drag-only.png`, cell pitch goes from about 111px to about 122px at the
-harness's 720px width, roughly 10%. Then `BoardMaxWidth` (370dp, the handoff's `max-width: 370px`)
-or the phone's own width binds instead, and every remaining pixel of height becomes the `Spacer`
-under the well. The board is top-aligned, so on a tall phone in drag mode the dead space sits at the
-bottom.
-
-Cells are square and derived from the pitch (`GameBoard`, `BoardScale`), so with five columns fixed
-there are exactly three ways to spend that height and they are not the same decision:
-
-1. **Raise or drop `BoardMaxWidth`.** Cheapest. Lets height stay the binding constraint on tall
-   devices and makes the blocks bigger everywhere. Changes no rule and no score. The handoff's 370
-   was a CSS number for a design canvas, not a measurement.
-2. **Centre the board in the freed space** rather than leaving the gutter at the bottom. Cosmetic,
-   independent of 1, and worth doing either way.
-3. **More rows.** The only option that is *literally* vertical growth, and the expensive one.
-   `board.rows` is a remote key (SPEC 10) precisely so the 7-versus-8 question can be reopened, but
-   SPEC 3 also says the high score table is not comparable across dimensions and so rows do not move
-   mid-version. C1a's finding is the other half: the spawn table sets the tier ceiling and **the
-   board geometry sets the level**, so a ninth row is a balance change, not a layout change, and it
-   wants a harness pass before it wants a UI pass.
-
-1 and 2 are a layout fix and should just be done. 3 is a design decision and should be made on
-`tools/balance` output, not on a screenshot.
+What is left is option 3, **more rows**, and it is a balance change rather than a layout one.
+`board.rows` is a remote key (SPEC 10) precisely so the 7-versus-8 question can be reopened, but SPEC
+3 says the high score table is not comparable across dimensions and so rows do not move mid-version.
+C1a's finding is the other half: the spawn table sets the tier ceiling and **the board geometry sets
+the level**, so a ninth row wants a `tools/balance` pass before it wants a UI pass, and it lands at a
+version boundary with everything else that moves `PINNED_DIGEST`.
 
 ### The stacked-out sheet under-reports the run it is summarising
 
@@ -335,6 +261,10 @@ The two worth adding are **level reached**, because it is the run's difficulty a
 the player was watching all game, and a **distance-to-best** read for a run that did not set one.
 "4,896" against a best of 130,450 is the standard near-miss beat and the data is sitting there
 unused.
+
+D28 did not do either, and it tightened the budget: the sheet now carries a continue option and a Pro
+upsell card, and `StackedOutOverlay`'s own comment says it already overflows a short phone when the
+card is up. Two more figures go into the existing SCORE / BIGGEST row or they do not go in at all.
 
 ### `GameControls` argues for the quiet ▼ with the number that argues against it
 
@@ -361,14 +291,15 @@ Small: one screen, and the copy is mostly already written in SPEC 4.3 and 5.2.
 
 Since D11 removed the preview, `Lookahead-1` sees a block the player cannot and never will. SPEC 4.4
 already says it must not be quoted as a prediction of play, which is the honest framing, but the
-consequence is that **the declared ceiling is a policy playing a different game** and nothing
-measures the ceiling of the game that shipped.
+consequence is that **the declared ceiling is a policy playing a different game** and nothing measures
+the ceiling of the game that shipped.
 
-This matters more now than it did: the owner has ruled the next-block preview permanently out
-(2026-09-16, "it's too easy with that"), so the no-preview game is the only game there will be. A
-policy that plans against board shape rather than against a known next block would give the tail
-past 1024 an honest ceiling. Pairs with "Re-run `tools/balance` with measured constants" above: both
-are waiting on the same harness pass.
+This matters more now than it did. The owner has ruled the next-block preview permanently out
+(2026-09-16, "it's too easy with that"), so the no-preview game is the only game there will be. And
+D26 ran the harness harder than anything before it, three sweeps, with every difficulty ruling in the
+spec now resting on `Policy.Greedy` clocked, and this gap did not close. So "wait for the next
+harness pass" has stopped being an answer. A policy that plans against board shape rather than
+against a known next block would give the tail past 1024 an honest ceiling.
 
 ## Later
 
@@ -389,9 +320,12 @@ drops, a player who sets up three merges in a row is paid exactly as if they had
 times. It is the cheapest lever left for making skill *feel* like skill, and it needs no change to
 the merge rules.
 
-Filed under Later because it is not free. Scoring formulas are on SPEC 10's **never remote** list
-and a new payout invalidates every banked score, so it lands at a version boundary alongside
-anything else that moves `PINNED_DIGEST`, or not at all. The five derived achievement score targets
+Filed under Later because it is not free. Scoring formulas are on SPEC 10's **never remote** list and
+a new payout invalidates every banked score, so it lands at a version boundary alongside anything
+else that moves `PINNED_DIGEST`. **D26 was that boundary and this did not go with it**: the digest
+moved a fourth time on 2026-09-20, and `decisions.md` calls it the last time the "no scores recorded
+yet" argument gets written. So this is either taken before the first build ships or it costs a real
+score reset. The five derived achievement score targets
 (SPEC 15) move with it by construction, which is the reason they were derived.
 
 ---
@@ -410,8 +344,13 @@ lands.
 - **A failed iOS link reports `BUILD SUCCEEDED`** and silently runs the previously linked framework
   (L24). **A Kotlin compiler crash** can also pass, because Gradle retries out of process (L62).
 - **Goldens are not declared task inputs**, so swapping one leaves the test UP-TO-DATE and green.
-  Proving the verifier works needs `--rerun` (L60). And the capture itself is a **no-op** unless
-  verification is enabled (L39).
+  Proving the verifier works needs `--rerun` (L60). The L39 half is now handled by configuration
+  rather than by luck: every Roborazzi module sets `roborazzi.test.verify = true` unless the task
+  name contains `recordRoborazzi`, so do not go looking for an unset flag.
+- **A golden can be green and still be the wrong scenario.** `game-stacked-out` never set
+  `inDanger`, which made it the only stacked-out screen in existence that was not in danger, and it
+  hid a visible defect for as long as it existed (D28). A golden asserts that a composable draws what
+  it drew last time, never that the state it was handed is a state the app can reach.
 - **An API with no production call site looks like coverage.** Prove the call site by deleting it
   and checking the *caller's* test goes red while the API's own test stays green (L55).
 
@@ -421,7 +360,10 @@ lands.
   the game-over scrim: invisible, untouchable, live for two chunks (L32).
 - **A `pointerInput` keyed on a value that changes mid-gesture** drops its release callback, so any
   hold-to-do-X leaks its "on" state (D21).
-- **`Modifier.blur` clips to bounds at any radius, including zero** (L43).
+- **`Modifier.blur` clips to bounds at any radius, including zero** (L43), and it clips to the
+  **rectangle** even when what it covers follows a rounded one. D28 found the second face: the
+  stacked-out scrim left four red corner stubs where the board's corner arc bulges inside its own
+  rectangle, because `BoardWell` draws the danger ring outside its bounds on purpose.
 - **Top-level `val`s initialise in declaration order**, so a colour derived from one declared below
   it comes out transparent with no warning (L22). Same family: a `get() = false` on a sealed
   interface is a JVM default method and can half-build a companion (L42).
@@ -430,6 +372,16 @@ lands.
   nothing about the narrowing (L61).
 - **`UIApplication.canOpenURL` needs its scheme in `LSApplicationQueriesSchemes`**, or every outbound
   link silently opens nothing.
+- **An `apply` on a call that returns `Unit` binds to the enclosing receiver.**
+  `destination(Builder(...)).apply { deepLinks.forEach { deepLink(it) } }` compiles, the graph builds,
+  the destination resolves, and every link lands on the *graph* instead. `bottomSheet<>` was written
+  that way and silently dropped every deep link into a sheet. `NavGraph.matchDeepLink` answers `true`
+  under the bug because it searches children too, so only `NavDestination.hasDeepLink` can tell.
+- **A gesture threshold can be individually correct and measured from the wrong origin.** The flick's
+  30dp of travel and 450ms release window were timed from the moment the finger landed rather than
+  from the start of the downward stroke, so "slide it over, then send it down, without lifting", the
+  gesture the tutorial asks for by name, could not be performed at all. Neither threshold changed in
+  the fix.
 
 **Things tests structurally cannot see:**
 
@@ -439,3 +391,12 @@ lands.
   `LocalInspectionMode`.
 - **A test that advances a full drop tick and then asserts on the falling block** is asserting about
   the next one (L31).
+- **A `ModalBottomSheet` draws into a window of its own**, so a module's goldens capture the content
+  composable and pass identically whether the route is registered with `bottomSheet<>` or `screen<>`.
+  `PaywallGraphTest` asserts the destination is a `FloatingWindow` one because nothing else in the
+  repo can say it.
+- **A nav typeMap hole is invisible to every JVM harness.** `enter` / `exit` / `popExit` resolve
+  through a reflective enum fallback on the JVM and return `UNKNOWN` on Native, so graph-build throws
+  only under `iosSimulatorArm64Test`, often naming a different argument than the missing one. Proved
+  by deleting `+ baseRouteTypeMap` and watching `testDebugUnitTest` stay green. AGENTS.md lists the
+  crash; this is the reason no JVM test will ever find it.

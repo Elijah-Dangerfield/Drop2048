@@ -183,7 +183,7 @@ class LaunchGatesTest {
     }
 
     @Test
-    fun `a terms bump alone is a notice, not a wall`() {
+    fun `a terms bump alone is a notice rather than a wall`() {
         val gates = resolveLaunchGates(
             upgrade = upgradeOk(),
             maintenance = MaintenanceInputs(mode = MaintenanceOff, message = ""),

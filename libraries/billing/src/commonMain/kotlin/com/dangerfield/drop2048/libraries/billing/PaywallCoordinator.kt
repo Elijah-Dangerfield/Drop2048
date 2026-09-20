@@ -29,8 +29,14 @@ enum class PaywallTrigger(val id: String) {
 
     /**
      * Next to the rewarded continue, where the player is already weighing
-     * "watch an ad or not" — so Pro reads as the other answer to a question
+     * "watch an ad or not", so Pro reads as the other answer to a question
      * they are already being asked.
+     *
+     * Declared in C10 and wired on 2026-09-20 (D28). It sat with zero call
+     * sites for three chunks, which is the same failure `feature.leaderboards`
+     * was: a documented surface that did not exist. It is now a quiet option on
+     * the continue overlay, under "No thanks", drawn only when [mayOffer] says
+     * the tap would go somewhere.
      */
     Continue("continue"),
 }
@@ -71,15 +77,34 @@ interface PaywallCoordinator {
     fun requestOffer(trigger: PaywallTrigger): Boolean
 
     /**
+     * Whether a [requestOffer] at [trigger] would be accepted, asked without
+     * spending it.
+     *
+     * For drawing the control rather than for deciding anything: a Pro entry
+     * point that opens nothing is worse than no entry point, and the caller
+     * cannot know the two rules [requestOffer] applies without copying them.
+     * Pure: it moves nothing and logs nothing, so asking twice is free.
+     */
+    fun mayOffer(trigger: PaywallTrigger): Boolean
+
+    /**
      * Take the session's one stacked-out card, if it is still there. True at
-     * most once per session, and never for a Pro player or with
-     * `pro.upsell.enabled` off.
+     * most once per session, and never for a Pro player, with
+     * `pro.upsell.enabled` off, or before this player has actually been shown an
+     * ad.
      *
      * Separate from [requestOffer] because SPEC 12's card is not a sheet: it is
      * drawn in place, it costs the player nothing until they touch it, and it is
      * the *card* that is capped at once per session rather than the paywall
      * behind it. A player who taps it, backs out and taps it again is asking, and
      * asking is never refused.
+     *
+     * Suspending since D28. The card's copy is "Tired of the ads?", and whether
+     * this player has ever seen one is a fact on disk, behind `AdImpressions`
+     * in `:libraries:ads`, rather than something the process knows already. It
+     * is called from the run-end path, which is
+     * already suspending, so the cost is a read the sheet was waiting for
+     * anyway.
      */
-    fun claimStackedOutCard(): Boolean
+    suspend fun claimStackedOutCard(): Boolean
 }

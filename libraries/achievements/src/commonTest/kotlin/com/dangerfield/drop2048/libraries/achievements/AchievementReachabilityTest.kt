@@ -27,8 +27,8 @@ import kotlin.test.assertTrue
  * - [Reach.OverManyRuns] — the value accumulates across a lifetime. There is
  *   nothing to bound; what has to be true is that the engine can produce the
  *   thing *at all*, and the witness is one run that does.
- * - [Reach.OffTheBoard] — a wall clock or a calendar decides it. The engine has
- *   no opinion and neither does this file.
+ * - [Reach.OffTheBoard] — a wall clock decides it. The engine has no opinion and
+ *   neither does this file.
  *
  * The measured numbers come from forty greedy runs, which is small next to
  * `tools/balance`'s ten thousand and is not trying to be a distribution: it only
@@ -107,8 +107,8 @@ class AchievementReachabilityTest {
      *
      * Measured for the four that a competent run simply reaches; witnessed for
      * the two that are far too rare to turn up in any affordable number of
-     * played runs; counted-per-run for the accumulators; and refused for the two
-     * a clock and a calendar own.
+     * played runs; counted-per-run for the accumulators; and refused for the one
+     * a clock owns.
      */
     private fun reachOf(stat: Stat): Reach = when (stat) {
         Stat.BestScore -> Reach.WithinOneRun(bestRun.score, "the best of $Runs greedy runs")
@@ -136,9 +136,7 @@ class AchievementReachabilityTest {
             "a Wildcard dropped beside a 1024",
         )
 
-        Stat.MinutesPlayed,
-        Stat.BestDailyStreak,
-        -> Reach.OffTheBoard
+        Stat.MinutesPlayed -> Reach.OffTheBoard
     }
 
     /**
@@ -268,7 +266,7 @@ class AchievementReachabilityTest {
         /** A lifetime tally. [perRun] is how many one run has been shown to produce. */
         data class OverManyRuns(val perRun: Long, val how: String) : Reach
 
-        /** A wall clock or a calendar bounds it, not the engine. */
+        /** A wall clock bounds it, not the engine. */
         data object OffTheBoard : Reach
     }
 

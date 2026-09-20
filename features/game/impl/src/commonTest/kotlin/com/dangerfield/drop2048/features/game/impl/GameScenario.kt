@@ -1,10 +1,12 @@
 package com.dangerfield.drop2048.features.game.impl
 
 import com.dangerfield.drop2048.features.debug.DebugController
+import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.debug.NoDebugController
 import com.dangerfield.drop2048.features.debug.NoDiagnostics
 import com.dangerfield.drop2048.libraries.ads.AdGate
 import com.dangerfield.drop2048.libraries.ads.AdPlacement
+import com.dangerfield.drop2048.libraries.ads.BannerAds
 import com.dangerfield.drop2048.libraries.ads.InMemoryRunActivity
 import com.dangerfield.drop2048.libraries.ads.InterstitialGate
 import com.dangerfield.drop2048.libraries.ads.RewardOutcome
@@ -17,10 +19,12 @@ import com.dangerfield.drop2048.libraries.gameconfig.RewardedContinuesPerRun
 import com.dangerfield.drop2048.libraries.cascade.Block
 import com.dangerfield.drop2048.libraries.cascade.BlockValue
 import com.dangerfield.drop2048.libraries.cascade.Board
+import com.dangerfield.drop2048.libraries.cascade.Cascade
 import com.dangerfield.drop2048.libraries.cascade.Cell
 import com.dangerfield.drop2048.libraries.cascade.EngineConfig
 import com.dangerfield.drop2048.libraries.cascade.FallingBlock
 import com.dangerfield.drop2048.libraries.cascade.GameState
+import com.dangerfield.drop2048.libraries.cascade.Input
 import com.dangerfield.drop2048.libraries.cascade.NumberBlock
 import com.dangerfield.drop2048.libraries.cascade.Rng
 import com.dangerfield.drop2048.libraries.cascade.Special
@@ -33,22 +37,12 @@ import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.drop2048.AppData
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycle
 import com.dangerfield.drop2048.libraries.drop2048.AppLifecycleObserver
-import com.dangerfield.drop2048.libraries.progress.GameMode
 import com.dangerfield.drop2048.libraries.progress.ProgressRepository
 import com.dangerfield.drop2048.libraries.progress.RunRecord
 import com.dangerfield.drop2048.libraries.progress.RunStats
-import com.dangerfield.drop2048.libraries.progress.daily.DailyAttempt
-import com.dangerfield.drop2048.libraries.progress.daily.DailyRepository
-import com.dangerfield.drop2048.libraries.progress.daily.DailyResult
-import com.dangerfield.drop2048.libraries.progress.daily.DailyRetryResult
-import com.dangerfield.drop2048.libraries.progress.daily.DailyStatus
-import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
-import com.dangerfield.drop2048.libraries.progress.daily.dailySeedFor
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboard
 import com.dangerfield.drop2048.libraries.leaderboards.Leaderboards
 import com.dangerfield.drop2048.libraries.progress.statsFrom
-import kotlin.time.Duration
-import kotlinx.datetime.LocalDate
 import com.dangerfield.drop2048.libraries.ui.system.Cue
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -84,7 +78,6 @@ internal class GameScenario private constructor(
     val cache: FakeAppCache,
     val progress: FakeProgressRepository,
     val savedRuns: FakeSavedRunStore,
-    val daily: FakeDailyRepository,
     val achievements: FakeAchievementsRepository,
     val leaderboards: FakeLeaderboards,
     val lifecycle: FakeAppLifecycle,
@@ -94,6 +87,7 @@ internal class GameScenario private constructor(
     val interstitials: FakeInterstitialGate,
     val runActivity: RunActivity,
     val paywall: FakePaywallCoordinator,
+    val banners: FakeBannerAds,
     private val continuesPerRun: Int,
 ) {
     val cues = mutableListOf<Cue>()
@@ -110,27 +104,12 @@ internal class GameScenario private constructor(
                 override fun newRun() = StartedRun(
                     state = start,
                     seed = SCENARIO_SEED,
-                    mode = GameMode.ENDLESS,
-                    debug = debug.isDebugSession.value,
-                )
-
-                /**
-                 * The same scripted board, flagged as a Daily. The seed is the
-                 * caller's so a scenario can assert which day it opened, and the
-                 * state is the fixture so the board under test stays the one the
-                 * scenario drew.
-                 */
-                override fun dailyRun(seed: Long) = StartedRun(
-                    state = start,
-                    seed = seed,
-                    mode = GameMode.DAILY,
                     debug = debug.isDebugSession.value,
                 )
             },
             appCache = cache,
             savedRunStore = savedRuns,
             progress = progress,
-            daily = daily,
             achievements = achievements,
             leaderboards = leaderboards,
             clock = clock,
@@ -141,6 +120,7 @@ internal class GameScenario private constructor(
             interstitials = interstitials,
             runActivity = runActivity,
             paywall = paywall,
+            banners = banners,
             continuesPerRun = RewardedContinuesPerRun(
                 object : AppConfigMap() {
                     override val map: Map<String, *> = mapOf(
@@ -177,7 +157,7 @@ internal class GameScenario private constructor(
 
     /**
      * Put the falling block down, the way a player does since decision D21: one
-     * press of ▼.
+     * hard drop, whether that is ▼ or a downward flick.
      *
      * It advances **no** drop ticks and waits out no lock delay, because a hard
      * drop needs neither. That matters for the same reason L31 does: `tick()`
@@ -245,6 +225,26 @@ internal class GameScenario private constructor(
         assertEquals(Cell(col, row), falling.cell, "falling cell")
     }
 
+    /**
+     * The column the engine will put the block *after* this scenario's opening
+     * one into.
+     *
+     * Since the owner's 2026-09-20 ruling the entry column is a uniform draw off
+     * the run's own RNG, so a test about a buffered move — which is a
+     * displacement, not a destination — has to ask where the block arrived
+     * rather than assume the middle. It is asked of the same seeded start state
+     * the scenario was built from and by running the engine, so it is the draw
+     * the run will actually make rather than a second copy of the rule that
+     * could agree with a bug.
+     *
+     * Only meaningful before the opening block has locked, which is the only
+     * place any of its callers use it.
+     */
+    val nextSpawnColumn: Int
+        get() = requireNotNull(Cascade.apply(start, Input.Lock).state.falling) {
+            "the opening lock ended the run, so there is no next block"
+        }.cell.col
+
     /** Backgrounding, which SPEC 8.4 auto-pauses and SPEC 18.9 snapshots. */
     fun background() {
         lifecycle.background()
@@ -300,8 +300,16 @@ internal class GameScenario private constructor(
              * do with it.
              */
             teach: Boolean = false,
-            /** The ledger a Daily scenario spends its attempt against (SPEC 14). */
-            daily: FakeDailyRepository = FakeDailyRepository(),
+            /**
+             * What this device has stored for SPEC 6's control scheme.
+             *
+             * Null is a device that has never opened settings, which is the
+             * scheme the player is actually shipped. Naming one is how a test
+             * asks what the game looks like to somebody who turned the arrow row
+             * back on — the tutorial teaches a different control there, and
+             * under `Buttons` the board refuses drags outright.
+             */
+            scheme: ControlScheme? = null,
             /** What the run that ends in this scenario is told it unlocked (SPEC 15). */
             achievements: FakeAchievementsRepository = FakeAchievementsRepository(),
             /**
@@ -317,6 +325,8 @@ internal class GameScenario private constructor(
             interstitials: FakeInterstitialGate = FakeInterstitialGate(),
             /** Whether the once-per-session upsell card is still there. */
             paywall: FakePaywallCoordinator = FakePaywallCoordinator(),
+            /** Whether `ads.enabled`, `ads.banner.enabled` and not-Pro all hold (D28). */
+            banners: FakeBannerAds = FakeBannerAds(),
             /** `ads.rewarded.continuesPerRun`. SPEC 12's hard cap is 2. */
             continuesPerRun: Int = 2,
             body: GameScenario.() -> T,
@@ -334,10 +344,11 @@ internal class GameScenario private constructor(
             val scenario = GameScenario(
                 scope = this,
                 start = start,
-                cache = FakeAppCache(AppData(hasUserOnboarded = !teach)),
+                cache = FakeAppCache(
+                    AppData(hasUserOnboarded = !teach, controlScheme = scheme?.name),
+                ),
                 progress = FakeProgressRepository(best = best),
                 savedRuns = FakeSavedRunStore(resume),
-                daily = daily,
                 achievements = achievements,
                 leaderboards = FakeLeaderboards(),
                 lifecycle = FakeAppLifecycle(),
@@ -347,6 +358,7 @@ internal class GameScenario private constructor(
                 interstitials = interstitials,
                 runActivity = InMemoryRunActivity(),
                 paywall = paywall,
+                banners = banners,
                 continuesPerRun = continuesPerRun,
             )
             scenario.launch(backgroundScope)
@@ -419,9 +431,6 @@ internal fun GameScenario.recordedRuns(): List<RunRecord> = progress.recorded.to
 /** What would be restored if the process died right now. */
 internal fun GameScenario.savedRun(): SavedRun? = savedRuns.stored
 
-/** The save in a named slot. Endless and the Daily each have one (SPEC 11). */
-internal fun GameScenario.savedRun(mode: GameMode): SavedRun? = savedRuns.stored(mode)
-
 internal class FakeProgressRepository(best: Long = 0) : ProgressRepository {
     val recorded = mutableListOf<RunRecord>()
     private val seededBest = best
@@ -440,93 +449,20 @@ internal class FakeProgressRepository(best: Long = 0) : ProgressRepository {
  * [load] so a test can assert what the process would have found on disk without
  * having to be inside a coroutine.
  */
-/**
- * Two slots, keyed by mode, exactly as the real store is.
- *
- * A single field with the mode ignored would have made every two-slot assertion
- * in `ResumeTest` and `DailyRunTest` vacuous — the fake would have reproduced the
- * bug those tests exist to pin.
- */
 internal class FakeSavedRunStore(initial: SavedRun? = null) : SavedRunStore {
-    private val slots = mutableMapOf<GameMode, SavedRun>()
 
-    init {
-        initial?.let { slots[it.mode] = it }
-    }
+    /** What the process would find on disk. */
+    var stored: SavedRun? = initial
+        private set
 
-    /** The Endless slot, which is what almost every scenario means by "the save". */
-    val stored: SavedRun? get() = slots[GameMode.ENDLESS]
-
-    fun stored(mode: GameMode): SavedRun? = slots[mode]
-
-    override suspend fun load(mode: GameMode): SavedRun? = slots[mode]
+    override suspend fun load(): SavedRun? = stored
 
     override suspend fun save(run: SavedRun) {
-        slots[run.mode] = run
+        stored = run
     }
 
-    override suspend fun clear(mode: GameMode) {
-        slots.remove(mode)
-    }
-
-    override suspend fun clearAll() {
-        slots.clear()
-    }
-}
-
-/**
- * The Daily ledger, in memory.
- *
- * Records what the ViewModel asked for rather than simulating a database: the
- * repository's own rules are `DailyRepositoryImplTest`'s, and re-implementing
- * them here would mean a scenario could pass against a fake that had drifted
- * from the real one.
- */
-internal class FakeDailyRepository(
-    private val attempts: MutableList<DailyAttempt> = mutableListOf(),
-) : DailyRepository {
-
-    val started = mutableListOf<Unit>()
-    val banked = mutableListOf<Pair<LocalDate, Long>>()
-
-    /** Every attempt after the scripted ones is refused, which is the default rule. */
-    fun grant(date: LocalDate = DefaultDay, seed: Long = DefaultSeed, number: Int = 1) = apply {
-        attempts += DailyAttempt.Granted(date = date, seed = seed, attemptNumber = number)
-    }
-
-    override fun observe(): Flow<DailyStatus> = MutableStateFlow(Today)
-
-    override suspend fun status(): DailyStatus = Today
-
-    override suspend fun startAttempt(): DailyAttempt {
-        started += Unit
-        return attempts.removeFirstOrNull() ?: DailyAttempt.NoAttemptsLeft
-    }
-
-    override suspend fun recordAttempt(date: LocalDate, score: Long) {
-        banked += date to score
-    }
-
-    override suspend fun grantRetry(): DailyRetryResult = DailyRetryResult.Unavailable
-
-    override suspend fun history(): List<DailyResult> = emptyList()
-
-    override suspend fun reset() = Unit
-
-    companion object {
-        val DefaultDay: LocalDate = LocalDate(2026, 9, 9)
-        val DefaultSeed: Long = dailySeedFor(DefaultDay)
-
-        private val Today = DailyStatus(
-            date = DefaultDay,
-            seed = DefaultSeed,
-            result = null,
-            streak = DailyStreak.Empty,
-            attemptsAllowed = 1,
-            retryOffered = false,
-            resetsIn = Duration.ZERO,
-            enabled = true,
-        )
+    override suspend fun clear() {
+        stored = null
     }
 }
 
@@ -619,8 +555,8 @@ internal class MutableClock(private var millis: Long = 0) : Clock {
  * The rewarded gate, as something a scenario can set an answer on.
  *
  * It records [requests] rather than only returning, because half of what SPEC 12
- * asks for is about ads that are *not* asked for — a Daily run must never reach
- * this, and neither must a third continue.
+ * asks for is about ads that are *not* asked for — a third continue must never
+ * reach this.
  */
 internal class FakeAdGate(
     var outcome: RewardOutcome = RewardOutcome.Rewarded,
@@ -673,6 +609,7 @@ internal class FakeInterstitialGate(
 
 internal class FakePaywallCoordinator(
     var cardAvailable: Boolean = true,
+    var offerable: Boolean = true,
 ) : PaywallCoordinator {
     val offers = mutableListOf<PaywallTrigger>()
     var cardClaims = 0
@@ -683,11 +620,33 @@ internal class FakePaywallCoordinator(
 
     override fun requestOffer(trigger: PaywallTrigger): Boolean {
         offers += trigger
-        return true
+        return offerable
     }
 
-    override fun claimStackedOutCard(): Boolean {
+    override fun mayOffer(trigger: PaywallTrigger): Boolean = offerable
+
+    override suspend fun claimStackedOutCard(): Boolean {
         cardClaims++
         return cardAvailable
+    }
+}
+
+/**
+ * The banner's policy half (D28), as something a scenario can switch off.
+ *
+ * [fills] is what the screen's slot would report, and the game only ever does
+ * one thing with it, so recording it is the whole assertion: a banner that
+ * arrived is an ad this player has seen.
+ */
+internal class FakeBannerAds(
+    var allowed: Boolean = true,
+) : BannerAds {
+    var fills = 0
+        private set
+
+    override fun isAllowed(): Boolean = allowed
+
+    override fun noteFilled() {
+        fills++
     }
 }

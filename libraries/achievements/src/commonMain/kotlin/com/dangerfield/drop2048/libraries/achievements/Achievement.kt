@@ -15,8 +15,16 @@ import com.dangerfield.drop2048.libraries.cascade.EngineConfig
  * `achievement_clean_sweep_name`.
  *
  * Declared in [Achievements]' own order — the three firsts, then chains, then
- * endurance, the three rare moments, score, the Daily, and time on the board —
- * so the enum and the grid read the same way down the file.
+ * endurance, the three rare moments, score, and time on the board — so the enum
+ * and the grid read the same way down the file.
+ *
+ * Two entries are gone rather than renamed, which the paragraph above says never
+ * to do. `SevenDays` and `ThirtyDays` were folds over the Daily streak, and D27
+ * removed the Daily: nothing left in the game can move that counter, so keeping
+ * them would have meant shipping two badges with a progress bar frozen at zero
+ * and no way for a player to tell they were dead. Nobody has earned either —
+ * there are no store accounts and no release — so there is nothing to throw
+ * away.
  */
 enum class AchievementId {
     FirstMerge,
@@ -40,9 +48,6 @@ enum class AchievementId {
     SharpRun,
     BigRun,
     MonsterRun,
-
-    SevenDays,
-    ThirtyDays,
 
     OneHour,
     FiveHours,
@@ -69,7 +74,6 @@ enum class AchievementGroup {
     Endurance,
     Rare,
     Score,
-    Daily,
     Dedication,
 }
 
@@ -113,7 +117,7 @@ data class AchievementSection(
 )
 
 /**
- * SPEC 15's twenty-four, client-side and shipped in the binary rather than
+ * SPEC 15's twenty-two, client-side and shipped in the binary rather than
  * served: every badge needs copy, so a new one costs a release regardless.
  *
  * [sections] is the source of truth and [catalog] is its flattening, so display
@@ -171,13 +175,6 @@ object Achievements {
                 Achievement(AchievementId.SharpRun, Stat.BestScore, ScoreLadder.rungs[2]),
                 Achievement(AchievementId.BigRun, Stat.BestScore, ScoreLadder.rungs[3]),
                 Achievement(AchievementId.MonsterRun, Stat.BestScore, ScoreLadder.rungs[4]),
-            ),
-        ),
-        AchievementSection(
-            AchievementGroup.Daily,
-            listOf(
-                Achievement(AchievementId.SevenDays, Stat.BestDailyStreak, target = 7),
-                Achievement(AchievementId.ThirtyDays, Stat.BestDailyStreak, target = 30),
             ),
         ),
         AchievementSection(

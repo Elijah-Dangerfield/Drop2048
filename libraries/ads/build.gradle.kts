@@ -19,6 +19,9 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.libraries.core)
             implementation(compose.runtime)
+            // `BannerSurface.Banner` takes a `Modifier`: the caller decides where
+            // the strip sits, this module only decides what goes in it.
+            implementation(compose.ui)
             api(libs.kotlinx.coroutines.core)
         }
     }

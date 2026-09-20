@@ -14,9 +14,10 @@ import kotlin.test.assertNull
  * The SQL behind `run_record`, run against real SQLite.
  *
  * `bestScore()`'s `WHERE mode = 'ENDLESS'` (decision D19) is the reason this
- * file exists. `FakeRunRecordDao` filters the same way in Kotlin, so the *rule*
- * has always been covered and the *query* never was — and the query is the half
- * that ships.
+ * file exists: `FakeRunRecordDao` filtered the same way in Kotlin, so the
+ * *rule* was covered and the *query* never was. D27 removed the mode and the
+ * filter, and the file stays because the rest of the SQL — the ordering, the
+ * generated key, the wipe — was never covered anywhere else either.
  */
 @RunWith(RobolectricTestRunner::class)
 class RunRecordDaoTest {
@@ -28,43 +29,16 @@ class RunRecordDaoTest {
     fun tearDown() = db.close()
 
     @Test
-    fun `best score ignores daily runs`() = runTest {
-        dao.insert(record(score = 100, mode = "ENDLESS"))
-        dao.insert(record(score = 900, mode = "DAILY"))
-        dao.insert(record(score = 400, mode = "ENDLESS"))
+    fun `best score is the highest of every run`() = runTest {
+        dao.insert(record(score = 100))
+        dao.insert(record(endedAt = 2, score = 900))
+        dao.insert(record(endedAt = 3, score = 400))
 
-        assertEquals(400, dao.bestScore())
-    }
-
-    /**
-     * The other half of the filter, and the one a Kotlin fake makes look
-     * impossible: a player whose only runs are Dailies has no best score at all,
-     * rather than a best of zero or of their best Daily.
-     */
-    @Test
-    fun `best score is null when every run is a daily`() = runTest {
-        dao.insert(record(score = 900, mode = "DAILY"))
-        dao.insert(record(score = 1200, mode = "DAILY"))
-
-        assertNull(dao.bestScore())
+        assertEquals(900, dao.bestScore())
     }
 
     @Test
     fun `best score is null on an empty table`() = runTest {
-        assertNull(dao.bestScore())
-    }
-
-    /**
-     * `mode` is a free-text column, so the filter is a string comparison and
-     * SQLite's `=` is case sensitive for ASCII. A mode written in the wrong case
-     * would silently drop out of the best score, which is worth pinning: it is
-     * what makes storing the enum *name* rather than its ordinal load-bearing at
-     * both ends.
-     */
-    @Test
-    fun `best score matches the mode name exactly`() = runTest {
-        dao.insert(record(score = 700, mode = "endless"))
-
         assertNull(dao.bestScore())
     }
 
@@ -101,7 +75,6 @@ class RunRecordDaoTest {
     private fun record(
         endedAt: Long = 1,
         score: Long = 0,
-        mode: String = "ENDLESS",
     ) = RunRecordEntity(
         endedAt = endedAt,
         score = score,
@@ -113,7 +86,6 @@ class RunRecordDaoTest {
         longestCascade = 2,
         bursts = 0,
         merges = 12,
-        mode = mode,
         seed = 42,
     )
 }

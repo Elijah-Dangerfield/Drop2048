@@ -65,6 +65,23 @@ Commit `telemetry.properties` afterwards. A DSN is a write-only ingest
 endpoint shipped inside every store binary, not a secret — keeping it per
 developer is what leaves fresh clones silently reporting nothing.
 
+## generate_placeholder_audio.py
+
+Synthesises the placeholder sound bank: one mono Ogg Vorbis file per `Sound` in
+`Cue.kt`, written to `libraries/ui/src/androidMain/assets/audio/` and
+`apps/ios/iosApp/audio/`.
+
+```bash
+./scripts/generate_placeholder_audio.py
+```
+
+Needs `oggenc` (`brew install vorbis-tools`) or an ffmpeg built with libvorbis.
+Python only, no third-party packages.
+
+These are stand-ins for real sound design, and the script is where each one is
+described. See the README beside the files for what is in the bank and why the
+merge tone is built the way it is.
+
 ## cleanup.sh
 
 Cleans build artifacts and caches:

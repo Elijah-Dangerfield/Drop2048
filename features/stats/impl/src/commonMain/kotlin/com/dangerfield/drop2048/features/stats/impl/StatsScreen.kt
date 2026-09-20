@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dangerfield.drop2048.libraries.progress.RunStats
-import com.dangerfield.drop2048.libraries.progress.daily.DailyStreak
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.BarChart
 import com.dangerfield.drop2048.libraries.ui.components.BarChartEntry
@@ -29,9 +28,6 @@ import com.dangerfield.drop2048.libraries.ui.components.game.StatPanel
 import com.dangerfield.drop2048.libraries.ui.components.game.StatReadout
 import com.dangerfield.drop2048.libraries.ui.components.game.Tile
 import com.dangerfield.drop2048.libraries.ui.components.header.TopBar
-import com.dangerfield.drop2048.libraries.ui.components.streak.StreakStop
-import com.dangerfield.drop2048.libraries.ui.components.streak.StreakStopState
-import com.dangerfield.drop2048.libraries.ui.components.streak.StreakTrack
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.libraries.ui.screenContentPadding
 import com.dangerfield.drop2048.libraries.ui.system.color.GameColors
@@ -43,22 +39,18 @@ import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD200
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import drop2048.libraries.resources.generated.resources.Res
-import drop2048.libraries.resources.generated.resources.daily_title
 import drop2048.libraries.resources.generated.resources.stats_average
 import drop2048.libraries.resources.generated.resources.stats_best
 import drop2048.libraries.resources.generated.resources.stats_bests
 import drop2048.libraries.resources.generated.resources.stats_blocks_placed
-import drop2048.libraries.resources.generated.resources.stats_daily_best_streak
-import drop2048.libraries.resources.generated.resources.stats_daily_streak
-import drop2048.libraries.resources.generated.resources.stats_days
 import drop2048.libraries.resources.generated.resources.stats_empty
+import drop2048.libraries.resources.generated.resources.stats_highest_level
 import drop2048.libraries.resources.generated.resources.stats_highest_tier
 import drop2048.libraries.resources.generated.resources.stats_lifetime
 import drop2048.libraries.resources.generated.resources.stats_lifetime_bursts
 import drop2048.libraries.resources.generated.resources.stats_longest_cascade
 import drop2048.libraries.resources.generated.resources.stats_most_bursts
 import drop2048.libraries.resources.generated.resources.stats_none_yet
-import drop2048.libraries.resources.generated.resources.stats_one_day
 import drop2048.libraries.resources.generated.resources.stats_playtime
 import drop2048.libraries.resources.generated.resources.stats_recent
 import drop2048.libraries.resources.generated.resources.stats_runs_played
@@ -85,13 +77,12 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * fixed-width slots, the HUD's quiet uppercase labels — and the one number that
  * is *also a tier* is drawn as an actual tile in that tier's colour.
  *
- * ### Three questions, three groups
+ * ### Two questions, two groups
  *
  * Grouping matters more here than density. **Bests** is "how good have I ever
- * been", **Lifetime** is "how much have I played", and **Daily** is a walk over
- * `daily_result` rather than a fold over `run_record` at all — putting its two
- * numbers beside the lifetime totals would imply a relationship the fold does not
- * have.
+ * been" and **Lifetime** is "how much have I played". There was a third,
+ * **Daily**, which walked `daily_result` rather than folding `run_record`; D27
+ * deleted the mode and the table under it.
  */
 @Composable
 fun StatsScreen(
@@ -132,8 +123,6 @@ fun StatsScreen(
             VerticalSpacerD1000()
             Lifetime(state.stats)
             VerticalSpacerD1000()
-            Daily(state.streak)
-            VerticalSpacerD1000()
         }
     }
 }
@@ -151,9 +140,11 @@ private fun EmptyStats() {
 }
 
 /**
- * The best score gets the counter the HUD uses, counting from zero, because it
+ * The high score gets the counter the HUD uses, counting from zero, because it
  * is the number the page is about and a player who has just beaten it should
- * watch it arrive.
+ * watch it arrive. It was labelled "best endless run" until the owner ruling of
+ * 2026-09-20 — wording that existed to tell it apart from a Daily score, and
+ * D27 removed the Daily.
  *
  * Runs played and the average sit under it on their own plates rather than as
  * two more rows. They are the second and third numbers anyone looks for, and a
@@ -238,6 +229,15 @@ private fun RecentRuns(stats: RunStats) {
 /**
  * How good the player has ever been.
  *
+ * **Highest level and highest tier are both here and they are different
+ * questions** (owner ruling, 2026-09-20). A level is how far a run got, since
+ * levels advance on blocks dropped; a tier is the biggest block the player ever
+ * made. Survival and achievement come apart often enough that showing one and
+ * calling it the other would be wrong for most players.
+ *
+ * The high score is not repeated here. It is the headline at the top of the
+ * page, in the HUD's own counter, which is the largest thing on the screen.
+ *
  * **Highest tier is drawn as the tile it is.** It is the one number on this page
  * that names an object the player has held on the board, and printing `1024` as
  * a digit string throws away the fact that they know exactly what that block
@@ -269,6 +269,10 @@ private fun Bests(stats: RunStats) {
                 )
             }
         }
+        StatReadout(
+            label = stringResource(Res.string.stats_highest_level).uppercase(),
+            value = stats.highestLevel.toString(),
+        )
         StatReadout(
             label = stringResource(Res.string.stats_longest_cascade).uppercase(),
             value = stats.longestCascade.toString(),
@@ -303,52 +307,6 @@ private fun Lifetime(stats: RunStats) {
 }
 
 /**
- * SPEC 15's Daily streak, current and best, over SPEC 14's milestone track.
- *
- * Drawn even at zero, unlike the rest of the page before the first run, because
- * a streak of zero on a mode that exists is a true and actionable statement —
- * whereas C4 left this section out entirely, and was right to, when the mode did
- * not exist.
- *
- * The track earns its place by answering the question the two numbers do not:
- * how far to the next milestone. The milestones are cosmetic and pay nothing
- * (D19), so nothing here is captioned as a reward.
- */
-@Composable
-private fun Daily(streak: DailyStreak) {
-    GameSection(title = stringResource(Res.string.daily_title)) {
-        StreakTrack(stops = streakStops(streak.current))
-        StatReadout(
-            label = stringResource(Res.string.stats_daily_streak).uppercase(),
-            value = daysLabel(streak.current),
-        )
-        StatReadout(
-            label = stringResource(Res.string.stats_daily_best_streak).uppercase(),
-            value = daysLabel(streak.best),
-        )
-    }
-}
-
-@Composable
-private fun streakStops(current: Int): List<StreakStop> = StreakMilestones.map { day ->
-    StreakStop(
-        label = day.toString(),
-        description = daysLabel(day),
-        state = if (current >= day) StreakStopState.Reached else StreakStopState.Ahead,
-    )
-}
-
-@Composable
-private fun daysLabel(days: Int): String = if (days == 1) {
-    stringResource(Res.string.stats_one_day)
-} else {
-    stringResource(Res.string.stats_days, days)
-}
-
-/** SPEC 14's milestones. */
-private val StreakMilestones = listOf(3, 7, 14, 30)
-
-/**
  * Small enough that the tile is a value in a row rather than a board fragment,
  * and its em is scaled with it so the numeral stays in proportion.
  */
@@ -371,6 +329,7 @@ private fun StatsScreenPreview() {
                     runsPlayed = 14,
                     bestScore = 18_240,
                     averageScore = 6_112,
+                    highestLevel = 11,
                     highestTier = 1024,
                     totalMerges = 1_284,
                     totalBlocksPlaced = 2_610,
@@ -380,7 +339,6 @@ private fun StatsScreenPreview() {
                     totalPlaytimeMs = 9_240_000,
                     recentScores = listOf(18_240L, 4_010L, 9_120L, 2_400L, 6_780L),
                 ),
-                streak = DailyStreak(current = 4, best = 11),
             ),
             onAction = {},
         )

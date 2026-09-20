@@ -17,6 +17,9 @@ class RealAppDatabaseProvider @Inject constructor(
         builderFactory
             .create()
             .setQueryCoroutineContext(dispatcherProvider.io)
+            // The one migration that is not an @AutoMigration. See its KDoc for
+            // why Room cannot generate it.
+            .addMigrations(MIGRATE_AWAY_FROM_THE_DAILY)
             // Only the pre-game template schemas may be dropped. Everything from
             // AppDatabase.FIRST_PLAYER_DATA_VERSION up migrates, because there is
             // no account to restore a wiped run history from. See AppDatabase.

@@ -40,6 +40,7 @@ object AdUnits {
     object AndroidTest {
         const val rewarded = "ca-app-pub-3940256099942544/5224354917"
         const val interstitial = "ca-app-pub-3940256099942544/1033173712"
+        const val banner = "ca-app-pub-3940256099942544/6300978111"
 
         /** For the manifest, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~3347511713"
@@ -49,6 +50,7 @@ object AdUnits {
     object IosTest {
         const val rewarded = "ca-app-pub-3940256099942544/1712485313"
         const val interstitial = "ca-app-pub-3940256099942544/4411468910"
+        const val banner = "ca-app-pub-3940256099942544/2934735716"
 
         /** For `Info.plist`'s `GADApplicationIdentifier`, not for a request. */
         const val applicationId = "ca-app-pub-3940256099942544~1458002511"
@@ -58,12 +60,14 @@ object AdUnits {
     object AndroidLive {
         const val rewarded = ""
         const val interstitial = ""
+        const val banner = ""
     }
 
     /** Real iOS units. Empty until the AdMob app exists — see [useTestUnits]. */
     object IosLive {
         const val rewarded = ""
         const val interstitial = ""
+        const val banner = ""
     }
 
     /**
@@ -76,10 +80,12 @@ object AdUnits {
         test = when (format) {
             AdFormat.Rewarded -> AndroidTest.rewarded
             AdFormat.Interstitial -> AndroidTest.interstitial
+            AdFormat.Banner -> AndroidTest.banner
         },
         live = when (format) {
             AdFormat.Rewarded -> AndroidLive.rewarded
             AdFormat.Interstitial -> AndroidLive.interstitial
+            AdFormat.Banner -> AndroidLive.banner
         },
     )
 
@@ -88,10 +94,12 @@ object AdUnits {
         test = when (format) {
             AdFormat.Rewarded -> IosTest.rewarded
             AdFormat.Interstitial -> IosTest.interstitial
+            AdFormat.Banner -> IosTest.banner
         },
         live = when (format) {
             AdFormat.Rewarded -> IosLive.rewarded
             AdFormat.Interstitial -> IosLive.interstitial
+            AdFormat.Banner -> IosLive.banner
         },
     )
 
