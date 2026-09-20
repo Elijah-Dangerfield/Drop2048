@@ -42,6 +42,9 @@ kotlin {
             implementation(projects.libraries.gameconfig)
             implementation(projects.libraries.config)
             implementation(libs.kotlinx.coroutines.test)
+            // AdStateSerializationTest round-trips through Json, which is the
+            // call that throws when the serialization plugin is missing.
+            implementation(libs.kotlinx.serialization.json)
         }
 
         androidMain.dependencies {

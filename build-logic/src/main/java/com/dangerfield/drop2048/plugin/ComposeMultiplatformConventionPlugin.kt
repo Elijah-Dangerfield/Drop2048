@@ -49,6 +49,16 @@ class ComposeMultiplatformConventionPlugin : Plugin<Project> {
                 apply("com.android.library")
                 apply("org.jetbrains.compose")
                 apply("org.jetbrains.kotlin.plugin.compose")
+
+                // The other three convention plugins have always applied this.
+                // This one not doing so was a trap rather than a decision: a
+                // `@Serializable` class in a compose-convention module compiles
+                // to an annotation and nothing else, the whole app builds green,
+                // and the first object to construct a cache throws `Serializer
+                // for class 'X' is not found` on the main thread at boot. It
+                // caught DevFeedbackFabState, and then AdState. The plugin costs
+                // nothing in a module with no `@Serializable` in it.
+                apply(libs.plugins.kotlinSerialization.get().pluginId)
             }
 
             project.optInKotlinMarkers("kotlin.time.ExperimentalTime")
