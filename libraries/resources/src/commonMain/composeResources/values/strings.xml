@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Drop 2048</string>
+    <string name="app_name">Doublestack</string>
 
     <!--
         The guided run (SPEC 13). Every drop of it is landed by the player's own
@@ -163,7 +163,7 @@
     <string name="settings_replay_tutorial">Play the tutorial again</string>
     <string name="settings_replay_tutorial_hint">Six guided drops. Your run and your scores are untouched.</string>
 
-    <string name="settings_section_pro">Drop 2048 Pro</string>
+    <string name="settings_section_pro">Doublestack Pro</string>
     <string name="settings_pro_status">Pro</string>
     <string name="settings_pro_active">Active</string>
     <string name="settings_pro_inactive">Not active</string>
@@ -226,7 +226,7 @@
         licence now, because naming one is the thing that goes stale.
     -->
     <string name="licenses_title">Open source licences</string>
-    <string name="licenses_body">Drop 2048 is built on work other people gave away. Below is every third-party component in the release build, grouped by the licence it is published under, with the address where you can read that licence in full. The two fonts are listed too, though they are not code.</string>
+    <string name="licenses_body">Doublestack is built on work other people gave away. Below is every third-party component in the release build, grouped by the licence it is published under, with the address where you can read that licence in full. The two fonts are listed too, though they are not code.</string>
     <string name="licenses_count">%1$d components</string>
 
     <!--
@@ -238,7 +238,7 @@
         resource.
     -->
     <string name="gate_force_update_title">Time to update</string>
-    <string name="gate_force_update_body">This version of Drop 2048 is too old to keep playing. The update is quick.</string>
+    <string name="gate_force_update_body">This version of Doublestack is too old to keep playing. The update is quick.</string>
     <string name="gate_force_update_action">Get the update</string>
 
     <string name="gate_maintenance_title">Back shortly</string>
@@ -247,15 +247,25 @@
     <string name="gate_legal_body">We have changed the terms of use and the privacy policy. Have a read, then carry on.</string>
     <string name="gate_legal_accept">Accept and play</string>
 
-    <string name="notice_soft_update">A newer version of Drop 2048 is out.</string>
+    <string name="notice_soft_update">A newer version of Doublestack is out.</string>
     <string name="notice_soft_update_action">Update</string>
     <string name="notice_legal">Our terms and privacy policy have been updated. Closing this accepts them.</string>
     <string name="notice_legal_action">Read them</string>
     <string name="notice_dismiss">Dismiss</string>
 
+    <!--
+        The blocking navigation surfaces in :libraries:navigation:impl — the 403
+        access-denied screen, and the unrecoverable error screen and its dialog
+        twin. The aside under the report button is deliberately in the author's
+        voice; it is the only joke in the app and it is load-bearing for tone.
+    -->
+    <string name="nav_access_denied_appeal">Appeal this decision</string>
+    <string name="nav_error_report">Report to developers</string>
+    <string name="nav_error_report_aside">(which is me cause I wrote myself)</string>
+
     <!-- The template's placeholder home screen. Still registered because the
          feedback and bug-report flows hang off it. -->
-    <string name="home_title">Drop 2048</string>
+    <string name="home_title">Doublestack</string>
     <string name="home_body">This is your starting point.</string>
     <string name="home_feedback">Send feedback</string>
     <string name="home_bug_report">Report a bug</string>
@@ -345,13 +355,13 @@
     <!-- SPEC 15's share. The formatter in :libraries:sharing owns the layout and
          the numbers; these are the only words in it. -->
     <string name="share_run">Share this run</string>
-    <string name="share_title_endless">Drop 2048 · Endless</string>
-    <string name="share_footer">drop2048.app</string>
+    <string name="share_title_endless">Doublestack · Endless</string>
+    <string name="share_footer">doublestack.app</string>
 
     <string name="settings_achievements">Achievements</string>
     <string name="settings_achievements_hint">Twenty-two badges, and how far you are into each.</string>
     <!-- SPEC 12: the Pro sheet, the two rewarded placements, and the upsell card. -->
-    <string name="paywall_title">Drop 2048 Pro</string>
+    <string name="paywall_title">Doublestack Pro</string>
     <string name="paywall_subtitle">One purchase. Yours forever.</string>
     <string name="paywall_perk_ads">No interstitial ads, ever</string>
     <string name="paywall_perk_ads_detail">Rewarded videos stay, if you want them. Nothing interrupts a run.</string>

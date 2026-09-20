@@ -21,6 +21,9 @@ import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.system.AppTheme
 import com.dangerfield.drop2048.system.Dimension
 import com.dangerfield.drop2048.system.VerticalSpacerD1600
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.nav_access_denied_appeal
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -83,7 +86,7 @@ internal fun AccessDeniedScreen(
                     onClick = { onAppeal(appealUrl) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "Appeal this decision")
+                    Text(text = stringResource(Res.string.nav_access_denied_appeal))
                 }
                 VerticalSpacerD1600()
             }

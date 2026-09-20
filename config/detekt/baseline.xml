@@ -1,14 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <SmellBaseline>
   <ManuallySuppressedIssues/>
-  <CurrentIssues>
-    <ID>VerifyStrings:AccessDeniedScreen.kt:"Appeal this decision"</ID>
-    <ID>VerifyStrings:BlockingErrorScreen.kt:"(which is me cause I wrote myself)"</ID>
-    <ID>VerifyStrings:BlockingErrorScreen.kt:"Report to developers"</ID>
-    <ID>VerifyStrings:ErrorDialogContent.kt:"(which is me cause I wrote myself)"</ID>
-    <ID>VerifyStrings:NativeButton.jvm.kt:"Native Button"</ID>
-    <ID>VerifyStrings:ShakeDialog.kt:"Dismiss"</ID>
-    <ID>VerifyStrings:ShakeDialog.kt:"Report a bug"</ID>
-    <ID>VerifyStrings:SplashScreen.kt:"Drop 2048"</ID>
-  </CurrentIssues>
+  <CurrentIssues/>
 </SmellBaseline>

@@ -15,7 +15,7 @@
 	  app's display name; it must be unique on the App Store.
 	-->
 	<key>CFBundleName</key>
-	<string>Drop 2048</string>
+	<string>Doublestack</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>We'd like to send you notifications.</string>
 	<key>UIBackgroundModes</key>

@@ -19,6 +19,10 @@ import com.dangerfield.drop2048.system.AppTheme
 import com.dangerfield.drop2048.system.Dimension
 import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD500
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.nav_error_report
+import drop2048.libraries.resources.generated.resources.nav_error_report_aside
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
@@ -31,7 +35,7 @@ internal fun ErrorDialog(
     onDismissRequest: () -> Unit,
     onAction: () -> Unit,
     onReportToDeveloper: (() -> Unit)? = null,
-    reportActionTitle: String = "Report to developers",
+    reportActionTitle: String = stringResource(Res.string.nav_error_report),
 ) {
     val showReportButton = onReportToDeveloper != null
 
@@ -80,7 +84,7 @@ internal fun ErrorDialog(
 
                     VerticalSpacerD500()
 
-                    Text("(which is me cause I wrote myself)")
+                    Text(stringResource(Res.string.nav_error_report_aside))
                 }
             }
         }

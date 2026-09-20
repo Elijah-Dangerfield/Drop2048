@@ -18,9 +18,11 @@ import com.dangerfield.drop2048.libraries.ui.components.button.ButtonType
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-// Debug-only CTA label — dev-facing, so a constant rather than a string
-// resource (the button never renders in release builds).
+// Debug-only CTA labels — dev-facing, so constants rather than string
+// resources (this dialog never renders in release builds).
 private const val NetworkInspectorCta = "Network inspector"
+private const val ReportBugCta = "Report a bug"
+private const val DismissCta = "Dismiss"
 
 @Composable
 fun ShakeDialog(
@@ -73,7 +75,7 @@ fun ShakeDialog(
                     size = ButtonSize.Medium,
                     type = ButtonType.Danger,
                 ) {
-                    Text("Report a bug")
+                    Text(ReportBugCta)
                 }
 
                 if (onOpenNetworkInspector != null) {
@@ -99,7 +101,7 @@ fun ShakeDialog(
                     size = ButtonSize.Medium,
                     style = ButtonStyle.Text
                 ) {
-                    Text("Dismiss")
+                    Text(DismissCta)
                 }
             }
         }

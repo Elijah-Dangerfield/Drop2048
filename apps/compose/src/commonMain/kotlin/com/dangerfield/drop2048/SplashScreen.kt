@@ -22,7 +22,10 @@ import com.dangerfield.drop2048.libraries.core.Platform
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.text.Text
 import com.dangerfield.drop2048.system.AppTheme
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.app_name
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private const val FadeInMillis = 450
@@ -65,7 +68,7 @@ private fun SplashContent(alpha: Float) {
     ) {
         Text(
             modifier = Modifier.fillMaxWidth(),
-            text = "Drop 2048",
+            text = stringResource(Res.string.app_name),
             typography = AppTheme.typography.Brand.B1300,
             textAlign = TextAlign.Center,
         )

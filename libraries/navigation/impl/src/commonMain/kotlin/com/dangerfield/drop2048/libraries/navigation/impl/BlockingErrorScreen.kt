@@ -25,6 +25,10 @@ import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD1200
 import com.dangerfield.drop2048.system.VerticalSpacerD1600
 import com.dangerfield.drop2048.system.VerticalSpacerD500
+import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.nav_error_report
+import drop2048.libraries.resources.generated.resources.nav_error_report_aside
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -75,12 +79,12 @@ internal fun BlockingErrorScreen(
                     onClick = onReportToDevelopers,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Report to developers")
+                    Text(text = stringResource(Res.string.nav_error_report))
                 }
 
                 VerticalSpacerD500()
 
-                Text("(which is me cause I wrote myself)")
+                Text(stringResource(Res.string.nav_error_report_aside))
 
                 VerticalSpacerD1600()
             }

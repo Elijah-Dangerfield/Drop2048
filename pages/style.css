@@ -1,10 +1,13 @@
+/* Sampled from the app icon: the deep plum backdrop, the gold "2" tile, and
+   the pink "16" tile. Keep these in step if the icon is ever redrawn. */
 :root {
-    --bg: #111214;
-    --surface: #1a1b1e;
-    --text: #f5f5f5;
-    --text-muted: #a0a0a0;
-    --accent: #EC407A;
-    --border: #2a2b2e;
+    --bg: #0E0B17;
+    --surface: #1A1430;
+    --text: #F5F3FA;
+    --text-muted: #9A93B5;
+    --accent: #E3AE28;
+    --accent-soft: #FF8BAA;
+    --border: #241D3D;
 }
 
 * {
@@ -42,6 +45,9 @@ header {
     display: block;
     width: 96px;
     height: 96px;
+    /* The source art is a full-bleed square; the OS applies the mask on a
+       device, so round it here or it reads as a poster rather than an icon. */
+    border-radius: 22px;
     margin-bottom: 16px;
 }
 
