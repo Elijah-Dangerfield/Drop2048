@@ -17,6 +17,8 @@ import com.dangerfield.drop2048.libraries.ads.AdNetwork
 import com.dangerfield.drop2048.libraries.ads.AdUnits
 import com.dangerfield.drop2048.libraries.ads.BannerSurface
 import com.dangerfield.drop2048.libraries.ads.NoBannerSurface
+import com.dangerfield.drop2048.libraries.core.Catching
+import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.logEvent
 import com.google.android.gms.ads.AdListener
@@ -96,24 +98,36 @@ class AdMobBannerSurface(
 
         if (inspecting) return
 
+        // Constructing an AdView touches the SDK, and unlike every other call
+        // here that happens during *composition*, outside the Catching that
+        // wraps prepare(). A missing or malformed app id in the manifest makes
+        // the SDK throw on first touch, and a throw on this path takes the frame
+        // down rather than costing an impression. So it is caught, and a null
+        // view degrades to the same nothing a no-fill already draws.
         val view = remember(widthDp) {
-            AdView(context).apply {
-                adUnitId = AdUnits.android(AdFormat.Banner)
-                setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, widthDp))
-                adListener = object : AdListener() {
-                    override fun onAdLoaded() {
-                        filled = true
-                        report(true)
-                    }
+            Catching {
+                AdView(context).apply {
+                    adUnitId = AdUnits.android(AdFormat.Banner)
+                    setAdSize(
+                        AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, widthDp),
+                    )
+                    adListener = object : AdListener() {
+                        override fun onAdLoaded() {
+                            filled = true
+                            report(true)
+                        }
 
-                    override fun onAdFailedToLoad(error: LoadAdError) {
-                        logger.logEvent("ads.banner_failed", "code" to error.code)
-                        filled = false
-                        report(false)
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            logger.logEvent("ads.banner_failed", "code" to error.code)
+                            filled = false
+                            report(false)
+                        }
                     }
                 }
             }
-        }
+                .logOnFailure { "AdView construction threw; drawing no banner" }
+                .getOrNull()
+        } ?: return
 
         DisposableEffect(view) {
             val job = appScope.launch {
