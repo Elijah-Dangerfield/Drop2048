@@ -90,19 +90,30 @@
 
           It is **not** in `AdUnits.kt` with the unit ids for exactly that
           reason: this one cannot be a Kotlin constant, because it is read too
-          early. The value below is Google's published sample app id and it
-          pairs with `AdUnits.useTestUnits`; both flip together when the real
-          AdMob app exists. See `OWNER-TODO.md`.
+          early.
 
-          The real AdMob app now does exist, created 2026-09-21, and its id is
-          recorded as `AdUnits.AndroidLive.applicationId`. It is deliberately
-          not pasted below yet: going live is one atomic change, this value and
-          `useTestUnits` together, because a build with a real app id and test
-          units is the half-migrated state the pairing exists to prevent.
+          It also cannot branch on the release channel, which is why it is the
+          real id unconditionally rather than paired with a flag. A manifest
+          value is fixed at build time and `AdUnits.useTestUnits` is answered at
+          runtime from `BuildInfo.releaseChannel`, so the two cannot flip
+          together even in principle.
+
+          That is fine, and it is not the half-migrated state an earlier version
+          of this comment warned about. A real app id with test *units* is a
+          supported AdMob combination: the app id only identifies the publisher
+          to the SDK, and no request is billed or attributed to it unless the
+          unit id is also real. Every `dev` and `beta` build now ships exactly
+          that pairing. The dangerous direction is the other one, a real unit in
+          a build nobody installs from a store, and that is what
+          `AdUnits.useTestUnits` prevents.
+
+          Value: `AdUnits.AndroidLive.applicationId`, AdMob app "Doublestack
+          (Android)", created 2026-09-21. Keep the two in step by hand; nothing
+          can assert it, because the manifest is not on any Kotlin classpath.
         -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-7008637445039253~5728891206" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

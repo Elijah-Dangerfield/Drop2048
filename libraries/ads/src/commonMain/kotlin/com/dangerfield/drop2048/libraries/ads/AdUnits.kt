@@ -2,6 +2,7 @@
 
 package com.dangerfield.drop2048.libraries.ads
 
+import com.dangerfield.drop2048.libraries.core.BuildInfo
 import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
 
@@ -19,22 +20,55 @@ import kotlin.native.ObjCName
  *
  * ## Going live
  *
- * Flip [useTestUnits] to `false` and fill in the `Live` blocks. Both are one edit
- * in one file, on purpose — the failure this guards against is a half-migrated
- * app with one real unit and one test unit still in it. The app id itself is
- * *not* here: it goes in `AndroidManifest.xml`
+ * Nothing to flip. [useTestUnits] reads the release channel, so a `store` build
+ * requests the `Live` blocks and every other build requests Google's samples.
+ * Filling both `Live` blocks is the only manual step, and it is one edit in one
+ * file on purpose: the failure this guards against is a half-migrated app with
+ * one real unit and one test unit still in it.
+ *
+ * The app id is *not* here. It goes in `AndroidManifest.xml`
  * (`com.google.android.gms.ads.APPLICATION_ID`) and `Info.plist`
- * (`GADApplicationIdentifier`), because both SDKs read it before any Kotlin runs.
+ * (`GADApplicationIdentifier`), because both SDKs read it before any Kotlin
+ * runs, which is also why those two carry the real id unconditionally: a
+ * manifest value cannot branch on a runtime channel. A real app id paired with
+ * test units is a supported combination and is what every non-store build now
+ * ships.
  */
 @ObjCName("AdUnits", exact = true)
 object AdUnits {
 
     /**
-     * The single switch. Left `true` until real units exist; when it flips,
-     * `Live` must be complete on **both** platforms or the placement falls back
-     * to its test unit rather than silently requesting an empty string.
+     * Whether to request Google's sample units instead of ours.
+     *
+     * **Derived from the release channel, not hand-flipped, and not from
+     * `isDebug`.** `isDebug` is false for a TestFlight build and false for a
+     * Play internal-track build, so keying off it would have every tester
+     * requesting live inventory from a build nobody is going to install from a
+     * store. That is invalid traffic, and invalid traffic is what gets an AdMob
+     * account suspended. `dev` and `beta` therefore stay on test units and only
+     * `store` goes live.
+     *
+     * `releaseChannel` is the artifact's own label, set by
+     * `RELEASE_CHANNEL_OVERRIDE` in `release.yml` and defaulted to `dev` in
+     * `versions.properties`. It says which pipeline built this binary, which is
+     * exactly the question here. Note what it is not: a promise about who is
+     * holding the phone. A `store` build handed to a tester before submission
+     * does request live units, and should, because that is the binary that
+     * ships.
+     *
+     * When this is false, `Live` must be complete on **both** platforms or the
+     * placement falls back to its test unit rather than silently requesting an
+     * empty string. See [pick].
      */
-    const val useTestUnits: Boolean = true
+    val useTestUnits: Boolean
+        get() = BuildInfo.releaseChannel != StoreChannel
+
+    /**
+     * The one channel that serves real ads. Matches `RELEASE_CHANNEL_OVERRIDE`
+     * in `.github/workflows/release.yml`; `beta.yml` sets `beta` and gets test
+     * units.
+     */
+    private const val StoreChannel = "store"
 
     /** https://developers.google.com/admob/android/test-ads — reserved sample units. */
     object AndroidTest {
@@ -58,8 +92,7 @@ object AdUnits {
 
     /**
      * Real Android units, from the AdMob app "Doublestack (Android)" created
-     * 2026-09-21. Live but **not yet in use**: [useTestUnits] is still `true`,
-     * and flipping it is the deliberate second step.
+     * 2026-09-21. In use on `store` builds only, per [useTestUnits].
      *
      * These are not secrets. An AdMob app id and an ad unit id ship inside every
      * binary on both stores and can be read out of any APK, so they belong in git
@@ -77,18 +110,16 @@ object AdUnits {
     /**
      * Real iOS units, from the AdMob app "Doublestack (iOS)" created 2026-09-21.
      *
-     * **Nothing reads these yet.** iOS links no ad SDK: there is no
-     * `GoogleMobileAds` package in `project.pbxproj` and no
-     * `GADApplicationIdentifier` in `Info.plist`, so [applicationId] below has
-     * nowhere to go until that work happens. They are recorded here so the ids
-     * live in the repo rather than only in the AdMob console.
+     * Live since 2026-09-21: `GoogleMobileAds` is an SPM dependency of the
+     * iosApp target, `IOSAdNetwork` requests these, and [applicationId] is in
+     * `Info.plist` under `GADApplicationIdentifier`.
      */
     object IosLive {
         const val rewarded = "ca-app-pub-7008637445039253/8864347123"
         const val interstitial = "ca-app-pub-7008637445039253/4121040929"
         const val banner = "ca-app-pub-7008637445039253/1498747010"
 
-        /** For `Info.plist`'s `GADApplicationIdentifier`, once iOS has an ad SDK. */
+        /** For `Info.plist`'s `GADApplicationIdentifier`. Already set there. */
         const val applicationId = "ca-app-pub-7008637445039253~9568808728"
     }
 
