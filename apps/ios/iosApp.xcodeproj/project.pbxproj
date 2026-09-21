@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		43650040A35ABEE2FF88A523 /* Drop2048.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Drop2048.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		43650040A35ABEE2FF88A523 /* Doublestack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Doublestack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -55,7 +55,7 @@
 		AAAD9064E8710953FC84629E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				43650040A35ABEE2FF88A523 /* Drop2048.app */,
+				43650040A35ABEE2FF88A523 /* Doublestack.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,7 +93,7 @@
 				40F7ACE72EE5E1E70057F44F /* Sentry */,
 			);
 			productName = iosApp;
-			productReference = 43650040A35ABEE2FF88A523 /* Drop2048.app */;
+			productReference = 43650040A35ABEE2FF88A523 /* Doublestack.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -251,7 +251,6 @@
 				FRAMEWORK_SEARCH_PATHS = "\"$(SRCROOT)/../../apps/compose/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)\"";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Drop 2048";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -352,7 +351,6 @@
 				FRAMEWORK_SEARCH_PATHS = "\"$(SRCROOT)/../../apps/compose/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)\"";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Drop 2048";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

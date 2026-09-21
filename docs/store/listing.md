@@ -11,19 +11,20 @@ code moves.
 
 ## The name is one substitution, deliberately
 
-`{APP_NAME}` appears everywhere the store name would. **"Drop 2048" is the repo name and the store
-name is an open owner decision** (`OWNER-TODO.md`, "App name and store identity"), so nothing below
-hard-codes it. Substitute once and the whole file is done.
+`{APP_NAME}` appears everywhere the store name would. The decision has since been made and it is
+**Doublestack** (`OWNER-TODO.md`, "App name and store identity"), but the placeholder is left in
+place because substituting it is a copy pass over the whole file and that pass is yours. Substitute
+once and the file is done.
 
-Two things that bear on the decision and are worth knowing before you make it:
+Two things behind that decision, still worth knowing:
 
 - **"2048" is heavily squatted on both stores.** That is a discovery problem, not a legal one, and
   it is the reason the Play title below carries a descriptive suffix rather than standing alone.
-- **The Android launcher label and the iOS bundle name already disagree.**
-  `apps/compose/src/androidMain/res/values/strings.xml` says `Drop2048` (no space);
-  `libraries/resources/.../strings.xml` and `Info.plist`'s `CFBundleName` both say `Drop 2048`. The
-  manifest points `android:label` at the *androidMain* one, so today the Android home screen reads
-  "Drop2048" and everything else reads "Drop 2048". Fix that in the same pass as the name decision.
+- **The two launcher labels agreed as of 2026-09-21, and getting iOS there took a build setting.**
+  Both `strings.xml` files now say `Doublestack`, and on iOS the name comes from `PRODUCT_NAME` in
+  `apps/ios/Configuration/Config.xcconfig`, not from `Info.plist`: the generated plist overwrites a
+  `CFBundleName` written there. See `OWNER-TODO.md`, "App name and store identity", before editing
+  either one.
 
 ---
 

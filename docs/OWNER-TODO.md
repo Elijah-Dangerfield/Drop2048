@@ -175,6 +175,20 @@ just `Doublestack`. The identifiers keep the old spelling on purpose: `com.dange
 permanent on Play, `com.dangerfield.drop2048.Drop2048` is what the iOS target builds, and no player
 sees either. Same for `Drop2048Application`, `Theme.Drop2048` and the repo name.
 
+**One exception to that, found and fixed 2026-09-21: iOS `PRODUCT_NAME` could not stay `Drop2048`.**
+A build at 9d055db still read "Drop 2048" on the home screen, from two places. The target carried a
+leftover `INFOPLIST_KEY_CFBundleDisplayName = "Drop 2048"`, and CFBundleDisplayName beats
+CFBundleName on the home screen. Underneath it, `GENERATE_INFOPLIST_FILE = YES` derives
+`CFBundleName` from `PRODUCT_NAME` and overwrites whatever `iosApp/Info.plist` says, with no
+warning, so the `Doublestack` sitting in that file had never once reached a build. Setting
+`INFOPLIST_KEY_CFBundleName` does not rescue it either: Xcode accepts the setting and then ignores
+it, which was verified against the built plist rather than assumed. `PRODUCT_NAME` is the only lever,
+so it is now `Doublestack`, and `Doublestack.app`, the executable and the Swift module renamed with
+it. The bundle id is a literal in the pbxproj and did not move.
+
+That made it a submission blocker rather than a cosmetic one: CFBundleName is the name App Store
+delivery checks for ITMS-90129, and "Drop 2048" is the name that is already taken.
+
 ## Look at these when convenient
 
 ### The five block palettes, rendered

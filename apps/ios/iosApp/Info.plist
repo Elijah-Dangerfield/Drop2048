@@ -9,13 +9,14 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<!--
-	  Without this key the generated plist defaults CFBundleName to
-	  $(PRODUCT_NAME), and App Store delivery rejects names that are
-	  already taken by another app (ITMS-90129). Keep it set to the
-	  app's display name; it must be unique on the App Store.
+	  The app's name is NOT here, and putting it back here will not work.
+	  GENERATE_INFOPLIST_FILE is YES, and a key Xcode synthesizes overrides the
+	  same key in this file without warning: a CFBundleName set here lost to the
+	  generated $(PRODUCT_NAME) and shipped the app under its old name. Both keys
+	  live in Configuration/Config.xcconfig now, CFBundleName as PRODUCT_NAME
+	  itself (the generator takes it from nowhere else) and CFBundleDisplayName as
+	  INFOPLIST_KEY_CFBundleDisplayName.
 	-->
-	<key>CFBundleName</key>
-	<string>Doublestack</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>We'd like to send you notifications.</string>
 	<key>UIBackgroundModes</key>

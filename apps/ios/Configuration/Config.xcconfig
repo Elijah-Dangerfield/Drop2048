@@ -1,7 +1,24 @@
 TEAM_ID=
 
-PRODUCT_NAME=Drop2048
+// PRODUCT_NAME is the app's name, not just the artifact's. GENERATE_INFOPLIST_FILE
+// is YES, and the generator hardcodes CFBundleName=$(PRODUCT_NAME): it is one of
+// the keys it always derives, so INFOPLIST_KEY_CFBundleName is accepted as a
+// build setting and then ignored, and a CFBundleName in iosApp/Info.plist is
+// overwritten without a warning. Both were tried; only this line moves it.
+// CFBundleName has to be unique on the App Store, because delivery rejects a
+// name another app already holds (ITMS-90129). So PRODUCT_NAME must track the
+// store name even though it also names the .app, the executable and the
+// DerivedData path.
+//
+// The bundle id below deliberately does not track it (OWNER-TODO.md, "App name
+// and store identity"): com.dangerfield.drop2048 is permanent on Play.
+PRODUCT_NAME=Doublestack
 PRODUCT_BUNDLE_IDENTIFIER=com.dangerfield.drop2048.Drop2048$(TEAM_ID)
+
+// What the home screen shows. Takes precedence over CFBundleName there, which is
+// why the stale "Drop 2048" left in the target's build settings survived the
+// rename on its own.
+INFOPLIST_KEY_CFBundleDisplayName=Doublestack
 
 // Set per build by the pipeline (CURRENT_PROJECT_VERSION=<commit count>), not
 // by release-please. Kept here so a local Xcode build has something valid.
