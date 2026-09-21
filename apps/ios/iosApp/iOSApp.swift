@@ -9,7 +9,6 @@ struct iOSApp: App {
     let reviewLauncher = IOSReviewLauncher()
     let adNetwork = IOSAdNetwork()
     let storeBilling = IOSStoreBilling()
-    private let nativeViewFactory = IOSNativeViewFactory.shared
     private let iOSAppComponent: IosAppComponent
 
     init() {
@@ -17,8 +16,7 @@ struct iOSApp: App {
             permissionManager: permissionManager,
             reviewLauncher: reviewLauncher,
             adNetwork: adNetwork,
-            storeBilling: storeBilling,
-            nativeViewFactory: nativeViewFactory
+            storeBilling: storeBilling
         )
         iOSAppComponent.telemetry.initialize()
         // Construct every @AutoInit singleton up front — resolving the set is
@@ -28,10 +26,7 @@ struct iOSApp: App {
     
     var body: some Scene {
         WindowGroup {
-            RootComposeView(
-                appComponent: iOSAppComponent,
-                nativeViewFactory: nativeViewFactory
-            )
+            RootComposeView(appComponent: iOSAppComponent)
             .onOpenURL { url in
                 // Forward URLs from custom-scheme links and Universal Links
                 // into the Kotlin DeepLinkBridge — App.kt collects from it
@@ -45,25 +40,18 @@ struct iOSApp: App {
 struct RootComposeView: View {
     @Environment(\.scenePhase) private var scenePhase
     let appComponent: IosAppComponent
-    let nativeViewFactory: Drop2048NativeViewFactory
 
     var body: some View {
-        ComposeView(
-            appComponent: appComponent,
-            nativeViewFactory: nativeViewFactory
-        )
-        .ignoresSafeArea()
+        ComposeView(appComponent: appComponent)
+            .ignoresSafeArea()
     }
 }
 
 struct ComposeView: UIViewControllerRepresentable {
     let appComponent: IosAppComponent
-    let nativeViewFactory: Drop2048NativeViewFactory
 
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController(
-            appComponent: appComponent
-        )
+        MainViewControllerKt.MainViewController(appComponent: appComponent)
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}

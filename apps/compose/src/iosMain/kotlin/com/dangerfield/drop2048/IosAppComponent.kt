@@ -4,7 +4,6 @@ import com.dangerfield.drop2048.libraries.ads.AdNetwork
 import com.dangerfield.drop2048.libraries.billing.StoreBilling
 import com.dangerfield.drop2048.libraries.drop2048.PermissionManager
 import com.dangerfield.drop2048.libraries.review.ReviewLauncher
-import com.dangerfield.drop2048.libraries.ui.nativeviews.NativeViewFactory
 import me.tatarka.inject.annotations.Provides
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.MergeComponent
@@ -17,7 +16,6 @@ abstract class IosAppComponent(
     private val reviewLauncher: ReviewLauncher,
     private val adNetwork: AdNetwork,
     private val storeBilling: StoreBilling,
-    val nativeViewFactory: NativeViewFactory
 ) : AppComponent {
 
     @Provides
@@ -52,5 +50,4 @@ expect fun create(
     reviewLauncher: ReviewLauncher,
     adNetwork: AdNetwork,
     storeBilling: StoreBilling,
-    nativeViewFactory: NativeViewFactory
 ): IosAppComponent
