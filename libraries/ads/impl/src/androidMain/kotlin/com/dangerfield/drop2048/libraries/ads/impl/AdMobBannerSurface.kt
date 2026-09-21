@@ -21,6 +21,8 @@ import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.logging.KLog
 import com.dangerfield.drop2048.libraries.core.logging.logEvent
+import com.dangerfield.drop2048.libraries.flowroutines.AppCoroutineScope
+import com.dangerfield.drop2048.libraries.flowroutines.DispatcherProvider
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
@@ -28,11 +30,11 @@ import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.tatarka.inject.annotations.Inject
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
-import com.dangerfield.drop2048.libraries.flowroutines.AppCoroutineScope
 
 /**
  * An AdMob adaptive banner, drawn where the arrow row would be.
@@ -78,6 +80,7 @@ class AdMobBannerSurface(
     private val context: Context,
     private val network: AdNetwork,
     private val appScope: AppCoroutineScope,
+    private val dispatchers: DispatcherProvider,
 ) : BannerSurface {
 
     private val logger = KLog.withTag("Banner")
@@ -131,7 +134,20 @@ class AdMobBannerSurface(
 
         DisposableEffect(view) {
             val job = appScope.launch {
-                prepared.collect { ready -> if (ready) view.loadAd(AdRequest.Builder().build()) }
+                // `withContext(main)` is load-bearing, not tidiness.
+                // `BaseAdView.loadAd` enforces the main thread and throws
+                // IllegalStateException("#008 Must be called on the main UI
+                // thread.") off it, and `appScope` runs on
+                // `DispatcherProvider.default`. Nothing catches that: a throw
+                // inside a `launch` on a SupervisorJob reaches the thread's
+                // uncaught handler, so it killed the process rather than
+                // costing an impression. It shipped that way in 0.1.0+102 and
+                // crashed four testers twenty times in half an hour.
+                prepared.collect { ready ->
+                    if (ready) withContext(dispatchers.main) {
+                        view.loadAd(AdRequest.Builder().build())
+                    }
+                }
             }
             onDispose {
                 job.cancel()
