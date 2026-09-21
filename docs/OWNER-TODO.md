@@ -88,10 +88,30 @@ gets an AdMob account suspended for invalid traffic, which `AdUnits.kt` warns ab
 That is normal for an app AdMob cannot find on a store yet; the Sodogku apps sit in the same state.
 It resolves once Doublestack is actually published, not before, so it is not a thing to chase.
 
-**iOS has nowhere to put its id.** There is no `GoogleMobileAds` package in `project.pbxproj` and no
-`GADApplicationIdentifier` in `Info.plist`, so `AdUnits.IosLive` is recorded but dead. Linking the
-iOS ad SDK is a separate piece of work and the reason `data-safety.md` §7.2 is written the way it
-is; the Apple privacy answers change when it lands.
+**iOS is wired now, as of 2026-09-21.** `GoogleMobileAds` 13.9.0 is an SPM dependency,
+`IOSAdNetwork` is ported from Sodogku, and both plist keys are in. A simulator install boots and
+`AdUnits.IosLive` is live code rather than a record. Three things that port did **not** bring with
+it, all of which an iOS ad release needs:
+
+### iOS has no banner, and this one has nothing to copy
+
+Android draws banners through `AdMobBannerSurface`. iOS falls through to `NoBannerSurface`, so the
+strip is simply absent there, which is a safe and coherent state rather than a bug. Sodogku has no
+banners at all, so the UIKit-`AdView`-inside-Compose bridge is genuinely new work. Interstitials and
+rewarded video are unaffected and work on both platforms.
+
+### `SKAdNetworkItems` is missing from `Info.plist`
+
+Google publishes the list of network ids that belong there. Without it, install attribution for iOS
+ad campaigns does not work, so the ads serve but cannot be measured. Sodogku is missing this too.
+
+### `PrivacyInfo.xcprivacy` does not exist
+
+`data-safety.md` §7.2 item 4 and §7.4 both call for it. Apple requires a privacy manifest declaring
+`NSPrivacyTracking`, Google's tracking domains, and the collected-data types. Sodogku is missing it
+as well, so this is one fix worth making in both. Note §7.2 item 5: the Google and Sentry packages
+must each ship their own signed manifest, which is their obligation and not something our file can
+satisfy.
 
 ### `MaxAdContentRating` is never set, and the target audience now makes that matter
 
