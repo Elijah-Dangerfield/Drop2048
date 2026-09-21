@@ -102,22 +102,6 @@ From release two onward `release.yml` goes straight to production without you.
 
 Nothing here blocks a submission, and none of it needs doing before release one.
 
-- **Game Center: both leaderboards are in, the achievements are not.** The
-  boards carry the exact ids the code submits to, both integer / best score /
-  **high to low**, with English localisations. `score_weekly` is recurring,
-  starting Mon 28 Sep 2026 00:00, 7-day duration and 7-day restart.
-  - **The 22 achievements are blocked on badge art, not on typing.** Apple
-    marks the achievement image required, unlike the leaderboard's, so a record
-    created now is one that cannot be finished. The ids are the
-    `AchievementId` enum, 22 of them, pinned by `PlatformAchievementIdTest`.
-    Until they exist those submissions fail silently, exactly like a signed-out
-    player; the app still ships and reviews fine, which is why this is not
-    Required. **you** for the art, then **agent** for the records.
-
-    The in-app glyphs are placeholder emoji today (`OWNER-TODO.md`). If you are
-    happy for the store badges to be those same emoji rendered at 512x512, say
-    so and all 22 can be done in one pass. That is a visible quality decision,
-    which is why it has not been made for you.
 - **The Grafana pipe ships dark.** `GRAFANA_OTLP_BASE_URL`, `_INSTANCE_ID` and
   `LOGS_WRITE_TOKEN` are unset, so `resolve()` returns `""` and analytics are
   off in every build. The build does not fail; it just measures nothing. **you**
@@ -157,6 +141,15 @@ Store Connect: $2.99 base, 175 countries, English display name and description,
 and "Add for Review" is enabled. **The iOS icon is flattened** (ITMS-90717, the reject Sodogku
 lost a submission to) and **the iPad claim is dropped**, so no iPad screenshots
 are owed.
+
+**Game Center is complete.** Two leaderboards and 22 achievements, all carrying
+the exact ids the code submits to, cross-checked against the `AchievementId`
+enum rather than typed from a doc. Both boards are integer / best score / **high
+to low** (App Store Connect defaults every board to ascending, which would have
+ranked the worst run first); `score_weekly` is recurring from Mon 28 Sep 2026,
+7-day duration and restart. Every achievement is 45 points, not hidden,
+one-step, with an English localisation and a 512x512 badge rendered from the
+same emoji the app already draws.
 
 **Ads are release-ready without a flip.** `AdUnits.useTestUnits` reads
 `BuildInfo.releaseChannel`, so a `store` build serves live units and every other
