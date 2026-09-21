@@ -144,18 +144,14 @@ class GameCenterServices : GameServices {
      * badge is reported once in a player's lifetime, so there is no volume to
      * optimise for.
      *
-     * `percentComplete = 100.0` and nothing else: see [GameServices.reportAchievement].
-     * `showsCompletionBanner` is left at its default `false`. The app draws its
-     * own unlock toast at the same instant, and two banners for one badge is a
-     * bug the player attributes to us.
+     * `percentComplete = 100.0`, and `showsCompletionBanner` **explicitly**
+     * `false`: see [GameServices.reportAchievement] and [completedAchievement].
      */
     override suspend fun reportAchievement(achievementId: String): SubmitResult {
         if (!GKLocalPlayer.local.authenticated) return SubmitResult.NotAuthenticated
 
         return Catching {
-            val achievement = GKAchievement(identifier = achievementId).apply {
-                percentComplete = 100.0
-            }
+            val achievement = completedAchievement(achievementId)
             suspendCancellableCoroutine { continuation ->
                 GKAchievement.reportAchievements(listOf(achievement)) { error ->
                     if (!continuation.isActive) return@reportAchievements
@@ -271,3 +267,28 @@ private class DismissingDelegate : NSObject(), GKGameCenterControllerDelegatePro
         gameCenterViewController.dismissViewControllerAnimated(flag = true, completion = null)
     }
 }
+
+/**
+ * A `GKAchievement` at 100% that will **not** draw Game Center's own banner.
+ *
+ * `showsCompletionBanner = false` is set explicitly, and the explicitness is
+ * the whole point. `GKAchievement` defaults it to **`true`**, not false, so an
+ * achievement constructed and reported without touching it puts Game Center's
+ * banner on screen at the same instant the app draws its own unlock toast. Two
+ * banners for one badge is a bug the player attributes to us, and it is a bug
+ * only an iOS device shows: nothing in the JVM suite can reach GameKit.
+ *
+ * This is not a guess about Apple's default. `GKAchievementIosTest` reads it
+ * back off a real `GKAchievement`, so if Apple ever flips it the test says so
+ * rather than this comment quietly becoming wrong. It was wrong once already:
+ * the KDoc here claimed the default was `false` and shipped the double banner
+ * it was written to prevent.
+ *
+ * Extracted from `reportAchievement` so there is something to assert against
+ * without a signed-in Game Center player.
+ */
+internal fun completedAchievement(achievementId: String): GKAchievement =
+    GKAchievement(identifier = achievementId).apply {
+        percentComplete = 100.0
+        showsCompletionBanner = false
+    }
