@@ -82,6 +82,13 @@ class IOSAdNetwork: NSObject, AdNetwork {
         // answer. It is also the default, so this line is a statement of the
         // decision rather than a change of behaviour.
         MobileAds.shared.requestConfiguration.ageRestrictedTreatment = .unspecified
+        // The content ceiling, matching Android's
+        // `setMaxAdContentRating(MAX_AD_CONTENT_RATING_G)`. Play's declared
+        // target audience includes 13-15, and while that is a Play form rather
+        // than an Apple one, the creative pool is shared and there is no version
+        // of this app that needs mature ads. Set before `start()` for the same
+        // reason as the line above: no request goes out ahead of the config.
+        MobileAds.shared.requestConfiguration.maxAdContentRating = .general
         _ = await MobileAds.shared.start()
         initialised = true
         #endif

@@ -215,6 +215,20 @@ class AdMobAdNetwork(
                     .setTagForChildDirectedTreatment(
                         RequestConfiguration.TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE,
                     )
+                    // Play's target audience is filed as 13-15 / 16-17 / 18+, and
+                    // declaring any under-18 band puts the app under Families
+                    // policy whenever a child uses it. AdMob being a
+                    // Play-certified network satisfies the *network* half; this
+                    // is the *content* half, and without it AdMob is free to
+                    // serve MA-rated creative to a thirteen-year-old.
+                    //
+                    // G rather than PG deliberately. The cost is a slightly
+                    // thinner demand pool; the alternative is arguing the point
+                    // with a policy reviewer after a complaint, and there is no
+                    // version of this app that needs mature ads.
+                    .setMaxAdContentRating(
+                        RequestConfiguration.MAX_AD_CONTENT_RATING_G,
+                    )
                     .build(),
             )
             suspendCancellableCoroutine { cont ->
