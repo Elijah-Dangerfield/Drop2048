@@ -109,6 +109,46 @@ settled by construction, since its DSN is an HTTPS URL committed in `telemetry.p
 `share_footer` in `libraries/resources/.../strings.xml:349` prints it on every shared score image.
 Either buy the domain or point the string at the Pages site. An agent cannot buy a domain.
 
+It is also the domain the real website needs, below, so one purchase clears both.
+
+### Get off `github.io` and onto a real site
+
+Everything player-facing currently points at `https://elijah-dangerfield.github.io/Drop2048/`, which
+is four hand-written files in `pages/` published by `.github/workflows/pages.yml`. That was the
+right call for a repo with no store presence. It is the wrong thing to put on a store listing.
+
+**Why this is a blocker and not a polish item.** The URL contains a personal GitHub username and a
+repo name that no longer matches the product. It is also load-bearing in more places than it looks:
+
+- `LaunchGateConfigValues.kt:130` and `:141` compile it in as the fallback for the terms and privacy
+  URLs, so it is what the app opens when remote config is unreachable.
+- It is filed with Google as the **privacy policy URL**, the store listing **website**, and the
+  **delete-data URL** on the Data safety form.
+- It is filed with Apple as the **Support URL**.
+
+Changing a privacy policy URL after submission means re-filing on both stores, and a legal URL that
+404s because a username or repo name moved is worse than an ugly one. Cheapest to fix before the
+first submission, which is where we are.
+
+**Copy what Cards does.** `~/Workspace/Cards` already solved this and the shape is worth lifting
+wholesale rather than reinventing:
+
+- `website/` at the repo root, Astro (`astro@^7.1.3`), `npm run dev` to preview.
+- `website/astro.config.mjs` sets `site: 'https://downcard.app'`. Ours becomes `doublestack.app`.
+- `website/public/CNAME` holds the bare domain, which is what makes Pages serve it.
+- `.github/workflows/pages.yml` there builds with Node 22 and `npm ci`, then uploads `website/dist`.
+  Ours publishes `pages/` as static files and would be replaced by that version.
+- Pages are `index`, `privacy`, `terms`, `support`, `contact`, `thanks`, over a shared
+  `Layout.astro` with `Nav`, `Footer` and `ContactForm` components. We have no support or contact
+  page today; both stores want somewhere to send people, and `contact@nightjarlabs.llc` in a
+  `mailto:` is the current answer.
+
+**Split of work.** Buying `doublestack.app` and pointing its DNS at GitHub Pages is yours and
+cannot be delegated. Porting the three existing pages into Astro, building the site, writing the
+workflow and updating the four filed URLs is agent work, and the current `pages/` content carries
+over almost verbatim: the terms and privacy copy were rewritten on 2026-09-20 and the palette is
+already sampled from the app icon.
+
 ---
 
 ## Decide before the chunk that needs it
