@@ -100,7 +100,7 @@ strip is simply absent there, which is a safe and coherent state rather than a b
 banners at all, so the UIKit-`AdView`-inside-Compose bridge is genuinely new work. Interstitials and
 rewarded video are unaffected and work on both platforms.
 
-### `SKAdNetworkItems` and the privacy manifest: done, with one question left
+### `SKAdNetworkItems` and the privacy manifest: done
 
 **Done 2026-09-21.** `Info.plist` carries all 50 SKAdNetwork identifiers, scraped from
 developers.google.com/admob/ios/privacy/strategies rather than transcribed. Google adds buyers over
@@ -119,26 +119,12 @@ degrading them.
 ships nowhere. Only Xcode can do that. It is item 8 on `release-checklist.md` and it is the
 difference between a manifest and a file sitting in a folder.
 
-### The nutrition label may be missing Coarse Location
+### Advertising ID declaration, found and filed
 
-Found while wiring the manifest, and not yet acted on because it is a claim about the app rather
-than a config value.
-
-GoogleMobileAds' own manifest declares `NSPrivacyCollectedDataTypeCoarseLocation`, and Google's
-published data-disclosure page tells developers to disclose the IP address because it "may be used
-to estimate the general location of a device". The App Store nutrition label is app-level and
-covers what bundled SDKs collect, so the label published on 2026-09-21 is arguably one row short.
-
-`data-safety.md` §2.9 says location does not apply, but it reasons only about *our* use of IP: our
-server uses it as a rate-limit key and derives nothing. That was written before any ad SDK existed
-and it under-reads the AdMob case.
-
-Two knock-on effects if you agree it should be added:
-
-- **Android has shipped AdMob all along**, so the same argument applies to the Play Data safety
-  answers, which currently declare no Location.
-- **`pages/privacy.html` says "No location of any kind."** That sentence would have to change, and
-  it is the kind of claim worth getting right rather than leaving generous.
+Play flagged it on the App content page rather than the dashboard checklist, which is why it was
+missed: "you will not be able to submit releases targeting Android 13 until you complete this
+section". Filed 2026-09-21 as **yes, with Analytics and Advertising or marketing**, matching the
+advertising-id row in `data-safety.md` §4. App content now reads "you're all caught up".
 
 ### `MaxAdContentRating` is never set, and the target audience now makes that matter
 

@@ -46,14 +46,19 @@
   `sentry-cocoa`, `GoogleMobileAds` and `UserMessagingPlatform` each ship one at
   the versions actually resolved. That closes §7.2 item 5.
 
-  ## One thing this file does not settle
+  ## Coarse location is Google's to declare, and it does
 
   The Google SDK's own manifest declares `NSPrivacyCollectedDataTypeCoarseLocation`,
-  because it derives approximate location from the IP address. It is declared
-  there, so the manifest side is covered, but the **App Store nutrition label**
-  is app-level and covers what bundled SDKs collect too. `data-safety.md` §2.9
-  reasons only about *our* use of IP and concludes no location type applies,
-  which under-reads the AdMob case. See OWNER-TODO.
+  because it derives approximate location from the IP address. Apple aggregates
+  manifests, so it is not repeated here, for the same reason the tracking domains
+  are not.
+
+  The **labels** are a different matter, because they are app-level and cover what
+  bundled SDKs collect. Both now carry it: Apple's has Coarse Location (linked,
+  not tracking, third-party advertising and analytics) and Play's has Approximate
+  location (collected and shared). `data-safety.md` §2.8 and §2.9 were corrected
+  at the same time; they used to say no location category applied, which was true
+  of our own code and wrong about the app.
 -->
 <plist version="1.0">
 <dict>

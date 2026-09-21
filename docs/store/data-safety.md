@@ -255,17 +255,28 @@ Product Interaction row now cover a good deal more, which is what those rows are
 
 - `X-Country-Code` (`ClientHeaders.kt:47`) and the standard `Accept-Language` header are sent to
   our config endpoint. Both come from the OS locale the user set.
-- Not GPS, not the SIM, not IP geolocation. No location permission is declared on either platform.
-  **Neither store's "Location" category applies.**
+- Not GPS, not the SIM. No location permission is declared on either platform, and no code of ours
+  derives a position from anything.
+- **Corrected 2026-09-21: "neither store's Location category applies" was wrong, and this section
+  used to say it.** It was reasoning about our own code, which is still accurate, and then
+  generalising to the whole app, which is not. AdMob derives approximate location from the IP
+  address. See §2.9. Both stores now carry a coarse/approximate location row.
 
 ### 2.9 IP address
 
 - Our server reads the client IP as an in-memory rate-limit bucket key only. It is not stored and
   not used to derive location.
 - AdMob, Sentry, Grafana Cloud and, on iOS, Apple's Game Center necessarily observe the IP as the
-  origin of the requests they receive. That is disclosed in the privacy policy rather than as a
-  Data safety data type: Play's form has no IP-address type and only asks about location if IP is
-  used to derive it. We do not.
+  origin of the requests they receive. Sentry and Grafana only observe it; nothing derives a
+  location from it and `sendDefaultPii = false` keeps Sentry from attaching it at all.
+- **AdMob is the exception, and this row used to get it wrong.** Play's form asks about location if
+  the IP *is* used to derive it, and Google's own published data disclosure says the SDK collects
+  the IP address and that it "may be used to estimate the general location of a device". The
+  shipped `GoogleMobileAds.framework/PrivacyInfo.xcprivacy` confirms it independently: the SDK
+  declares `NSPrivacyCollectedDataTypeCoarseLocation` itself.
+- The old answer was that we do not derive location, which is true and beside the point. Both
+  stores ask what the **app** collects, and an app is its bundled SDKs. This reached Android as
+  well, which has shipped AdMob from the start.
 
 ### 2.10 Permissions, and the one that should not be there
 
@@ -335,6 +346,7 @@ defensible **Yes** here, unlike in the sibling project.
 | Data type | Collected | Shared | Ephemeral | Required/optional | Purposes | Why, and what makes it true |
 |---|---|---|---|---|---|---|
 | **Device or other IDs**, install id | Yes | No | No | Required | App functionality, Analytics | Random UUID from `CachedInstallIdProvider`, sent as `X-Install-Id`, as the `install_id` OTLP attribute and as a Sentry tag. Required because there is no in-app switch that turns it off; the only control is "Delete local data", which rotates it rather than disabling it. |
+| **Location**, approximate location | Yes | **Yes** | No | Required | Advertising or marketing, Analytics | Not ours and not a permission: AdMob derives it from the IP (§2.9). Shared for the same reason the advertising id is, AdMob is a third party rather than a processor. Added 2026-09-21. |
 | **Device or other IDs**, advertising id | Yes | **Yes** | No | Required | Advertising or marketing, Analytics | Collected by `play-services-ads`, not by our code (`AdMobAdNetwork.kt`). Shared because AdMob is a third party, not a processor acting on our behalf. |
 | **App activity → App interactions** | Yes | No | No | Required | Analytics, App functionality | The events in §2.3: run starts and ends, per-drop samples, tutorial steps, ad and paywall funnels, launch gates. |
 | **App info and performance → Crash logs** | Yes | No | No | Required | Analytics (Crash reporting) | Sentry, `attachStacktrace = true`. True of any build with a DSN. |
@@ -343,7 +355,7 @@ defensible **Yes** here, unlike in the sibling project.
 | **Messages → Other in-app messages** | Yes | No | No | **Optional** | App functionality, Developer communications | Free-text feedback and bug reports (§2.5). Optional because it only exists if the player types and submits it. The `session-log.txt` attachment rides with it. |
 | **Financial info → Purchase history** | Yes | No | No | Optional | App functionality, Analytics | The conservative answer. We never see a payment method and Play's own purchase records are out of scope, but `iap.purchase_result` records to our analytics that a purchase succeeded or failed against an `install_id`. Declaring it costs nothing; not declaring it is a judgement call you would have to defend. |
 
-**Rows that are deliberately absent:** Location (§2.8), Personal info (§1, §3), Photos and videos
+**Rows that are deliberately absent:** Personal info (§1, §3), Photos and videos
 (the app can send no image at all, no caller passes `screenshots`, §2.5), Contacts, Files and
 docs, Health and fitness, Web browsing.
 
@@ -381,6 +393,7 @@ that diff, written out, so it can be applied rather than re-derived.
 | Apple category → type | Collected | Linked to the user | Used for tracking | Purposes | Mechanism |
 |---|---|---|---|---|---|
 | **Identifiers → Device ID** | Yes | See note | **No** | Analytics, App Functionality | Our own install id (`CachedInstallIdProvider`), device-scoped, not user-scoped. No IDFA is read today. |
+| **Location → Coarse Location** | Yes | See note | No | Third-Party Advertising, Analytics | AdMob, from the IP. The SDK declares it in its own manifest; the nutrition label is app-level so it has to appear here too. Tracking follows the SDK's own answer, which is No. Added 2026-09-21. |
 | **Usage Data → Product Interaction** | Yes | See note | No | Analytics, App Functionality | The events in §2.3, via `GrafanaLogTree`. |
 | **Diagnostics → Crash Data** | Yes | See note | No | App Functionality, Analytics | Sentry, through `sentry-cocoa` (`project.pbxproj:398-412`). |
 | **Diagnostics → Performance Data** | Yes | See note | No | Analytics | Sentry traces, `IosJankMonitor`. Note `IosProcessStartTimeProvider` is a deliberate no-op, so no startup number is collected on iOS. |
@@ -394,7 +407,7 @@ The feedback row is App Functionality on Apple and App Functionality + Developer
 Play, and that is not an inconsistency.
 
 **Not collected, so leave unticked:** Contact Info (all), Health & Fitness, Financial Info,
-**Purchases → Purchase History** (there is no iOS billing, §2.6), Location (precise and coarse),
+**Purchases → Purchase History** (there is no iOS billing, §2.6), **Location → Precise Location**,
 Sensitive Info, Contacts, Browsing History, Search History, Photos or Videos, Usage Data →
 Advertising Data, Identifiers → User ID.
 

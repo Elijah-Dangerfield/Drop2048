@@ -54,8 +54,12 @@
             <p>Settings has a <strong>Send diagnostics with feedback</strong> switch, off unless you turn it on. With it on, a report also carries your device model, the build number, and a log of what the app printed during the session: the names of things that happened, not their contents. Your board, your scores and anything you typed elsewhere are not in it.</p>
             <p>The free-text box is yours to write in. If you put your email address or your name in it, we will have it, because you sent it.</p>
 
+            <h2>Location, and what we actually mean by that</h2>
+            <p>The app asks for no location permission on either platform and reads no GPS. Nothing in our code knows where you are. The country and language we send to our own server come from the language setting on your device, not from your position.</p>
+            <p>One thing is worth being precise about rather than glossing. Every internet request carries an IP address, and Google's ad network uses yours to estimate a rough area, usually about the size of a city, so it can pick which ad to show. We never see that estimate and never store it. It is still approximate location data being collected, so we say so here and declare it on both app stores rather than hiding behind the fact that it is not our code doing it.</p>
+
             <h2>What the app never collects</h2>
-            <p>No location of any kind. No contacts, calendar, photos, files, microphone or camera. No name, email address, phone number or postal address. No browsing or search history. No list of your other apps. No payment details. None of these has a read path in the app.</p>
+            <p>No precise location, ever. No contacts, calendar, photos, files, microphone or camera. No name, email address, phone number or postal address. No browsing or search history. No list of your other apps. No payment details. None of these has a read path in the app.</p>
 
             <h2>Permissions</h2>
             <ul>
