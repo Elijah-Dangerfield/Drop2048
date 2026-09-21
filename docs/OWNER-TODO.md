@@ -66,13 +66,32 @@ Both store records now exist and every Play declaration except Data safety is fi
 what stand between the current tree and a build anyone can install. Found 2026-09-21 while filling
 the Play forms.
 
-### AdMob is still wired to Google's sample account
+### AdMob: the apps and units exist now, and one flip remains
 
-`AdUnits.useTestUnits = true` (`libraries/ads/src/commonMain/.../AdUnits.kt:37`) and
-`AndroidManifest.xml:99` carries `ca-app-pub-3940256099942544~3347511713`, which is Google's public
-test app id. A release built today serves test ads: no revenue, and shipping someone else's app id
-is its own policy problem. The `Live` blocks in `AdUnits.kt` are empty and stay that way until an
-AdMob app exists, which needs your account.
+**Done 2026-09-21.** Two AdMob apps were created, `Doublestack (Android)`
+(`ca-app-pub-7008637445039253~5728891206`) and `Doublestack (iOS)`
+(`ca-app-pub-7008637445039253~9568808728`), each with a banner, an interstitial and a rewarded
+unit. All six ids are filled into `AdUnits.AndroidLive` and `AdUnits.IosLive`. None of this is
+secret: an app id and a unit id ship inside every binary and can be read out of any APK, so they
+live in git rather than in a CI secret.
+
+**What is left is one atomic change, and it is yours to time.** `AdUnits.useTestUnits` is still
+`true` and `AndroidManifest.xml` still carries Google's sample app id. Those two flip **together**,
+because a real app id paired with test units is exactly the half-migrated state the manifest
+comment and the `AdUnits` KDoc both exist to prevent. Until then a release serves test ads and
+earns nothing.
+
+Do not flip it before you intend to ship. Requesting a live unit from a development build is what
+gets an AdMob account suspended for invalid traffic, which `AdUnits.kt` warns about at the top.
+
+**Both apps read "Requires review, limited ad serving" and will until a store listing is attached.**
+That is normal for an app AdMob cannot find on a store yet; the Sodogku apps sit in the same state.
+It resolves once Doublestack is actually published, not before, so it is not a thing to chase.
+
+**iOS has nowhere to put its id.** There is no `GoogleMobileAds` package in `project.pbxproj` and no
+`GADApplicationIdentifier` in `Info.plist`, so `AdUnits.IosLive` is recorded but dead. Linking the
+iOS ad SDK is a separate piece of work and the reason `data-safety.md` §7.2 is written the way it
+is; the Apple privacy answers change when it lands.
 
 ### `MaxAdContentRating` is never set, and the target audience now makes that matter
 

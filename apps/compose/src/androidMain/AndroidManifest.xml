@@ -93,6 +93,12 @@
           early. The value below is Google's published sample app id and it
           pairs with `AdUnits.useTestUnits`; both flip together when the real
           AdMob app exists. See `OWNER-TODO.md`.
+
+          The real AdMob app now does exist, created 2026-09-21, and its id is
+          recorded as `AdUnits.AndroidLive.applicationId`. It is deliberately
+          not pasted below yet: going live is one atomic change, this value and
+          `useTestUnits` together, because a build with a real app id and test
+          units is the half-migrated state the pairing exists to prevent.
         -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"

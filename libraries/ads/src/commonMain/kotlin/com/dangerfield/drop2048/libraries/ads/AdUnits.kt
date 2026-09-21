@@ -56,18 +56,40 @@ object AdUnits {
         const val applicationId = "ca-app-pub-3940256099942544~1458002511"
     }
 
-    /** Real Android units. Empty until the AdMob app exists — see [useTestUnits]. */
+    /**
+     * Real Android units, from the AdMob app "Doublestack (Android)" created
+     * 2026-09-21. Live but **not yet in use**: [useTestUnits] is still `true`,
+     * and flipping it is the deliberate second step.
+     *
+     * These are not secrets. An AdMob app id and an ad unit id ship inside every
+     * binary on both stores and can be read out of any APK, so they belong in git
+     * rather than in a CI secret.
+     */
     object AndroidLive {
-        const val rewarded = ""
-        const val interstitial = ""
-        const val banner = ""
+        const val rewarded = "ca-app-pub-7008637445039253/9732460258"
+        const val interstitial = "ca-app-pub-7008637445039253/8064155369"
+        const val banner = "ca-app-pub-7008637445039253/5042495499"
+
+        /** For the manifest, not for a request. Already set in `AndroidManifest.xml`. */
+        const val applicationId = "ca-app-pub-7008637445039253~5728891206"
     }
 
-    /** Real iOS units. Empty until the AdMob app exists — see [useTestUnits]. */
+    /**
+     * Real iOS units, from the AdMob app "Doublestack (iOS)" created 2026-09-21.
+     *
+     * **Nothing reads these yet.** iOS links no ad SDK: there is no
+     * `GoogleMobileAds` package in `project.pbxproj` and no
+     * `GADApplicationIdentifier` in `Info.plist`, so [applicationId] below has
+     * nowhere to go until that work happens. They are recorded here so the ids
+     * live in the repo rather than only in the AdMob console.
+     */
     object IosLive {
-        const val rewarded = ""
-        const val interstitial = ""
-        const val banner = ""
+        const val rewarded = "ca-app-pub-7008637445039253/8864347123"
+        const val interstitial = "ca-app-pub-7008637445039253/4121040929"
+        const val banner = "ca-app-pub-7008637445039253/1498747010"
+
+        /** For `Info.plist`'s `GADApplicationIdentifier`, once iOS has an ad SDK. */
+        const val applicationId = "ca-app-pub-7008637445039253~9568808728"
     }
 
     /**
