@@ -92,10 +92,21 @@ From release two onward `release.yml` does both without you.
 
 Nothing here blocks a submission, and none of it needs doing before release one.
 
-- **Game Center has no records.** Two leaderboards and 22 achievements, ids in
-  `OWNER-TODO.md`, pinned by `PlatformAchievementIdTest`. Until they exist every
-  submission fails silently, exactly like a signed-out player. The app ships and
-  reviews fine without them; the boards simply do nothing. **agent**
+- **Game Center is one of three records in.** `score_alltime` is created and
+  complete: classic, integer, best score, **high to low**, with an English
+  localisation. Until the rest exist those submissions fail silently, exactly
+  like a signed-out player. The app ships and reviews fine either way, which is
+  why this is not Required.
+  - **`score_weekly`** needs about a minute of clicking. App Store Connect's
+    date picker never commits the value an automated click gives it (the field
+    stays empty in the accessibility tree while showing a date), so `Next` stays
+    disabled. Recurring, start **Mon 28 Sep 2026 00:00**, duration 7 days,
+    restart every 7 days, integer, best score, high to low. **you**
+  - **The 22 achievements are blocked on badge art, not on typing.** Apple marks
+    the achievement image required, unlike the leaderboard's, so a record
+    created now is one that cannot be completed. The ids are in the
+    `AchievementId` enum, 22 of them, pinned by `PlatformAchievementIdTest`.
+    Make the art first, then the records are mechanical. **you**, then **agent**
 - **The Grafana pipe ships dark.** `GRAFANA_OTLP_BASE_URL`, `_INSTANCE_ID` and
   `LOGS_WRITE_TOKEN` are unset, so `resolve()` returns `""` and analytics are
   off in every build. The build does not fail; it just measures nothing. **you**
