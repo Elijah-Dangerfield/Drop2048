@@ -14,25 +14,51 @@
   can do that. Until an owner opens the project and adds it, this file ships
   nowhere. That is on `docs/store/release-checklist.md`.
 
-  **It describes the iOS build that exists**, which has no ad SDK. There is no
-  `GoogleMobileAds` Swift package in `project.pbxproj` (only `sentry-cocoa`), no
-  `GADApplicationIdentifier` in `Info.plist` and no `NSUserTrackingUsageDescription`,
-  so no IDFA is read and no tracking happens. `NSPrivacyTracking` is `false` and
-  `NSPrivacyTrackingDomains` is empty *because that is true today*, not because
-  the question was skipped. `data-safety.md` §7.2 is the pre-written diff for the
-  day the SDK lands; apply all five of its steps at once.
+  **The ad SDK landed on 2026-09-21 and this file has been updated for it.**
+  GoogleMobileAds 13.9.0 is a package dependency, `GADApplicationIdentifier` and
+  `NSUserTrackingUsageDescription` are in `Info.plist`, and `IOSAdNetwork` runs
+  UMP then ATT then `MobileAds.start()`. So `NSPrivacyTracking` is now `true`,
+  Device ID is tracking and third-party advertising, and Advertising Data is a
+  new entry. That is `data-safety.md` §7.2 item 4, applied.
+
+  ## Why `NSPrivacyTrackingDomains` is still empty
+
+  Not an oversight, and not the same question as `NSPrivacyTracking`.
+
+  Checked against the resolved SDK rather than assumed: GoogleMobileAds 13.9.0
+  ships its own signed manifest at
+  `GoogleMobileAds.xcframework/*/GoogleMobileAds.framework/PrivacyInfo.xcprivacy`,
+  and that file declares **no** `NSPrivacyTrackingDomains` and no
+  `NSPrivacyTracking` key at all. Apple aggregates the app manifest with every
+  bundled SDK manifest, so domains Google connects to are Google's to declare.
+
+  It also matters functionally. iOS **blocks** connections to domains listed
+  here whenever ATT is not granted. Google's SDK expects to handle that case
+  itself by withholding the IDFA and serving non-personalised ads, so listing
+  their domains here would break ads for every user who declines rather than
+  degrading them. Our own code connects to the config endpoint, Grafana and
+  Sentry, none of which is a tracking domain under Apple's definition.
 
   ## The SDK half of the requirement is not ours
 
   Apple requires bundled third-party SDKs to ship their **own signed** manifests.
-  This file cannot satisfy that on their behalf. `sentry-cocoa` ships one; confirm
-  it on the version actually resolved, and confirm the same for Google Mobile Ads
-  when it arrives.
+  This file cannot satisfy that on their behalf. Confirmed 2026-09-21 that
+  `sentry-cocoa`, `GoogleMobileAds` and `UserMessagingPlatform` each ship one at
+  the versions actually resolved. That closes §7.2 item 5.
+
+  ## One thing this file does not settle
+
+  The Google SDK's own manifest declares `NSPrivacyCollectedDataTypeCoarseLocation`,
+  because it derives approximate location from the IP address. It is declared
+  there, so the manifest side is covered, but the **App Store nutrition label**
+  is app-level and covers what bundled SDKs collect too. `data-safety.md` §2.9
+  reasons only about *our* use of IP and concludes no location type applies,
+  which under-reads the AdMob case. See OWNER-TODO.
 -->
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>
-	<false/>
+	<true/>
 
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
@@ -51,12 +77,38 @@
 			<string>NSPrivacyCollectedDataTypeDeviceID</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
+			<!--
+			  Tracking since 2026-09-21. This row now covers two identifiers with
+			  very different characters: our own install id, which is not tracking
+			  and never leaves our processors, and the IDFA, which AdMob reads once
+			  ATT is granted and which is. Apple has one Device ID row, so the
+			  stronger answer wins.
+			-->
 			<key>NSPrivacyCollectedDataTypeTracking</key>
-			<false/>
+			<true/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
+			</array>
+		</dict>
+
+		<!--
+		  Which ads were requested, filled and seen. Entirely the Google Mobile
+		  Ads SDK; no code of ours produces it. Tracking, because that is the
+		  point of it.
+		-->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeAdvertisingData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
 			</array>
 		</dict>
 

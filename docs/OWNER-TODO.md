@@ -100,18 +100,45 @@ strip is simply absent there, which is a safe and coherent state rather than a b
 banners at all, so the UIKit-`AdView`-inside-Compose bridge is genuinely new work. Interstitials and
 rewarded video are unaffected and work on both platforms.
 
-### `SKAdNetworkItems` is missing from `Info.plist`
+### `SKAdNetworkItems` and the privacy manifest: done, with one question left
 
-Google publishes the list of network ids that belong there. Without it, install attribution for iOS
-ad campaigns does not work, so the ads serve but cannot be measured. Sodogku is missing this too.
+**Done 2026-09-21.** `Info.plist` carries all 50 SKAdNetwork identifiers, scraped from
+developers.google.com/admob/ios/privacy/strategies rather than transcribed. Google adds buyers over
+time and the list does not update itself, so re-check that page before a release.
+`PrivacyInfo.xcprivacy` has `NSPrivacyTracking` true, Device ID as tracking with third-party
+advertising, and a new Advertising Data entry, which is `data-safety.md` §7.2 item 4 applied. §7.2
+item 5 is closed too: `sentry-cocoa`, `GoogleMobileAds` and `UserMessagingPlatform` were each
+confirmed to ship their own signed manifest at the resolved versions.
 
-### `PrivacyInfo.xcprivacy` does not exist
+`NSPrivacyTrackingDomains` is deliberately still empty, and the file explains why at length: the
+Google SDK declares none of its own, Apple aggregates manifests, and iOS **blocks** any domain
+listed here when ATT is refused, which would break ads for every declining user rather than
+degrading them.
 
-`data-safety.md` §7.2 item 4 and §7.4 both call for it. Apple requires a privacy manifest declaring
-`NSPrivacyTracking`, Google's tracking domains, and the collected-data types. Sodogku is missing it
-as well, so this is one fix worth making in both. Note §7.2 item 5: the Google and Sentry packages
-must each ship their own signed manifest, which is their obligation and not something our file can
-satisfy.
+**Still yours:** the file has never been added to the target's Copy Bundle Resources phase, so it
+ships nowhere. Only Xcode can do that. It is item 8 on `release-checklist.md` and it is the
+difference between a manifest and a file sitting in a folder.
+
+### The nutrition label may be missing Coarse Location
+
+Found while wiring the manifest, and not yet acted on because it is a claim about the app rather
+than a config value.
+
+GoogleMobileAds' own manifest declares `NSPrivacyCollectedDataTypeCoarseLocation`, and Google's
+published data-disclosure page tells developers to disclose the IP address because it "may be used
+to estimate the general location of a device". The App Store nutrition label is app-level and
+covers what bundled SDKs collect, so the label published on 2026-09-21 is arguably one row short.
+
+`data-safety.md` §2.9 says location does not apply, but it reasons only about *our* use of IP: our
+server uses it as a rate-limit key and derives nothing. That was written before any ad SDK existed
+and it under-reads the AdMob case.
+
+Two knock-on effects if you agree it should be added:
+
+- **Android has shipped AdMob all along**, so the same argument applies to the Play Data safety
+  answers, which currently declare no Location.
+- **`pages/privacy.html` says "No location of any kind."** That sentence would have to change, and
+  it is the kind of claim worth getting right rather than leaving generous.
 
 ### `MaxAdContentRating` is never set, and the target audience now makes that matter
 
