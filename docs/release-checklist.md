@@ -56,15 +56,9 @@ only you hold. `SENTRY_DSN` is also read but is not needed: `resolve()` treats a
 blank env var as absent and falls through to the DSN committed in
 `telemetry.properties`.
 
-Two small console jobs ride along, both a couple of clicks and neither
-delegable:
-
-- **Apple's Paid Applications agreement**, with banking and tax details. Without
-  it no in-app purchase can be sold, and the Pro price below cannot be set.
-- **`drop2048_pro` price and availability.** The record exists with the right
-  type, reference name and product id; App Store Connect's price combobox
-  reverts every value an automated click gives it, so the last field is yours.
-  Set $2.99, all 175 regions, then add an English localisation.
+**This is the whole of it.** Apple's Paid Applications agreement is already
+active, the bank account and W-9 with it, so nothing on the money side is
+outstanding.
 
 ### 1. QA the build · **you** · needs 0
 
@@ -108,21 +102,22 @@ From release two onward `release.yml` goes straight to production without you.
 
 Nothing here blocks a submission, and none of it needs doing before release one.
 
-- **Game Center is one of three records in.** `score_alltime` is created and
-  complete: classic, integer, best score, **high to low**, with an English
-  localisation. Until the rest exist those submissions fail silently, exactly
-  like a signed-out player. The app ships and reviews fine either way, which is
-  why this is not Required.
-  - **`score_weekly`** needs about a minute of clicking. App Store Connect's
-    date picker never commits the value an automated click gives it (the field
-    stays empty in the accessibility tree while showing a date), so `Next` stays
-    disabled. Recurring, start **Mon 28 Sep 2026 00:00**, duration 7 days,
-    restart every 7 days, integer, best score, high to low. **you**
-  - **The 22 achievements are blocked on badge art, not on typing.** Apple marks
-    the achievement image required, unlike the leaderboard's, so a record
-    created now is one that cannot be completed. The ids are in the
+- **Game Center: both leaderboards are in, the achievements are not.** The
+  boards carry the exact ids the code submits to, both integer / best score /
+  **high to low**, with English localisations. `score_weekly` is recurring,
+  starting Mon 28 Sep 2026 00:00, 7-day duration and 7-day restart.
+  - **The 22 achievements are blocked on badge art, not on typing.** Apple
+    marks the achievement image required, unlike the leaderboard's, so a record
+    created now is one that cannot be finished. The ids are the
     `AchievementId` enum, 22 of them, pinned by `PlatformAchievementIdTest`.
-    Make the art first, then the records are mechanical. **you**, then **agent**
+    Until they exist those submissions fail silently, exactly like a signed-out
+    player; the app still ships and reviews fine, which is why this is not
+    Required. **you** for the art, then **agent** for the records.
+
+    The in-app glyphs are placeholder emoji today (`OWNER-TODO.md`). If you are
+    happy for the store badges to be those same emoji rendered at 512x512, say
+    so and all 22 can be done in one pass. That is a visible quality decision,
+    which is why it has not been made for you.
 - **The Grafana pipe ships dark.** `GRAFANA_OTLP_BASE_URL`, `_INSTANCE_ID` and
   `LOGS_WRITE_TOKEN` are unset, so `resolve()` returns `""` and analytics are
   off in every build. The build does not fail; it just measures nothing. **you**
@@ -157,8 +152,9 @@ declarations are all filed. **The five filed URLs** were re-pointed at
 describe the app that actually exists, including iOS ads.
 
 **iOS can take money.** `IOSStoreBilling` is StoreKit 2, ported from Sodogku and
-handed to the graph beside `IOSAdNetwork`. The `drop2048_pro` record exists in
-App Store Connect. **The iOS icon is flattened** (ITMS-90717, the reject Sodogku
+handed to the graph beside `IOSAdNetwork`. `drop2048_pro` is complete in App
+Store Connect: $2.99 base, 175 countries, English display name and description,
+and "Add for Review" is enabled. **The iOS icon is flattened** (ITMS-90717, the reject Sodogku
 lost a submission to) and **the iPad claim is dropped**, so no iPad screenshots
 are owed.
 
