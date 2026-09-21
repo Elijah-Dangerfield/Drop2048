@@ -81,7 +81,8 @@ class AdShowOutcome(
  * it is the same on both platforms and testable without an ad network.
  *
  * **Android binding** is `AdMobAdNetwork` in `:libraries:ads:impl/androidMain`.
- * **iOS has no real binding yet** and falls through to [NotWiredAdNetwork].
+ * **iOS binding** is `IOSAdNetwork` in Swift (`apps/ios/iosApp/Platform/AdNetwork.swift`),
+ * handed to the graph by `IosAppComponent`.
  *
  * Implementations must not throw. An ad SDK that blows up has to look like
  * [AdShowResult.Failed] from here.
@@ -143,11 +144,17 @@ interface AdNetwork {
  * to a real outcome, and the interstitial path shows nothing because there is
  * nothing to show. Neither is a lie about an impression.
  *
- * iOS needs `IOSAdNetwork` in Swift plus the GoogleMobileAds package on the
- * Xcode target; both are on `OWNER-TODO.md`.
+ * **Nothing binds this any more.** iOS got its real network on 2026-09-21:
+ * `IOSAdNetwork` in `apps/ios/iosApp/Platform/AdNetwork.swift`, handed to the
+ * graph by `IosAppComponent`. Android has always had `AdMobAdNetwork`. The class
+ * survives because `HouseAdsReleaseSafetyTest` uses it as the reference for what
+ * a stand-in is allowed to return, which is the whole point above.
+ *
+ * It deliberately carries no `@ContributesBinding`: a contributed binding here
+ * plus the `@Provides` in `IosAppComponent` is a duplicate the graph rejects,
+ * and the honest resolution is that no platform wants a fallback now.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
 @Inject
 class NotWiredAdNetwork : AdNetwork {
     override suspend fun prepare() = Unit

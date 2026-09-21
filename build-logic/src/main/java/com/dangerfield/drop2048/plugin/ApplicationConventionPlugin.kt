@@ -69,6 +69,15 @@ class ApplicationConventionPlugin : Plugin<Project> {
                     isStatic = true
                     binaryOption("bundleId", "com.dangerfield.drop2048")
                     export(project(":libraries:core"))
+                    // Swift reads `AdUnits` directly: the ad unit id lives in
+                    // one file on purpose, so the iOS ad code asks Kotlin for it
+                    // rather than keeping a second copy that could drift to a
+                    // test id while Kotlin held the real one. Kotlin/Native only
+                    // exports declarations reachable from the framework's API,
+                    // and nothing in Kotlin reads `AdUnits` on iOS, so without
+                    // this the `AdUnits.shared.ios(format:)` calls in
+                    // `AdNetwork.swift` do not resolve.
+                    export(project(":libraries:ads"))
                 }
             }
             configureKotlinInject()

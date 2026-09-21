@@ -337,7 +337,11 @@ kotlin {
             implementation(projects.libraries.drop2048.storage)
             implementation(projects.libraries.progress)
             implementation(projects.libraries.progress.impl)
-            implementation(projects.libraries.ads)
+            // `api`, not `implementation`, because `ApplicationConventionPlugin`
+            // exports this to the iOS framework so `AdNetwork.swift` can read
+            // `AdUnits`. Kotlin/Native refuses to export a dependency that is
+            // not an API dependency.
+            api(projects.libraries.ads)
             implementation(projects.libraries.ads.impl)
             implementation(projects.libraries.devfeedback)
             implementation(projects.libraries.billing)

@@ -7,6 +7,7 @@ struct iOSApp: App {
     
     let permissionManager = IOSPermissionManager()
     let reviewLauncher = IOSReviewLauncher()
+    let adNetwork = IOSAdNetwork()
     private let nativeViewFactory = IOSNativeViewFactory.shared
     private let iOSAppComponent: IosAppComponent
 
@@ -14,6 +15,7 @@ struct iOSApp: App {
         self.iOSAppComponent = create(
             permissionManager: permissionManager,
             reviewLauncher: reviewLauncher,
+            adNetwork: adNetwork,
             nativeViewFactory: nativeViewFactory
         )
         iOSAppComponent.telemetry.initialize()

@@ -21,7 +21,6 @@ import com.dangerfield.drop2048.libraries.ads.AdFormat
 import com.dangerfield.drop2048.libraries.ads.AdNetwork
 import com.dangerfield.drop2048.libraries.ads.AdShowOutcome
 import com.dangerfield.drop2048.libraries.ads.NoAdConsent
-import com.dangerfield.drop2048.libraries.ads.NotWiredAdNetwork
 import com.dangerfield.drop2048.libraries.ads.AdShowResult
 import com.dangerfield.drop2048.libraries.ads.AdUnits
 import com.dangerfield.drop2048.libraries.core.Catching
@@ -82,7 +81,6 @@ import kotlin.time.Duration.Companion.seconds
 @ContributesBinding(
     scope = AppScope::class,
     boundType = AdNetwork::class,
-    replaces = [NotWiredAdNetwork::class],
 )
 @ContributesBinding(
     scope = AppScope::class,
