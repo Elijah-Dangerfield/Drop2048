@@ -68,10 +68,18 @@ delegable:
 
 ### 1. QA the build · **you** · needs 0
 
-Merge the release-please PR. `beta.yml` puts it on TestFlight internal and the
-Play internal track, both of which build with `RELEASE_CHANNEL_OVERRIDE=beta`
-and therefore serve **test** ads, so nothing you do here touches AdMob
-inventory.
+**Run `beta.yml` by hand. Do not merge the release PR for this.**
+
+```bash
+gh workflow run beta.yml
+```
+
+It is `workflow_dispatch` only, and it is the only path that builds with
+`RELEASE_CHANNEL_OVERRIDE=beta`, which is what makes `AdUnits.useTestUnits`
+true. A QA build off the release tag would be channel `store` and would request
+**live** ad units, and requesting live units from a build being tested is what
+gets an AdMob account suspended for invalid traffic. It lands on TestFlight
+internal and the Play internal track.
 
 Worth exercising specifically, because these have never run on a real device:
 the Pro purchase on iOS (brand new, StoreKit 2), ads on iOS, and Core Haptics,
@@ -79,12 +87,20 @@ which compiles and links and has never once executed.
 
 ### 2. Submit on both platforms · **you** · needs 1
 
-Both stores refuse an automated first production upload, so release one is by
-hand. Play: Internal testing → Promote → Production. Apple: TestFlight build →
-Submit for review, with `drop2048_pro` attached to the version (a first
-non-consumable must be submitted alongside its app version).
+Merge the open release-please PR. That tags `v*`, which is what fires
+`release.yml`; nothing else does. Because this is release one, it routes to the
+**Play internal track and TestFlight internal** rather than production, so the
+last move is by hand:
 
-From release two onward `release.yml` does both without you.
+- Play: Internal testing → Promote → Production.
+- Apple: TestFlight build → Submit for review, with `drop2048_pro` attached to
+  the version (a first non-consumable must be submitted alongside its app
+  version).
+
+**This build is channel `store`, so it serves live ad units.** That is correct,
+it is the binary that ships. Just do the ad testing in step 1 and not here.
+
+From release two onward `release.yml` goes straight to production without you.
 
 ---
 
