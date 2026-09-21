@@ -3,7 +3,7 @@
 Things only a human with credentials, a password, a store account or an opinion can do. Agents add
 to this list; they cannot clear it.
 
-Ordered by when it starts blocking. Last pruned 2026-09-09 after C7.
+Ordered by when it starts blocking. Last pruned 2026-09-21 while filing the Play declarations.
 
 ---
 
@@ -60,12 +60,69 @@ The game is playable, persisted, and now looks like the handoff. Nobody but an a
    held for three frames and the 2048 existed for 400ms before its own burst erased it. It is now
    paced per step kind. Measured as readable; not yet judged as *good*.
 
+## Release blockers
+
+Both store records now exist and every Play declaration except Data safety is filed, so these are
+what stand between the current tree and a build anyone can install. Found 2026-09-21 while filling
+the Play forms.
+
+### AdMob is still wired to Google's sample account
+
+`AdUnits.useTestUnits = true` (`libraries/ads/src/commonMain/.../AdUnits.kt:37`) and
+`AndroidManifest.xml:99` carries `ca-app-pub-3940256099942544~3347511713`, which is Google's public
+test app id. A release built today serves test ads: no revenue, and shipping someone else's app id
+is its own policy problem. The `Live` blocks in `AdUnits.kt` are empty and stay that way until an
+AdMob app exists, which needs your account.
+
+### `MaxAdContentRating` is never set, and the target audience now makes that matter
+
+The Play target audience is filed as **13-15, 16-17, 18+**, which means Play's Families policy
+applies whenever a child uses the app. AdMob is a Play-certified ad network, so that half is
+already satisfied and needs nothing. What is missing is the content ceiling: nothing in the tree
+calls `setMaxAdContentRating`, so AdMob is free to serve `MA`-rated creative to a 13-year-old.
+
+`AdMobAdNetwork.kt:215` already builds a `RequestConfiguration`; this is one more line on that
+builder, set to `MAX_AD_CONTENT_RATING_G`. It is an agent-sized change and it is listed here only
+because it is a policy decision about your revenue, not a bug.
+
+The related question is `tagForUnderAgeOfConsent`, deliberately unset at `AdMobAdNetwork.kt:63`
+because setting it turns off personalised ads for everyone. That reasoning still holds for the
+general-audience branch, but it does mean an under-16 player in the EEA may receive personalised
+ads. Worth a ruling now that 13-15 is declared rather than after a complaint.
+
+### The Grafana telemetry pipe is dark, and it is not a URL-scheme question
+
+`gh secret list` shows exactly one repository secret, `SENTRY_AUTH_TOKEN`. Neither environment
+(`github-pages`, `production`) holds any. So `GRAFANA_OTLP_BASE_URL`, `GRAFANA_OTLP_INSTANCE_ID`
+and `GRAFANA_LOGS_WRITE_TOKEN` are all unset, `GrafanaAppEvents.kt:150` reads them as blank, and
+every release built today ships with analytics switched off.
+
+This is the same ask as "The Grafana credentials are now the single highest-value thing you can
+supply" below; it is repeated here because it now also touches a store form. `data-safety.md` §7.5
+worried that the OTLP URL might not be HTTPS. That worry is premature: there is no value to be
+non-HTTPS yet. Grafana Cloud's OTLP gateway is HTTPS, so the "encrypted in transit" answer on the
+Data safety form becomes true the moment you paste the real endpoint in. Sentry is already live and
+settled by construction, since its DSN is an HTTPS URL committed in `telemetry.properties`.
+
+### `doublestack.app` is not registered
+
+`share_footer` in `libraries/resources/.../strings.xml:349` prints it on every shared score image.
+Either buy the domain or point the string at the Pages site. An agent cannot buy a domain.
+
+---
+
 ## Decide before the chunk that needs it
 
-### Kids theming / age rating
+### Kids theming / age rating: answered, with one piece left
 
-Changes the ad SDK configuration, the consent flow and the store questionnaire. Getting it wrong
-is a policy problem, not a bug. **Cheaper to answer now than at C10.**
+**Answered 2026-09-21 as general audience, 13+.** The hosted privacy policy and terms both say 13
+and over and not directed at children, Play's target audience is filed as 13-15 / 16-17 / 18+, and
+the code already implements this branch with `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`. Designed for
+Families is not enrolled and should not be.
+
+What is left is the `MaxAdContentRating` ceiling and the `tagForUnderAgeOfConsent` ruling, both in
+Release blockers above. Reopen this only if you want to move to 18+ only, which would mean editing
+both legal pages and re-answering the Play form.
 
 ### The digest freeze — the window is closing
 
@@ -107,10 +164,16 @@ Must be bumped whenever `GameState`, `RunTally` or `SavedResolution` change shap
 it. If forgotten, the failure is silent and appears on a real player's device with their run in it.
 Decide whether it becomes a checklist item or a build assertion.
 
-### App name and store identity
+### App name and store identity — settled
 
-"Drop 2048" is the repo name. Is it the store name? "2048" is heavily squatted on both stores — a
-search-results problem, not a legal one. The bundle ID is set much earlier and is painful to change.
+**Settled 2026-09-20: the app is Doublestack.** "Drop 2048" turned out to be unavailable on the App
+Store, which the New App dialog is the only way to discover, since Apple holds reserved-but-unpublished
+names that appear in no search anywhere.
+
+Both stores carry `Doublestack: Merge Block Drop` as the title; the launcher and in-app name are
+just `Doublestack`. The identifiers keep the old spelling on purpose: `com.dangerfield.drop2048` is
+permanent on Play, `com.dangerfield.drop2048.Drop2048` is what the iOS target builds, and no player
+sees either. Same for `Drop2048Application`, `Theme.Drop2048` and the repo name.
 
 ## Look at these when convenient
 
