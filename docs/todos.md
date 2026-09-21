@@ -114,12 +114,33 @@ not a lower difficulty, so read run length and tier ceiling, never the level num
 A second count, not a change to `clutter`. D8's binding constraint still holds: the harness and SPEC
 17's live telemetry must compute it from the same function in `:libraries:cascade`.
 
-### Delete the iOS camera bridge
+### Present ads from the top of the stack, not the window root
 
-`NativeViewFactory`'s six camera members, `CameraGuidanceState`, and the camera half of
-`IOSNativeViewFactory.swift` (544 lines). C13a removed the Kotlin side and the permission; this is
-dead code in the iOS binary. The Apple Sign In button factory is dead the same way. Needs someone
-who can build the Xcode target.
+`AdNetwork.swift`'s `rootViewController()` returns `keyWindow?.rootViewController` and never walks
+`presentedViewController`. Sodogku fixed the same function on 2026-09-21 after Sentry caught what
+it costs; this repo still has the original. Two faults, both silent:
+
+**The root can already be presenting.** `prepare()` runs the UMP form and then the ATT prompt from
+the same window. Asking a controller that is already presenting to present again does nothing but
+log a line to the console, so the ad never appears, the SDK's delegate never fires, and the caller
+waits on a dismissal that cannot arrive.
+
+**The scene filter only accepts `.foregroundActive`,** and the scene sits at `.foregroundInactive`
+for a beat after the ATT prompt closes. The first rewarded ad a new player asks for can silently
+not show. This one costs money rather than correctness, and nothing anywhere reports it.
+
+The fix is the whole of `rootViewController()`: prefer an active scene, fall back to any scene
+holding a key window, then walk `presentedViewController` to the top, skipping anything being
+dismissed. Sodogku's version has the reasoning in a doc comment; copy it rather than paraphrasing.
+
+**Worth knowing what sent us there.** Sodogku chased a bug for weeks where the board stopped taking
+taps after a rewarded ad. Sentry eventually caught it: Compose host lifecycle stuck at CREATED with
+`GADFullScreenAdViewController` in `view_names` and five navigation commands queued behind the shut
+gate. The presentation change is the suspected cause; it is not proven, because the repro needs a
+phone. If this app ever gets a report of "it froze after an ad", that is the same shape, and
+Sodogku's second half (a root-level watchdog that drains the navigation queue when a touch proves
+the host is lying) is the belt to this pair of braces. Queued for the template as
+"The navigation queue can wedge, and only a touch can prove it".
 
 ### `FuseReach` could come up ~10%
 
