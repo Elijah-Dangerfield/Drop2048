@@ -18,7 +18,7 @@ after cloning, before your first commit:
 ## enable_ci.sh
 
 Present only if CI was declined at project init. Installs the staged CI /
-release automation (`.github/workflows/`, fastlane files, `pages/`,
+release automation (`.github/workflows/`, fastlane files, `legal/`,
 release-please config) and then removes itself:
 
 ```bash
@@ -26,6 +26,23 @@ release-please config) and then removes itself:
 ```
 
 See SETUP.md for the GitHub secrets the pipeline needs.
+
+## setup_legal_sync.sh
+
+Run once. Creates the two secrets that publish `legal/privacy.md` and
+`legal/terms.md` to `https://nightjarlabs.llc/doublestack/…`:
+
+```bash
+./scripts/setup_legal_sync.sh
+```
+
+It creates a Firebase service account and sets `FIREBASE_SERVICE_ACCOUNT` on
+the website repo, then prompts for a fine-grained GitHub token and sets
+`NIGHTJAR_SITE_TOKEN` here. The token is the only manual part — GitHub has no
+API for minting one. Idempotent; needs `gh` and `gcloud` logged in.
+
+Until both secrets exist, `legal-sync.yml` fails on every push that touches
+`legal/`. See [legal/README.md](../legal/README.md).
 
 ## create_module.main.kts
 

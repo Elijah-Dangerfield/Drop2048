@@ -714,7 +714,14 @@ on the App ID. It should be replaced by the one entitlement the app actually nee
 
 ### 8.5 The hosted privacy policy contradicts the app, in the most expensive possible direction
 
-`pages/privacy.html` is still the template's, and it states:
+**Closed 2026-09-21.** The policy is now `legal/privacy.md` in this repo, published to
+`https://nightjarlabs.llc/doublestack/privacy`, and it describes the app that exists. It moved out
+of the marketing folder and next to the code deliberately: the gap below opened because a claim
+about the binary lived somewhere the people changing the binary never looked. See `legal/README.md`.
+
+The original finding, kept because it is the reason the pattern exists:
+
+`pages/privacy.html` was still the template's, and it stated:
 
 > the app does not *"Use advertising or analytics SDKs (no Google Analytics, no Facebook SDK, no
 > ad networks)."*
@@ -724,10 +731,14 @@ literal template phrase "(unless your project adds one)", says the only permissi
 notifications, and does not mention the install id, the session-log attachment, Game Center or
 purchases.
 
-The URL is already wired: `legal.privacyUrl` defaults to the live
-`https://elijah-dangerfield.github.io/Drop2048/privacy.html`
-(`LaunchGateConfigValues.kt`), the launch gate links it, and the gate does legal re-accept, so the
-version matters and not only the text. **A live privacy policy that denies serving ads while the
-app serves them is both a store problem and a trust problem**, and it is exactly the failure this
-chunk exists to prevent. The text is owner-owned and is not written here; §2 is the material it
-has to be written from.
+The URL is wired: `legal.privacyUrl` defaults to the live
+`https://nightjarlabs.llc/doublestack/privacy` (`LaunchGateConfigValues.kt`), the launch gate links
+it, and the gate does legal re-accept, so the version matters and not only the text. **A live
+privacy policy that denies serving ads while the app serves them is both a store problem and a
+trust problem**, and it is exactly the failure this chunk exists to prevent. §2 is the material the
+text has to be written from.
+
+The same shape recurred once more before the move: the rewritten policy said "the iOS version
+contains no ad SDK and reads no advertising identifier", which stayed on the live site for the week
+between that sentence being written and AdMob shipping on iOS. Two identical failures in one month
+is what a process problem looks like, not two mistakes.

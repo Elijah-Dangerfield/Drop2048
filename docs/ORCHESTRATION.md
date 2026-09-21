@@ -891,6 +891,14 @@ Both halves are closed. C13a rewrote the page to describe the app that exists, a
 `legal.termsUrl` / `legal.privacyUrl` defaults moved off the unpublished `drop2048.app` domain onto
 the live Pages URLs, so the page the app opens is now the page that was fixed.
 
+**It reopened once, which is the interesting part.** The rewritten page said the iOS build carried
+no ad SDK. That was true when it was written and false a week later, when AdMob shipped on iOS, and
+nothing connected the two changes because the sentence lived in `pages/` and the SDK landed in
+`apps/ios/`. On 2026-09-21 the text moved to `legal/*.md` at the repo root and the hosting moved to
+`nightjarlabs.llc`, so the diff that changes what the app collects and the diff that corrects the
+claim about it now land in the same review. The fix for a finding that recurs is not a better
+rewrite.
+
 Four more of the same shape, all found by deriving the store forms from the code rather than from
 memory:
 

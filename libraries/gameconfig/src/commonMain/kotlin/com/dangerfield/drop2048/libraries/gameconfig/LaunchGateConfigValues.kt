@@ -113,12 +113,18 @@ class LegalForceReacceptBelow(appConfigMap: AppConfigMap) : IntConfigValue(appCo
 }
 
 /**
- * Defaults to the live GitHub Pages copy served out of `pages/`, which is the
- * only terms page that has ever existed. The earlier `drop2048.app` default was
- * a domain nobody had published, so a build that could not reach the server
- * opened a dead link from the gate the player has to clear.
+ * Defaults to the page published on the studio site. The text is written in
+ * `legal/terms.md` in this repo and carried to `nightjarlabs.llc` by the Legal
+ * Sync workflow; see `legal/README.md`.
  *
- * A custom domain later is a config push, not a release.
+ * The default has to be a URL that actually resolves, because it is what a
+ * build that cannot reach the config server opens from a gate the player has to
+ * clear. An earlier default pointed at `drop2048.app`, a domain nobody had
+ * bought, which made that gate a dead link.
+ *
+ * This URL is also filed with Apple and Google. Moving the page is a config
+ * push rather than a release, but it is still two store re-filings, so treat
+ * the slug as fixed.
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -127,10 +133,10 @@ class LegalTermsUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigMap
     override val name = "Terms URL"
     override val description = "Remote so a moved page is a config change, not a release."
     override val path = "legal.termsUrl"
-    override val default = "https://elijah-dangerfield.github.io/Drop2048/terms.html"
+    override val default = "https://nightjarlabs.llc/doublestack/terms"
 }
 
-/** The live GitHub Pages copy, for the reason on [LegalTermsUrl]. */
+/** The published privacy policy, for the reasons on [LegalTermsUrl]. */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
@@ -138,5 +144,5 @@ class LegalPrivacyUrl(appConfigMap: AppConfigMap) : StringConfigValue(appConfigM
     override val name = "Privacy policy URL"
     override val description = "Remote so a moved page is a config change, not a release."
     override val path = "legal.privacyUrl"
-    override val default = "https://elijah-dangerfield.github.io/Drop2048/privacy.html"
+    override val default = "https://nightjarlabs.llc/doublestack/privacy"
 }

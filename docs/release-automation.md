@@ -213,9 +213,20 @@ The pipeline ships only the binary + release notes (`skip_metadata: true`, `skip
 - [ ] Content rating, target audience, data safety, category, contact
 - [ ] **Ship the first production release manually from Play Console.** `r0adkll/upload-google-play` can't push to production until there's an approved prod release to update. Use `track: internal` in [release.yml](../.github/workflows/release.yml) for the first few releases if you prefer automation all the way down.
 
-### One-time GitHub Pages source
+### One-time legal-sync setup
 
-Marketing/landing pages (`index.html`, `privacy.html`, `terms.html`, `style.css`) live in [pages/](../pages/) so that `docs/` can stay developer-focused. Set **Settings → Pages → Source** to `main` / `/pages` so the site serves at `https://<user>.github.io/<repo>/` without any path change. The URLs referenced from the app (`/privacy.html`, `/terms.html`) stay the same.
+The privacy policy and terms of service live in [legal/](../legal/) as Markdown and are published to
+`https://nightjarlabs.llc/doublestack/privacy` and `/terms` by
+[legal-sync.yml](../.github/workflows/legal-sync.yml), which opens a pull request against the
+website's repository whenever either file changes on `main`.
+
+Run [`scripts/setup_legal_sync.sh`](../scripts/setup_legal_sync.sh) once to create the two secrets
+it needs. Until then the workflow fails on every push that touches `legal/`.
+
+The repo used to publish four hand-written HTML files to GitHub Pages. That is gone: a URL with a
+personal username and an outdated repo name in it is not something to file with Apple and Google,
+and a studio domain means the next app inherits the whole pipeline. See
+[legal/README.md](../legal/README.md).
 
 ## Runbook: something broke
 

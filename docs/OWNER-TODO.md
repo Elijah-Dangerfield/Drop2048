@@ -156,50 +156,54 @@ non-HTTPS yet. Grafana Cloud's OTLP gateway is HTTPS, so the "encrypted in trans
 Data safety form becomes true the moment you paste the real endpoint in. Sentry is already live and
 settled by construction, since its DSN is an HTTPS URL committed in `telemetry.properties`.
 
-### `doublestack.app` is not registered
+### Run `scripts/setup_legal_sync.sh` once
 
-`share_footer` in `libraries/resources/.../strings.xml:349` prints it on every shared score image.
-Either buy the domain or point the string at the Pages site. An agent cannot buy a domain.
+Two secrets, one script, and it is the only owner step left on the website work.
 
-It is also the domain the real website needs, below, so one purchase clears both.
+It creates a Firebase service account and sets `FIREBASE_SERVICE_ACCOUNT` on the `nightjar` repo,
+then prompts you for a fine-grained GitHub token and sets `NIGHTJAR_SITE_TOKEN` here. Until both
+exist, `legal-sync.yml` cannot open its pull request and merging one cannot deploy the site.
 
-### Get off `github.io` and onto a real site
+```bash
+./scripts/setup_legal_sync.sh
+```
 
-Everything player-facing currently points at `https://elijah-dangerfield.github.io/Drop2048/`, which
-is four hand-written files in `pages/` published by `.github/workflows/pages.yml`. That was the
-right call for a repo with no store presence. It is the wrong thing to put on a store listing.
+An agent cannot mint a GitHub personal access token, which is the only reason this is yours.
 
-**Why this is a blocker and not a polish item.** The URL contains a personal GitHub username and a
-repo name that no longer matches the product. It is also load-bearing in more places than it looks:
+### ~~`doublestack.app` is not registered~~ — closed 2026-09-21, not bought
 
-- `LaunchGateConfigValues.kt:130` and `:141` compile it in as the fallback for the terms and privacy
-  URLs, so it is what the app opens when remote config is unreachable.
-- It is filed with Google as the **privacy policy URL**, the store listing **website**, and the
+Resolved by not buying it. `share_footer` now prints `nightjarlabs.llc`, a domain that is already
+owned, already live and already the app's home. The full path to the app page is too long to read
+at share-image size, so the footer carries the bare studio domain.
+
+### ~~Get off `github.io` and onto a real site~~ — closed 2026-09-21
+
+Everything player-facing now points at `https://nightjarlabs.llc/doublestack/…`. The
+`pages/` folder and `.github/workflows/pages.yml` are deleted.
+
+**How it was solved, and why not the way this entry originally proposed.** The original plan was
+Cards' shape: buy `doublestack.app`, put an Astro site in `website/`, publish it from this repo to
+GitHub Pages. That is one domain, one site and one pipeline per app, forever.
+
+Instead the legal text lives here as Markdown in `legal/`, and `.github/workflows/legal-sync.yml`
+opens a pull request against `Elijah-Dangerfield/nightjar` whenever it changes. That repo renders it
+at `nightjarlabs.llc/doublestack/privacy` and `/terms` and deploys itself from CI. Every future app
+inherits the domain, the design and the pipeline for free.
+
+The load-bearing places the old URL appeared, all updated:
+
+- `LaunchGateConfigValues.kt:130` and `:141`, the compiled fallbacks the app opens when remote
+  config is unreachable.
+- Filed with Google as the **privacy policy URL**, the store listing **website**, and the
   **delete-data URL** on the Data safety form.
-- It is filed with Apple as the **Support URL**.
+- Filed with Apple as the **Support URL**.
 
-Changing a privacy policy URL after submission means re-filing on both stores, and a legal URL that
-404s because a username or repo name moved is worse than an ugly one. Cheapest to fix before the
-first submission, which is where we are.
+**Still yours:** re-file those four URLs in the two consoles. They were entered against the
+`github.io` host and nothing updates them automatically. Nothing is submitted yet, so this is free
+today and costs two review cycles once it is not.
 
-**Copy what Cards does.** `~/Workspace/Cards` already solved this and the shape is worth lifting
-wholesale rather than reinventing:
-
-- `website/` at the repo root, Astro (`astro@^7.1.3`), `npm run dev` to preview.
-- `website/astro.config.mjs` sets `site: 'https://downcard.app'`. Ours becomes `doublestack.app`.
-- `website/public/CNAME` holds the bare domain, which is what makes Pages serve it.
-- `.github/workflows/pages.yml` there builds with Node 22 and `npm ci`, then uploads `website/dist`.
-  Ours publishes `pages/` as static files and would be replaced by that version.
-- Pages are `index`, `privacy`, `terms`, `support`, `contact`, `thanks`, over a shared
-  `Layout.astro` with `Nav`, `Footer` and `ContactForm` components. We have no support or contact
-  page today; both stores want somewhere to send people, and `contact@nightjarlabs.llc` in a
-  `mailto:` is the current answer.
-
-**Split of work.** Buying `doublestack.app` and pointing its DNS at GitHub Pages is yours and
-cannot be delegated. Porting the three existing pages into Astro, building the site, writing the
-workflow and updating the four filed URLs is agent work, and the current `pages/` content carries
-over almost verbatim: the terms and privacy copy were rewritten on 2026-09-20 and the palette is
-already sampled from the app icon.
+**Note the ongoing obligation.** A sync pull request that sits unmerged means the published policy
+is stale. `docs/store/release-checklist.md` makes merging it part of shipping a release.
 
 ---
 

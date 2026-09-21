@@ -154,8 +154,8 @@ seam). A leaderboard line on the Play listing would be a claim about a feature t
 | In-app purchases | Yes, one managed product `drop2048_pro`, $2.99 | **Not yet.** iOS billing is unwired (`NoStoreBilling`), so there is no iOS IAP to declare until StoreKit is implemented |
 | Content rating | See `age-rating.md` | See `age-rating.md` |
 | Target audience | **Blocked on the kids decision** (`OWNER-TODO.md`) | same |
-| Privacy policy URL | `https://elijah-dangerfield.github.io/Drop2048/privacy.html` is the compiled default (`LaunchGateConfigValues.kt`) and is live. See `data-safety.md` §8.5 | same |
-| Support URL and email | **Not decided.** `pages/privacy.html` currently points at `contact@nightjarlabs.llc`; confirm or replace | same |
+| Privacy policy URL | `https://nightjarlabs.llc/doublestack/privacy`, the compiled default (`LaunchGateConfigValues.kt`). Written in `legal/privacy.md`, published by `legal-sync.yml`. See `data-safety.md` §8.5 | same |
+| Support URL and email | `https://nightjarlabs.llc/contact`. The email is **not settled**: `legal/*.md` say `contact@nightjarlabs.llc` and the site's own footer says `hello@nightjarlabs.llc`. Pick one | same |
 | App name | **Not decided** | **Not decided** |
 
 Data safety and the privacy nutrition label are in [`data-safety.md`](./data-safety.md), not here.

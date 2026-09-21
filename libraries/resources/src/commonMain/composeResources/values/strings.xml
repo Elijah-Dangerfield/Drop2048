@@ -356,7 +356,11 @@
          the numbers; these are the only words in it. -->
     <string name="share_run">Share this run</string>
     <string name="share_title_endless">Doublestack · Endless</string>
-    <string name="share_footer">doublestack.app</string>
+    <!-- The studio domain rather than a per-app one: nightjarlabs.llc is bought
+         and live, doublestack.app was never registered, and a share image that
+         sends people to a domain nobody owns is worse than no footer. The full
+         path to the app page is too long to read at share-image size. -->
+    <string name="share_footer">nightjarlabs.llc</string>
 
     <string name="settings_achievements">Achievements</string>
     <string name="settings_achievements_hint">Twenty-two badges, and how far you are into each.</string>

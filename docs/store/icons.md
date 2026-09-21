@@ -18,7 +18,7 @@ where each file goes.
 | Play feature graphic, 1024x500 | none | Does not exist | **Yes**, Play requires one |
 | iOS app icon | `Assets.xcassets/AppIcon.appiconset/icon_template.png` | Placeholder, 1024x1024, correct size | **Yes**, App Store review rejects placeholder icons |
 | iOS launch screen | Generated (`INFOPLIST_KEY_UILaunchScreen_Generation = YES`) | Plain, no art | No |
-| Web pages icon | `pages/app-icon.png` (1024), `apple-touch-icon.png` (180), `favicon.png` (64) | Placeholder, correct sizes | No, but it is public |
+| Website icon | `public/apps/doublestack.png` in the [nightjar](https://github.com/Elijah-Dangerfield/nightjar) repo, rendered at 58px on the Apps grid | The real icon | No, but it is public |
 
 **Nothing about this is a code problem.** Every file is the right size in the right place and is
 waiting for art. Replacing them is a file swap, and once the 1024 master exists the Android

@@ -117,7 +117,7 @@ every one of them is silent if forgotten.
 | 8 | `apps/ios/iosApp/PrivacyInfo.xcprivacy` | Written, **not in the target** | Added to Copy Bundle Resources | The manifest ships nowhere and the upload is rejected or warned. Only an owner can do this; it needs Xcode. |
 | 9 | `apps/compose/src/androidMain/AndroidManifest.xml`, `android.permission.CAMERA` + `uses-feature` | Declared | **Deleted** | The Play listing shows a Camera permission for a falling-block puzzle. Nothing uses a camera (`data-safety.md` §8.3). |
 | 10 | Same file, `android:allowBackup` | `true` | **An explicit decision** | Google Auto Backup restores `AppData` including the install id to a new device, which makes the Settings copy "There is no backup" false and weakens the privacy declarations. `data-safety.md` §7.3. |
-| 11 | `pages/privacy.html` | The template's, and it denies serving ads | Rewritten from `data-safety.md` §2 | A live privacy policy that contradicts the shipped app. `data-safety.md` §8.5. |
+| 11 | `legal/privacy.md` | The template's, and it denies serving ads | Rewritten from `data-safety.md` §2 | A live privacy policy that contradicts the shipped app. `data-safety.md` §8.5. It said "the iOS version contains no ad SDK" for a week after AdMob shipped on iOS; that is now corrected, and the file moved next to the code so the same gap is harder to open. |
 
 A lint rule or a release-time assertion over rows 1, 2 and 4 would be worth having, and does not
 exist. Flagged, not built.
@@ -255,12 +255,12 @@ or a file.
    already promises. `data-safety.md` §7.3. Nothing is blocked on this any more.
 4. **Whether to show the install id** somewhere copyable, so Play's "users can request deletion"
    answer is fully true rather than nearly. `data-safety.md` §7.1.
-5. **The support email**, `pages/privacy.html` currently says `contact@nightjarlabs.llc`. Confirm
-   or replace.
-6. **Confirm `drop2048.app` is yours.** It is the share footer (`share_footer` in `strings.xml`).
-   It is no longer a legal URL: `legal.termsUrl` and `legal.privacyUrl` compile to the live
-   GitHub Pages copies at `https://elijah-dangerfield.github.io/Drop2048/`. Buying the domain
-   later is a config push, not a release.
+5. **The support email.** `legal/*.md` say `contact@nightjarlabs.llc`; the website's own footer and
+   contact form say `hello@nightjarlabs.llc` (`src/data/site.ts` in the nightjar repo). Both
+   addresses now render on the same site, two clicks apart. Pick one and make the other match.
+6. ~~**Confirm `drop2048.app` is yours.**~~ Closed 2026-09-21 by not buying a domain. `share_footer`
+   is `nightjarlabs.llc`, and `legal.termsUrl` / `legal.privacyUrl` compile to
+   `https://nightjarlabs.llc/doublestack/terms` and `/privacy`.
 7. **Whether Play Games is in v1**, SPEC 15 says no and Android binds an inert seam. Saying yes
    means a Play Games project, a second id per board, and re-answering the IARC "users interact"
    question (`age-rating.md` §3.1).
@@ -299,12 +299,17 @@ or a file.
     §2.
 18. **Badge art**, the 22 achievement glyphs are placeholder emoji, and two of them (🩸 and 🃏)
     are the ones a content-rating reviewer would look twice at (`age-rating.md` §1).
-19. **Host the privacy policy and terms, and bump the legal version.** `pages/privacy.html` was
-    rewritten in C13a from `data-safety.md` §2 and no longer denies the ad and analytics SDKs the
-    app ships; what is left is an owner job, not a writing one. Confirm the support address
-    (item 5) and **bump the legal version**, because the launch gate re-asks for acceptance on the
-    version and not on the text. Hosting is done: both pages are live on GitHub Pages and are what
-    `legal.privacyUrl` and `legal.termsUrl` now compile to. `pages/terms.html` was not touched and should be read once before it goes up.
+19. **Merge the legal-sync PR, re-file the URLs, and bump the legal version.** The text lives in
+    `legal/privacy.md` and `legal/terms.md` and is published to
+    `https://nightjarlabs.llc/doublestack/…` by `legal-sync.yml`. Three things are left:
+    - Run `scripts/setup_legal_sync.sh` once (owner; it needs a GitHub token an agent cannot mint),
+      then merge the pull request it opens on the `nightjar` repo. **Until that PR is merged the
+      published policy is stale**, so this is part of shipping any release that touches `legal/`.
+    - **Re-file the four URLs** that were entered against the old `github.io` host: Play's privacy
+      policy URL, the listing website, the Data safety delete-data URL, and Apple's Support URL.
+      Free now, two review cycles once anything is submitted.
+    - **Bump the legal version**, because the launch gate re-asks for acceptance on the version and
+      not on the text.
 20. **Store screenshots.** Play: the goldens are admissible but soft, see `screenshots.md` §2.
     iOS: blocked on item 21.
 
