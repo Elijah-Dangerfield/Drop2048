@@ -23,7 +23,7 @@ A pull request rather than a direct push, because these are legal documents and
 a review step before publication is worth the extra click. **The consequence is
 that an unmerged PR means the published policy is stale.** If you change these
 files as part of a release, merging that PR is part of shipping the release, not
-an afterthought — it's on `docs/store/release-checklist.md`.
+an afterthought. It's on `docs/store/release-checklist.md`.
 
 ## Rules
 

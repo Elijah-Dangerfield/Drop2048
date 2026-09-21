@@ -15,6 +15,29 @@ redoes finished work.
 
 ## Now
 
+### The legal pages are on nightjarlabs.llc, and the rest is blocked on the owner
+
+Two things were asked for here. Both of the agent halves are **done**, and this entry exists so
+the next reader does not redo them:
+
+1. **Doublestack is listed on nightjarlabs.llc.** Icon, tagline, "Coming soon", and links to its
+   privacy and terms. `src/data/apps.ts` in the `nightjar` repo.
+2. **The legal documents are published from this repo.** `legal/privacy.md` and `legal/terms.md`
+   are the source of truth, `.github/workflows/legal-sync.yml` opens a PR against the site, and
+   `LaunchGateConfigValues.kt` compiles `https://nightjarlabs.llc/doublestack/…` as the fallback.
+   `pages/` and `pages.yml` are deleted.
+
+What is left is owner work, tracked in `OWNER-TODO.md`. Nothing for an agent until it lands:
+
+- `./scripts/setup_legal_sync.sh` has not been run, so both workflows fail on every push that
+  touches `legal/`. Until they pass, the pages exist in the site repo but are not deployed.
+- The four filed store URLs still point at `elijah-dangerfield.github.io/Drop2048`.
+
+**One decision is genuinely open and is agent-actionable once made.** `legal/*.md` say
+`contact@nightjarlabs.llc`; the site's own footer and contact form say `hello@nightjarlabs.llc`
+(`src/data/site.ts`). Both now render on the same site two clicks apart. Pick one, change the
+other, and bump `updated` in the frontmatter. `docs/store/release-checklist.md` item 5.
+
 ### The overlay options are 14dp apart, which caps their finger target at 39.5dp
 
 Left behind by the `GameQuietButton` fix, and it is a design question rather than a bug. The
