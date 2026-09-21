@@ -106,23 +106,25 @@ object ProductIds {
 }
 
 /**
- * The store on a platform that has not wired one, and the shape of the answer
- * during an outage.
+ * The shape of the answer on a platform that has not wired a store.
  *
- * Android replaces it with Play. iOS does **not** yet — StoreKit needs a Swift
- * implementation handed in through `IosAppComponent`, which is on
- * `OWNER-TODO.md` with the App Store Connect product it needs. Until then Pro is
- * unbuyable on iOS and every Pro-gated path behaves exactly as it does for a
- * free player, which is the failure mode worth having: the opposite — a stub
- * that answered [StoreOwnership.Owned] — would hand Pro out for nothing.
+ * **Nothing binds this any more, and it is no longer reachable at runtime.**
+ * Android has `PlayStoreBilling` and iOS has `IOSStoreBilling`, handed to the
+ * graph through `IosAppComponent`, so both platforms answer from a real store.
+ *
+ * It deliberately carries no `@ContributesBinding`: a contributed binding here
+ * plus the `@Provides` in `IosAppComponent` is a duplicate the graph rejects,
+ * which is the same resolution `NotWiredAdNetwork` reached. The class stays as
+ * the documented shape of a correct no-store answer, and as the thing to bind
+ * if a third platform ever arrives before its billing does.
  *
  * [StoreOwnership.Unknown] rather than [StoreOwnership.NotOwned], because
  * "we could not ask" is true and "they do not own it" is a claim this has no
  * standing to make. It is also what keeps a cached entitlement from being
- * cleared by a build that simply cannot see the store.
+ * cleared by a build that simply cannot see the store. The opposite, a stub
+ * that answered [StoreOwnership.Owned], would hand Pro out for nothing.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
 @Inject
 class NoStoreBilling : StoreBilling {
     override suspend fun ownership(productId: String): StoreOwnership = StoreOwnership.Unknown

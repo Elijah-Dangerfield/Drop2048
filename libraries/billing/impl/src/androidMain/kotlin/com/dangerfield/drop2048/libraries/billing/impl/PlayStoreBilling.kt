@@ -12,7 +12,6 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
-import com.dangerfield.drop2048.libraries.billing.NoStoreBilling
 import com.dangerfield.drop2048.libraries.billing.StoreBilling
 import com.dangerfield.drop2048.libraries.billing.StoreOwnership
 import com.dangerfield.drop2048.libraries.billing.StorePurchaseOutcome
@@ -58,10 +57,12 @@ import kotlin.time.Duration.Companion.seconds
  * device that answered no.
  */
 @SingleIn(AppScope::class)
+// No `replaces`: `NoStoreBilling` stopped contributing a binding when iOS got
+// `IOSStoreBilling`, and naming a class that contributes nothing is a no-op
+// that reads like a live constraint.
 @ContributesBinding(
     scope = AppScope::class,
     boundType = StoreBilling::class,
-    replaces = [NoStoreBilling::class],
 )
 @Inject
 class PlayStoreBilling(
