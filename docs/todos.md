@@ -15,6 +15,35 @@ redoes finished work.
 
 ## Now
 
+### Two TestFlight builds are stuck on export compliance right now
+
+**The symptom.** Builds `202609252110` and `202609212359` both finished
+processing, both read VALID, and neither is installable by anyone. App Store
+Connect has them in `MISSING_EXPORT_COMPLIANCE`. Nothing warns about this: the
+upload succeeds, the workflow is green, and the testers simply never get a
+build. Verified against the App Store Connect API on 2026-09-25.
+
+**The one-line fix.** Add to `apps/ios/iosApp/Info.plist`:
+
+```xml
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
+```
+
+False is correct rather than convenient: the only encryption here is HTTPS
+through the system's own TLS, to Sentry, Grafana and the ad network, which
+Apple exempts under Category 5 Part 2. It would stop being correct if the app
+ever implemented or bundled a cipher.
+
+**The two builds already uploaded still need answering by hand**, because the
+key only affects builds made after it. Either answer the question in App Store
+Connect, or PATCH `usesNonExemptEncryption: false` onto each build through the
+API. The key stops it recurring; it does not reach back.
+
+**Provenance.** Sodogku hit this on its first release on 2026-09-25 and the fix
+is in its `Info.plist` and in the template's. This entry was written because
+the same API call showed this app in the same state, unasked.
+
 ### The legal pages are on nightjarlabs.llc, and the rest is blocked on the owner
 
 Two things were asked for here. Both of the agent halves are **done**, and this entry exists so
