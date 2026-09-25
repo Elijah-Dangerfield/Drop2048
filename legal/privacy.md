@@ -1,7 +1,7 @@
 ---
 app: Doublestack
 title: Privacy Policy
-updated: 2026-09-21
+updated: 2026-09-25
 contact: contact@nightjarlabs.llc
 ---
 
@@ -11,7 +11,7 @@ Doublestack is made by Nightjar Labs LLC. It is a single-player puzzle game with
 
 The app never asks for your name, your email address or a password, and we hold no record of you. The only identifier is an **install ID**: a random number generated on your device the first time the app runs. It is not your advertising ID, not a hardware ID, and not derived from anything about you or your phone. It identifies the installation, not the person.
 
-Settings → Delete local data erases everything the app has stored and issues a new install ID, which breaks the link between this device and anything sent before.
+Settings → Delete local data erases everything the app has stored and issues a new install ID, which breaks the link between this device and anything sent before. It cannot reach records that already left the device; for those, [nightjarlabs.llc/delete-data](https://nightjarlabs.llc/delete-data) asks for the install ID, which Settings shows directly under that button.
 
 ## What stays on your device
 
@@ -83,7 +83,7 @@ That is the whole list. The app declares no camera, microphone, location, contac
 - **Reset progress** (Settings): clears runs, scores and stats, keeps your settings.
 - **Advertising ID**: reset or opt out in your device settings.
 - **Uninstall**: removes everything the app stored.
-- To ask us to delete analytics or crash records already sent, email the address below.
+- **Delete records already sent** at [nightjarlabs.llc/delete-data](https://nightjarlabs.llc/delete-data). Deleting local data cannot reach analytics and crash records that already left the device; the form can, because those records are keyed by your install ID. Settings shows it under Delete local data, and tapping it copies it.
 
 ## Children
 

@@ -13,12 +13,14 @@ import com.dangerfield.drop2048.libraries.core.BuildInfo
 import com.dangerfield.drop2048.libraries.core.Catching
 import com.dangerfield.drop2048.libraries.core.logOnFailure
 import com.dangerfield.drop2048.libraries.core.versionString
+import com.dangerfield.drop2048.libraries.drop2048.AppCache
 import com.dangerfield.drop2048.libraries.flowroutines.SEAViewModel
 import com.dangerfield.drop2048.libraries.flowroutines.collectIn
 import com.dangerfield.drop2048.libraries.gameconfig.LegalPrivacyUrl
 import com.dangerfield.drop2048.libraries.gameconfig.LegalTermsUrl
 import com.dangerfield.drop2048.libraries.ui.system.HapticsSetting
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
+import kotlinx.coroutines.delay
 import me.tatarka.inject.annotations.Inject
 
 /**
@@ -43,6 +45,7 @@ class SettingsViewModel(
     private val paywall: PaywallCoordinator,
     private val termsUrl: LegalTermsUrl,
     private val privacyUrl: LegalPrivacyUrl,
+    private val appCache: AppCache,
 ) : SEAViewModel<SettingsState, SettingsEvent, SettingsAction>(
     initialStateArg = SettingsState(
         appVersion = BuildInfo.versionString(),
@@ -58,6 +61,27 @@ class SettingsViewModel(
      */
     private var versionTaps = 0
 
+    /**
+     * Copy the install id, and say so on the row for a beat.
+     *
+     * The id is the only key on anything we hold, so it is what
+     * `nightjarlabs.llc/delete-data` asks for. `PlayerDataEraser` covers the
+     * local half and cannot reach records already sent to Sentry and Grafana;
+     * those are findable only by the id that was current when they were sent,
+     * which is why the player needs to be able to read it out.
+     *
+     * The confirmation replaces the id rather than sitting beside it, because
+     * the row is already two lines and a third would push the section past a
+     * short phone. It comes back after [CopiedMillis].
+     */
+    private suspend fun SettingsAction.copyInstallId() {
+        val id = state.installId ?: return
+        sendEvent(SettingsEvent.CopyToClipboard(id))
+        updateState { it.copy(installIdCopied = true) }
+        delay(CopiedMillis)
+        updateState { it.copy(installIdCopied = false) }
+    }
+
     init {
         takeAction(SettingsAction.Load)
         // Collected rather than read once. The store hydrates from disk
@@ -70,6 +94,17 @@ class SettingsViewModel(
         }
         entitlement.isPro.collectIn(viewModelScope) {
             takeAction(SettingsAction.ProChanged(it))
+        }
+        // Read from AppCache rather than InstallIdProvider, which lives in
+        // :libraries:networking and would be a dependency this module has no
+        // other reason to carry. Same value: the provider caches this field.
+        //
+        // Collected rather than read once, because "Delete local data" issues a
+        // *new* id, and a row still showing the old one would send the player to
+        // the web form with an id that no longer matches anything they could
+        // still ask us to delete.
+        appCache.updates.collectIn(viewModelScope) {
+            takeAction(SettingsAction.InstallIdChanged(it.installId))
         }
     }
 
@@ -104,6 +139,10 @@ class SettingsViewModel(
             SettingsAction.OpenQaTools -> sendEvent(SettingsEvent.OpenQaTools)
             SettingsAction.ReplayTutorial -> sendEvent(SettingsEvent.ReplayTutorial)
             SettingsAction.OpenFeedback -> sendEvent(SettingsEvent.OpenFeedback)
+            SettingsAction.CopyInstallId -> action.copyInstallId()
+            is SettingsAction.InstallIdChanged -> action.updateState {
+                it.copy(installId = action.installId)
+            }
             SettingsAction.OpenLicenses -> sendEvent(SettingsEvent.OpenLicenses)
             SettingsAction.OpenTerms -> sendEvent(SettingsEvent.OpenLink(termsUrl()))
             SettingsAction.OpenPrivacy -> sendEvent(SettingsEvent.OpenLink(privacyUrl()))
@@ -218,6 +257,17 @@ data class SettingsState(
 
     val appVersion: String = "",
 
+    /**
+     * This install's id, or null before `AppCache` has hydrated. Null takes the
+     * row off the screen rather than drawing an empty one: a blank where an
+     * identifier should be is worse than no row, because the player copies the
+     * blank and files it.
+     */
+    val installId: String? = null,
+
+    /** Set for a beat after a copy, so the row can say it worked. */
+    val installIdCopied: Boolean = false,
+
     /** The one destructive dialog on screen, if any. */
     val dialog: SettingsDialog? = null,
 )
@@ -239,6 +289,15 @@ enum class RestoreMessage { Working, Restored, NothingToRestore, Unavailable }
 sealed interface SettingsEvent {
     data object NavigateBack : SettingsEvent
     data object OpenFeedback : SettingsEvent
+
+    /**
+     * Put [text] on the clipboard.
+     *
+     * An event rather than a call, for the reason `DebugEvent.Copy` gives: the
+     * clipboard is composition-scoped (`LocalClipboardManager`), and a view
+     * model reaching for it would need a platform seam per target.
+     */
+    data class CopyToClipboard(val text: String) : SettingsEvent
     data object OpenLicenses : SettingsEvent
 
     /** `GameRoute(replayTutorial = true)` — SPEC 13's replay, from its only caller. */
@@ -284,6 +343,11 @@ sealed interface SettingsAction {
 
     data object ReplayTutorial : SettingsAction
     data object OpenFeedback : SettingsAction
+
+    /** The install id row. See [SettingsEvent.CopyToClipboard]. */
+    data object CopyInstallId : SettingsAction
+
+    data class InstallIdChanged(val installId: String?) : SettingsAction
     data object OpenLicenses : SettingsAction
     data object OpenTerms : SettingsAction
     data object OpenPrivacy : SettingsAction
@@ -308,3 +372,6 @@ sealed interface SettingsAction {
     data class ConfirmResetProgress(val typed: String, val required: String) : SettingsAction
     data object ConfirmDeleteLocalData : SettingsAction
 }
+
+/** How long the install id row says "copied" before showing the id again. */
+internal const val CopiedMillis = 2_000L

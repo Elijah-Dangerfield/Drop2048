@@ -93,7 +93,7 @@ answer set for each branch rather than picking one. Everything in §4 and §5 is
 | **Leaves the device, 3** | As a Sentry scope **tag** named `install_id` (`AppTelemetry.kt:150-152`, wired by `SessionTelemetryBinder.kt:55`). Because it is on the scope, a native crash symbolicated on the next launch still carries it. |
 | **What our server does with it** | Bucketing key for config rollouts and allow/deny targeting, and lifted into logging MDC / OTel spans / the server's Sentry scope. Not written to Postgres. |
 | **Lifetime** | Until the app is uninstalled **or** the player uses "Delete local data". Unqualified since C13a set `android:allowBackup="false"`; before that Auto Backup could restore it onto a second device. See §7.3. |
-| **Shown to the user** | Never. `grep -rn "installId" features apps/compose/src` returns no UI reference, including the debug menu. This matters for §7.1. |
+| **Shown to the user** | **Yes, since 2026-09-25.** Settings → Data, directly under "Delete local data", with a tap-to-copy action and a line saying it is a reference for a deletion request rather than an account. It is read from `AppCache.updates`, so it follows the new id that "Delete local data" issues. This is what makes §7.1's answer fully true. |
 
 ### 2.2 Advertising identifier: Android only, today
 
@@ -513,15 +513,18 @@ What is true:
   app never shows it to the player (§2.1).
 - There is no in-app analytics opt-out (§2.3). `diagnosticsOptIn` is not one (§2.5).
 
-**Recommended answer, and what it costs.** Answer **Yes** to "users can request that their data be
-deleted", on the basis of the in-app control, and provide a support email in the free-text field.
-Then make one cheap change so the claim is fully true: **show the install id somewhere the player
-can copy it** (Settings → About, or the debug menu, or appended to a feedback report), so a
-deletion request has a key to name. Without it, "request deletion" resolves to "we cannot find your
-rows".
+**Answered Yes, and it is now fully true.** Two halves, and the second landed on 2026-09-25.
 
-**Not determined:** whether you want the support email in the loop at all. That is a product call
-and it needs a support address to exist first (`OWNER-TODO.md`).
+"Delete local data" covers everything still on the device and issues a fresh install id, which
+breaks the link going forward. It cannot reach records already sent to Grafana and Sentry, and
+those are findable only by the id that was current when they were sent.
+
+So the delete-data URL on the form is `nightjarlabs.llc/delete-data`, which asks for that id, and
+Settings now shows it directly under "Delete local data" with a copy action. Before that the
+answer was defensible but thin: the player had no way to name the key, so "request deletion"
+resolved to "we cannot find your rows".
+
+`legal/privacy.md` describes the route in the same terms, under "Your choices".
 
 ### 7.2 The iOS ad SDK diff, pre-written
 

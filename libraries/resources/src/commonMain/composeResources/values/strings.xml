@@ -193,6 +193,14 @@
     <string name="settings_delete_data">Delete local data</string>
     <string name="settings_delete_data_hint">Everything above, plus the record this device keeps of you.</string>
 
+    <!-- The install id row, under Delete local data. The id is the only key on
+         anything held off the device, so it is what nightjarlabs.llc/delete-data
+         asks for. The supporting copy has to stop it reading as an account
+         number in an app that has no accounts. -->
+    <string name="settings_install_id">Install ID</string>
+    <string name="settings_install_id_hint">Your reference for a data deletion request at nightjarlabs.llc/delete-data. Not an account, and not tied to you. Tap to copy.</string>
+    <string name="settings_install_id_copied">Copied.</string>
+
     <!-- Two steps, and the second one asks for a typed word. There is no
          account and no server copy, so a reset here is final in a way it is not
          in an app that can restore. -->

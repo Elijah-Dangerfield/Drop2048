@@ -1,5 +1,7 @@
 package com.dangerfield.drop2048.features.settings.impl
 
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
@@ -46,6 +48,7 @@ class SettingsFeatureEntryPoint(
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         screen<SettingsRoute> {
             val viewModel: SettingsViewModel = viewModel { settingsViewModelFactory() }
+            val clipboard = LocalClipboardManager.current
             val state = viewModel.stateFlow.collectAsStateWithLifecycle().value
 
             val resetDone = stringResource(Res.string.settings_reset_done)
@@ -59,6 +62,8 @@ class SettingsFeatureEntryPoint(
                     SettingsEvent.OpenDebugMenu -> router.navigate(DebugRoute())
                     SettingsEvent.OpenQaTools -> router.navigate(QaToolsRoute())
                     SettingsEvent.OpenFeedback -> router.navigate(FeedbackRoute())
+                    is SettingsEvent.CopyToClipboard ->
+                        clipboard.setText(AnnotatedString(event.text))
                     SettingsEvent.OpenLicenses -> router.navigate(LicensesRoute())
                     is SettingsEvent.OpenLink -> router.openWebLink(event.url)
                     SettingsEvent.ReplayTutorial -> router.navigate(

@@ -14,19 +14,21 @@ import com.dangerfield.drop2048.libraries.gameconfig.LegalPrivacyUrl
 import com.dangerfield.drop2048.libraries.gameconfig.LegalTermsUrl
 import com.dangerfield.drop2048.libraries.ui.system.HapticsSetting
 import com.dangerfield.drop2048.libraries.ui.system.color.BlockPaletteChoice
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 
 /**
  * The settings screen's rules, none of which are "a toggle flips a boolean".
@@ -156,8 +158,64 @@ class SettingsViewModelTest : CoroutineTest() {
         assertFalse(scenario.viewModel.state.adConsentAvailable)
     }
 
-    private fun TestScope.scenario(): Scenario {
-        val cache = FakeAppCache(AppData())
+    /**
+     * The row exists so a player can quote the id to
+     * `nightjarlabs.llc/delete-data`, which is the only route to records that
+     * already left the device. `PlayerDataEraser` cannot reach those.
+     */
+    @Test
+    fun `the install id is shown once the cache has one`() = runUnitTest {
+        val scenario = scenario(AppData(installId = "abc-123"))
+
+        assertEquals("abc-123", scenario.viewModel.state.installId)
+    }
+
+    /** Null keeps the row off the screen rather than drawing a blank one. */
+    @Test
+    fun `the install id is absent before the cache hydrates`() = runUnitTest {
+        val scenario = scenario(AppData(installId = null))
+
+        assertNull(scenario.viewModel.state.installId)
+    }
+
+    @Test
+    fun `copying the install id emits it and says so for a beat`() = runUnitTest {
+        val scenario = scenario(AppData(installId = "abc-123"))
+
+        val events = mutableListOf<SettingsEvent>()
+        val collector = launch { scenario.viewModel.eventFlow.toList(events) }
+
+        scenario.viewModel.takeAction(SettingsAction.CopyInstallId)
+        runCurrent()
+
+        assertEquals(listOf<SettingsEvent>(SettingsEvent.CopyToClipboard("abc-123")), events)
+        assertTrue(scenario.viewModel.state.installIdCopied)
+
+        advanceTimeBy(CopiedMillis + 1)
+        runCurrent()
+        assertFalse(scenario.viewModel.state.installIdCopied)
+        collector.cancel()
+    }
+
+    /**
+     * The one that makes collecting the cache worth it rather than reading it
+     * once: "Delete local data" mints a fresh id, and a row still showing the
+     * old one would send the player to the form with a key that no longer
+     * matches anything they could still ask us to delete.
+     */
+    @Test
+    fun `the install id follows the one delete local data issues`() = runUnitTest {
+        val scenario = scenario(AppData(installId = "old-id"))
+        assertEquals("old-id", scenario.viewModel.state.installId)
+
+        scenario.cache.set(AppData(installId = "new-id"))
+        runCurrent()
+
+        assertEquals("new-id", scenario.viewModel.state.installId)
+    }
+
+    private fun TestScope.scenario(data: AppData = AppData()): Scenario {
+        val cache = FakeAppCache(data)
         val store = FakeSettingsStore()
         val dao = RecordingDao()
         val viewModel = SettingsViewModel(
@@ -168,6 +226,7 @@ class SettingsViewModelTest : CoroutineTest() {
             paywall = RecordingPaywall(),
             termsUrl = LegalTermsUrl(EmptyConfigMap),
             privacyUrl = LegalPrivacyUrl(EmptyConfigMap),
+            appCache = cache,
         )
         runCurrent()
         return Scenario(viewModel, store, cache, dao)

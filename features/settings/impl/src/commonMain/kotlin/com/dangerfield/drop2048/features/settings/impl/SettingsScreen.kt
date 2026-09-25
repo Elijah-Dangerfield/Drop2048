@@ -15,10 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.dangerfield.drop2048.features.debug.DebugMenuLabels
 import com.dangerfield.drop2048.features.debug.QaToolsLabels
-import com.dangerfield.drop2048.libraries.core.BuildInfo
-import com.dangerfield.drop2048.libraries.core.isTesterBuild
 import com.dangerfield.drop2048.features.settings.ControlScheme
 import com.dangerfield.drop2048.features.settings.PlayerSettings
+import com.dangerfield.drop2048.libraries.core.BuildInfo
+import com.dangerfield.drop2048.libraries.core.isTesterBuild
 import com.dangerfield.drop2048.libraries.ui.PreviewContent
 import com.dangerfield.drop2048.libraries.ui.components.ListItemAccessory
 import com.dangerfield.drop2048.libraries.ui.components.ListSection
@@ -35,6 +35,8 @@ import com.dangerfield.drop2048.system.AppTheme
 import com.dangerfield.drop2048.system.VerticalSpacerD1000
 import com.dangerfield.drop2048.system.VerticalSpacerD500
 import drop2048.libraries.resources.generated.resources.Res
+import drop2048.libraries.resources.generated.resources.settings_achievements
+import drop2048.libraries.resources.generated.resources.settings_achievements_hint
 import drop2048.libraries.resources.generated.resources.settings_ad_consent
 import drop2048.libraries.resources.generated.resources.settings_arrow_buttons
 import drop2048.libraries.resources.generated.resources.settings_arrow_buttons_hint
@@ -48,6 +50,9 @@ import drop2048.libraries.resources.generated.resources.settings_haptics
 import drop2048.libraries.resources.generated.resources.settings_haptics_light
 import drop2048.libraries.resources.generated.resources.settings_haptics_off
 import drop2048.libraries.resources.generated.resources.settings_haptics_strong
+import drop2048.libraries.resources.generated.resources.settings_install_id
+import drop2048.libraries.resources.generated.resources.settings_install_id_copied
+import drop2048.libraries.resources.generated.resources.settings_install_id_hint
 import drop2048.libraries.resources.generated.resources.settings_large_numbers
 import drop2048.libraries.resources.generated.resources.settings_large_numbers_hint
 import drop2048.libraries.resources.generated.resources.settings_licenses
@@ -59,21 +64,19 @@ import drop2048.libraries.resources.generated.resources.settings_palette_protano
 import drop2048.libraries.resources.generated.resources.settings_palette_tritanopia
 import drop2048.libraries.resources.generated.resources.settings_privacy_policy
 import drop2048.libraries.resources.generated.resources.settings_pro_active
+import drop2048.libraries.resources.generated.resources.settings_pro_hint
 import drop2048.libraries.resources.generated.resources.settings_pro_inactive
 import drop2048.libraries.resources.generated.resources.settings_pro_status
+import drop2048.libraries.resources.generated.resources.settings_pro_upgrade
 import drop2048.libraries.resources.generated.resources.settings_replay_tutorial
 import drop2048.libraries.resources.generated.resources.settings_replay_tutorial_hint
 import drop2048.libraries.resources.generated.resources.settings_reset_progress
 import drop2048.libraries.resources.generated.resources.settings_reset_progress_hint
-import drop2048.libraries.resources.generated.resources.settings_pro_hint
-import drop2048.libraries.resources.generated.resources.settings_pro_upgrade
 import drop2048.libraries.resources.generated.resources.settings_restore
 import drop2048.libraries.resources.generated.resources.settings_restore_nothing
 import drop2048.libraries.resources.generated.resources.settings_restore_restored
 import drop2048.libraries.resources.generated.resources.settings_restore_unavailable
 import drop2048.libraries.resources.generated.resources.settings_restore_working
-import drop2048.libraries.resources.generated.resources.settings_achievements
-import drop2048.libraries.resources.generated.resources.settings_achievements_hint
 import drop2048.libraries.resources.generated.resources.settings_section_about
 import drop2048.libraries.resources.generated.resources.settings_section_accessibility
 import drop2048.libraries.resources.generated.resources.settings_section_controls
@@ -145,7 +148,7 @@ fun SettingsScreen(
             VerticalSpacerD1000()
             LegalSection(state, onAction)
             VerticalSpacerD1000()
-            DataSection(onAction)
+            DataSection(state, onAction)
             VerticalSpacerD1000()
             AboutSection(state, onAction)
             // On any tester build, with no seven taps and no passphrase. The
@@ -413,11 +416,22 @@ private fun LegalSection(state: SettingsState, onAction: (SettingsAction) -> Uni
     )
 }
 
+/**
+ * Reset, delete, and the id that makes the web form work.
+ *
+ * The install id sits here rather than under About because its only purpose is
+ * the deletion request two rows above it. `PlayerDataEraser` handles everything
+ * still on the device; what it cannot reach is the records already sent to
+ * Sentry and Grafana, and `nightjarlabs.llc/delete-data` finds those by this id
+ * and nothing else.
+ */
 @Composable
-private fun DataSection(onAction: (SettingsAction) -> Unit) {
+private fun DataSection(state: SettingsState, onAction: (SettingsAction) -> Unit) {
+    val installIdCopied = stringResource(Res.string.settings_install_id_copied)
     ListSection(
         title = stringResource(Res.string.settings_section_data),
-        items = listOf(
+        items = buildList {
+            add(
             ListSectionItem(
                 headlineText = stringResource(Res.string.settings_reset_progress),
                 supportingText = stringResource(Res.string.settings_reset_progress_hint),
@@ -429,6 +443,8 @@ private fun DataSection(onAction: (SettingsAction) -> Unit) {
                     onAction(SettingsAction.ShowDialog(SettingsDialog.ResetProgressWarn))
                 },
             ),
+            )
+            add(
             ListSectionItem(
                 headlineText = stringResource(Res.string.settings_delete_data),
                 supportingText = stringResource(Res.string.settings_delete_data_hint),
@@ -440,8 +456,29 @@ private fun DataSection(onAction: (SettingsAction) -> Unit) {
                     onAction(SettingsAction.ShowDialog(SettingsDialog.DeleteLocalDataWarn))
                 },
             ),
-        ),
+            )
+            // Absent, not blank, until AppCache has hydrated. A row showing
+            // nothing where an identifier belongs is one the player copies and
+            // files anyway.
+            state.installId?.let { id ->
+                add(
+                    ListSectionItem(
+                        headlineText = stringResource(Res.string.settings_install_id),
+                        supportingText = if (state.installIdCopied) installIdCopied else id,
+                        onClick = { onAction(SettingsAction.CopyInstallId) },
+                    ),
+                )
+            }
+        },
     )
+    state.installId?.let {
+        VerticalSpacerD500()
+        Text(
+            text = stringResource(Res.string.settings_install_id_hint),
+            typography = AppTheme.typography.Body.B500,
+            color = AppTheme.colors.textSecondary,
+        )
+    }
 }
 
 /**

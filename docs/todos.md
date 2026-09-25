@@ -132,27 +132,6 @@ not a lower difficulty, so read run length and tier ceiling, never the level num
 A second count, not a change to `clutter`. D8's binding constraint still holds: the harness and SPEC
 17's live telemetry must compute it from the same function in `:libraries:cascade`.
 
-### Show the install ID in Settings, next to Delete local data
-
-`nightjarlabs.llc/delete-data` went live on 2026-09-25 and asks for the install
-ID, because that is the only key on any record we hold. This app never shows it, so a
-player cannot supply one.
-
-Half of this is already built and is the better half. `PlayerDataEraser.deleteLocalData()`
-erases the tables and issues a fresh install ID, which breaks the link going forward without
-the player having to read anything out. What it cannot do is reach records **already sent** to
-Sentry and Grafana, which is exactly what the web form is for, and those can only be found by
-the ID that was current when they were sent.
-
-So: a row in Settings → About showing `installId` with a copy action. It is a random UUID with
-nothing behind it, so there is nothing to leak, but in an app with no accounts it will read
-like an account number unless the supporting text calls it a reference for a support request.
-`legal/privacy.md` should then point at the form as a real route rather than describing a
-limitation.
-
-Raised by the owner on 2026-09-25. Sodogku carries the same item as SD-151; it has the display
-half to build and not the eraser, so the two repos are converging from opposite ends.
-
 ### `FuseReach` could come up ~10%
 
 The bomb fuse is legible at real cell size and is the smallest of the three special marks. One
