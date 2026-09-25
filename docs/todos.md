@@ -38,6 +38,24 @@ What is left is owner work, tracked in `OWNER-TODO.md`. Nothing for an agent unt
 (`src/data/site.ts`). Both now render on the same site two clicks apart. Pick one, change the
 other, and bump `updated` in the frontmatter. `docs/store/release-checklist.md` item 5.
 
+### The pause-on-cover wiring has no test, and the paywall harness is the pattern
+
+`GameFeatureEntryPoint`'s `LifecycleEventEffect(ON_PAUSE)` is what stops the run when the shake
+dialog or the bug report covers the board. It went in untested: the assertion needs a real
+`NavHost`, because the thing being relied on is that `LocalLifecycleOwner` inside a destination is
+that destination's `NavBackStackEntry`, and no JVM harness that calls a screen's content composable
+directly can see it. That is the same blind spot `PaywallNavHarness` was written for, and its KDoc
+says to copy it for the next feature.
+
+**Done when** a harness drives `GameFeatureEntryPoint`'s real graph, starts a run, navigates to a
+second destination, and asserts the phase is `Paused` — then goes back and asserts it is still
+`Paused` rather than silently resumed. Worth covering the dialog case separately from the forward
+navigation, because they drop the entry to different lifecycle states (STARTED and CREATED) and only
+one of them is the shake dialog.
+
+The cost is `GameViewModel`'s dependency list, which is why this is queued rather than done: the
+paywall needed two fakes and this needs most of `GameScenario`'s.
+
 ### The overlay options are 14dp apart, which caps their finger target at 39.5dp
 
 Left behind by the `GameQuietButton` fix, and it is a design question rather than a bug. The

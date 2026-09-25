@@ -2,11 +2,13 @@ package com.dangerfield.drop2048.features.game.impl
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
@@ -31,8 +33,8 @@ import com.dangerfield.drop2048.libraries.ui.system.LocalCues
 import drop2048.libraries.resources.generated.resources.Res
 import drop2048.libraries.resources.generated.resources.share_footer
 import drop2048.libraries.resources.generated.resources.share_title_endless
-import org.jetbrains.compose.resources.stringResource
 import me.tatarka.inject.annotations.Inject
+import org.jetbrains.compose.resources.stringResource
 import software.amazon.lastmile.kotlin.inject.anvil.AppScope
 import software.amazon.lastmile.kotlin.inject.anvil.ContributesBinding
 import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
@@ -71,6 +73,28 @@ class GameFeatureEntryPoint(
 
             LaunchedEffect(replay) {
                 if (replay) viewModel.takeAction(GameAction.ReplayTutorial)
+            }
+
+            // Pause when anything covers the board, because the run keeps
+            // running otherwise and the player is not looking at it.
+            //
+            // `LocalLifecycleOwner` inside a destination is that destination's
+            // `NavBackStackEntry`, so this fires for a dialog drawn over the
+            // board (the entry drops to STARTED) and for a forward navigation
+            // (it drops to CREATED). The shake dialog and the bug report it
+            // opens are both of those, and neither backgrounds the process, so
+            // `GameViewModel`'s own `AppLifecycleObserver` never saw them: it
+            // hangs off `ProcessLifecycleOwner`. Blocks kept falling while the
+            // player typed a bug report, which is a run lost to the button you
+            // press because something already went wrong.
+            //
+            // Both observers are wanted. This one cannot cover backgrounding,
+            // because the mid-cascade snapshot has to be written whether or not
+            // the composition is still around to write it, which is the reason
+            // the other one lives in the view model. `pause()` no-ops outside
+            // `Playing` and `Resolving`, so the overlap is free.
+            LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+                viewModel.takeAction(GameAction.Pause)
             }
 
             viewModel.ObserveEvents { effect ->
