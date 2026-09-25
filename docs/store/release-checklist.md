@@ -302,9 +302,9 @@ or a file.
 19. **Merge the legal-sync PR, re-file the URLs, and bump the legal version.** The text lives in
     `legal/privacy.md` and `legal/terms.md` and is published to
     `https://nightjarlabs.llc/doublestack/…` by `legal-sync.yml`. Three things are left:
-    - Run `scripts/setup_legal_sync.sh` once (owner; it needs a GitHub token an agent cannot mint),
-      then merge the pull request it opens on the `nightjar` repo. **Until that PR is merged the
-      published policy is stale**, so this is part of shipping any release that touches `legal/`.
+    - Run `scripts/setup_legal_sync.sh` once (owner; it needs a GitHub token an agent cannot mint).
+      Nothing to merge after that: the `nightjar` repo's `auto-merge-legal.yml` merges the sync PR
+      once the site builds, so a push to `legal/` publishes on its own.
     - **Re-file the four URLs** that were entered against the old `github.io` host: Play's privacy
       policy URL, the listing website, the Data safety delete-data URL, and Apple's Support URL.
       Free now, two review cycles once anything is submitted.

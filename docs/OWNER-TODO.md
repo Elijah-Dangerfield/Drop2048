@@ -202,8 +202,8 @@ The load-bearing places the old URL appeared, all updated:
 `github.io` host and nothing updates them automatically. Nothing is submitted yet, so this is free
 today and costs two review cycles once it is not.
 
-**Note the ongoing obligation.** A sync pull request that sits unmerged means the published policy
-is stale. `docs/store/release-checklist.md` makes merging it part of shipping a release.
+**No ongoing obligation here.** The sync PR merges itself once the site builds, so editing
+`legal/privacy.md` publishes it. Write those files as though they are already live.
 
 ---
 

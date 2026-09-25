@@ -16,14 +16,17 @@ notices until a store reviewer does.
 `.github/workflows/legal-sync.yml` watches `legal/**` on `main`. When either file
 changes it opens a pull request against
 [Elijah-Dangerfield/nightjar](https://github.com/Elijah-Dangerfield/nightjar),
-copying both files into `src/content/legal/doublestack/`. Merging that PR builds
-and deploys the site.
+copying both files into `src/content/legal/doublestack/`. That repo's
+`auto-merge-legal.yml` merges the PR as soon as the site builds, and publishes.
 
-A pull request rather than a direct push, because these are legal documents and
-a review step before publication is worth the extra click. **The consequence is
-that an unmerged PR means the published policy is stale.** If you change these
-files as part of a release, merging that PR is part of shipping the release, not
-an afterthought. It's on `docs/store/release-checklist.md`.
+**So editing these files is publishing them.** There is no click between your
+commit and `nightjarlabs.llc`, give or take a couple of minutes. Write them as
+if they are already live, because shortly they are.
+
+The one gate is the build. The site validates frontmatter against a zod schema,
+so a malformed file leaves the PR open and the live site serving the last good
+version. It does not check whether the words are true. Nothing does. That part
+is on you, which is the whole reason these files sit next to the code.
 
 ## Rules
 
