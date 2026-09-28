@@ -27,23 +27,42 @@ import kotlin.math.pow
  * find, once, and that [Sound] stays silent while every other one plays — which
  * is what makes a half-finished bank playable rather than a build failure.
  *
- * ### Why the same format on both platforms
+ * ### Why the format differs per platform
  *
- * Ogg Vorbis, because it is the one lossy format Android's `SoundPool` and iOS's
- * `AVAudioPlayer` both decode without a wrapper, so the bank is one set of files
- * rather than two that can drift out of sync. Keep them short and keep them
- * mono: `SoundPool` decodes into memory and a stereo pad is the one way to make
- * a bank of clicks expensive.
+ * This used to say the two platforms shared Ogg Vorbis, "the one lossy format
+ * Android's `SoundPool` and iOS's `AVAudioPlayer` both decode without a
+ * wrapper". The second half of that is false, and the app shipped mute on iOS
+ * because of it: **there is no Vorbis decoder in the iOS system libraries**, so
+ * `AVAudioPlayer` refused all fifteen samples and every cue fell back to
+ * nothing. Playing Vorbis on iOS means bundling libogg and libvorbis and
+ * feeding PCM to `AVAudioEngine` yourself.
+ *
+ * The trap is that **macOS decodes Vorbis fine**, so a `swift` snippet on a
+ * laptop loads these files and proves nothing about the device. Verify audio
+ * formats against iOS, not against the machine you are sitting at.
+ *
+ * So Android keeps Ogg, which `SoundPool` decodes and which is a tenth the
+ * size, and iOS gets WAV, which it is guaranteed to decode and which the
+ * generator already produces on the way to the encoder. Keep them short and
+ * keep them mono: `SoundPool` decodes into memory and a stereo pad is the one
+ * way to make a bank of clicks expensive.
  */
+/**
+ * The sample container this platform can actually decode.
+ *
+ * Not a cosmetic difference and not safe to unify: iOS has no Vorbis decoder,
+ * so an `ogg` here makes the app silent with nothing in the UI to say so. See
+ * [SoundBank] for the full reasoning.
+ */
+expect val SoundFileExtension: String
+
 object SoundBank {
 
     /** The folder both platforms look in, under whichever resource root they have. */
     const val Directory = "audio"
 
-    const val Extension = "ogg"
-
-    /** `merge` becomes `merge.ogg`. */
-    fun fileName(sound: Sound): String = "${sound.key}.$Extension"
+    /** `merge` becomes `merge.ogg` on Android and `merge.wav` on iOS. */
+    fun fileName(sound: Sound): String = "${sound.key}.$SoundFileExtension"
 
     /**
      * The playback rate that raises a sample by [pitchSteps] semitones.

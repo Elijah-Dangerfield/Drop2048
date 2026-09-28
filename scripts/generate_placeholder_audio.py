@@ -8,10 +8,12 @@ Vorbis encoder.
 
     ./scripts/generate_placeholder_audio.py
 
-Output is mono 44.1 kHz Ogg Vorbis, written to both places the engines look:
+Output is mono 44.1 kHz, written to both places the engines look, in the
+format each platform can actually decode (Ogg for Android, WAV for iOS,
+because iOS has no Vorbis decoder):
 
-    libraries/ui/src/androidMain/assets/audio/
-    apps/ios/iosApp/audio/
+    libraries/ui/src/androidMain/assets/audio/   *.ogg
+    apps/ios/iosApp/audio/                       *.wav
 
 The file stems come from `Sound.key`, read out of Cue.kt at run time, so a new
 entry in the enum fails this script loudly instead of shipping a silent cue.
@@ -43,10 +45,24 @@ CUE_KT = os.path.join(
     REPO,
     "libraries/ui/src/commonMain/kotlin/com/dangerfield/drop2048/libraries/ui/system/Cue.kt",
 )
-DESTINATIONS = (
-    os.path.join(REPO, "libraries/ui/src/androidMain/assets/audio"),
-    os.path.join(REPO, "apps/ios/iosApp/audio"),
-)
+# Two formats, not one, and the reason is not aesthetic.
+#
+# **iOS cannot decode Ogg Vorbis.** There is no Vorbis decoder in the iOS system
+# libraries, so `AVAudioPlayer` refuses every file in the bank and the game runs
+# silent with nothing on screen to say why. This file and `SoundBank` both used
+# to claim the two platforms shared a format; they do not, and the app shipped
+# mute on iOS because of it.
+#
+# macOS *can* decode Vorbis, so a `swift` snippet on a laptop loads these files
+# happily. Do not let that talk you back into one format.
+#
+# Android keeps Ogg: `SoundPool` decodes it, and it is a tenth the size.
+# iOS gets the uncompressed WAV that already exists a line above the encoder
+# call. AAC would be smaller, but it needs `afconvert`, which would make this
+# script macOS-only for no gain on a bank of clicks this small.
+ANDROID_AUDIO = os.path.join(REPO, "libraries/ui/src/androidMain/assets/audio")
+IOS_AUDIO = os.path.join(REPO, "apps/ios/iosApp/audio")
+DESTINATIONS = (ANDROID_AUDIO, IOS_AUDIO)
 
 # Ogg Vorbis quality. 4 keeps a 200ms blip near 3 KB, and SoundPool decodes the
 # whole bank into memory, so size is not free.
@@ -419,8 +435,8 @@ def main():
             ogg = os.path.join(scratch, f"{key}.ogg")
             write_wav(wav, samples)
             subprocess.run(command(wav, ogg), check=True, capture_output=True)
-            for directory in DESTINATIONS:
-                shutil.copyfile(ogg, os.path.join(directory, f"{key}.ogg"))
+            shutil.copyfile(ogg, os.path.join(ANDROID_AUDIO, f"{key}.ogg"))
+            shutil.copyfile(wav, os.path.join(IOS_AUDIO, f"{key}.wav"))
 
             size = os.path.getsize(ogg) / 1024
             duration = len(samples) / SAMPLE_RATE * 1000

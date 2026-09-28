@@ -79,11 +79,11 @@ private class BundledSoundPlayer : SoundPlayer {
     private fun urlFor(sound: Sound): NSURL? = Catching {
         NSBundle.mainBundle.URLForResource(
             name = sound.key,
-            withExtension = SoundBank.Extension,
+            withExtension = SoundFileExtension,
             subdirectory = SoundBank.Directory,
         ) ?: NSBundle.mainBundle.URLForResource(
             name = sound.key,
-            withExtension = SoundBank.Extension,
+            withExtension = SoundFileExtension,
         )
     }.getOrNull()
 
