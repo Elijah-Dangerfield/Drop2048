@@ -28,18 +28,22 @@ class ShakeDialogEntryPoint(
         dialog<ShakeDialogRoute> { backStackEntry, dialogState ->
             val route = backStackEntry.toRouteOrNull<ShakeDialogRoute>()
 
-            // Releases the handler's "a dialog is already up" latch.
+            // The handler's "a dialog is already up" flag is owned here, by the
+            // destination, rather than by the act of asking to navigate.
             //
-            // On dispose rather than in the callbacks below, because there are
-            // five ways out of here and only three of them are callbacks: the
-            // two CTAs, dismiss, the system back gesture, and a tap on the
-            // scrim. Wiring the three would have left the other two latched,
-            // which is a subtler version of the bug this fixes — the shake
-            // worked exactly once per process because nothing called
-            // `onDialogDismissed` at all.
+            // Set on enter, because a navigation the router drops (it refuses
+            // to move while a blocking error screen is up) must not suppress
+            // the gesture for a dialog that never appeared.
             //
-            // Leaving composition is the one event every route out shares.
+            // Cleared on dispose, because there are five ways out of here and
+            // only three are callbacks: the two CTAs, dismiss, the system back
+            // gesture and a tap on the scrim. Wiring the three would leave the
+            // other two latched, which is how this broke in the first place —
+            // nothing called `onDialogDismissed` at all and the shake worked
+            // exactly once per process. Leaving composition is the one event
+            // every route out shares.
             DisposableEffect(Unit) {
+                shakeHandler.onDialogShown()
                 onDispose { shakeHandler.onDialogDismissed() }
             }
 

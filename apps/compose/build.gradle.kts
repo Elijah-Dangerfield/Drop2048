@@ -288,6 +288,13 @@ sentry {
 kotlin {
 
     sourceSets {
+        commonTest.dependencies {
+            // `ShakeHandler` collects on Dispatchers.Main because it navigates,
+            // so testing it at all needs the main dispatcher swapped. That is
+            // what `CoroutineTest` exists for.
+            implementation(projects.libraries.flowroutines.testing)
+        }
+
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.splashscreen)
