@@ -79,6 +79,21 @@ Worth exercising specifically, because these have never run on a real device:
 the Pro purchase on iOS (brand new, StoreKit 2), ads on iOS, and Core Haptics,
 which compiles and links and has never once executed.
 
+**One of these is a release blocker rather than a nice-to-have.** On a physical
+iPhone, set Settings, Privacy & Security, Tracking to deny for Doublestack, then
+confirm a banner still loads. `PrivacyInfo.xcprivacy` now lists
+`googleads.g.doubleclick.net` and `pagead2.googlesyndication.com`, which it has
+to, because `NSPrivacyTracking = true` is invalid without at least one domain
+and Apple bars the build from review otherwise (ITMS-91064, hit on build
+202609252110).
+
+The catch is that iOS blocks listed domains when tracking is denied. If that
+enforcement is real, ads stop loading entirely for those users instead of
+falling back to non-personalised, and `legal/privacy.md` promises the opposite
+in as many words. Apple documents the blocking; developers report it not firing.
+Nobody can tell you which from a document, so check the device. Ads loading with
+tracking allowed and failing with it denied means the domain list is the cause.
+
 ### 2. Submit on both platforms · **you** · needs 1
 
 Merge the open release-please PR. That tags `v*`, which is what fires
