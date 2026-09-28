@@ -233,6 +233,11 @@ private fun BadgeTile(badge: Badge, onClick: () -> Unit) {
  * The design system's [Dialog], not a hand-rolled scrim, which is what buys the
  * entrance animation, the back-press handling and a scrim that covers the top
  * bar rather than stopping at its own sibling.
+ *
+ * [Dialog] draws a rounded card and nothing else: the inset is the caller's, the
+ * same way `BasicDialog` supplies its own `D800`. Without it a `fillMaxWidth`
+ * child runs to the card's edge and its corners fight the card's own, which is
+ * what the close button did here until 2026-09-28.
  */
 @Composable
 private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
@@ -240,7 +245,9 @@ private fun BadgeDetailDialog(badge: Badge, onDismiss: () -> Unit) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Dimension.D500),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimension.D800),
         ) {
             Text(text = badge.face(), typography = AppTheme.typography.Display.D1400)
             Text(
