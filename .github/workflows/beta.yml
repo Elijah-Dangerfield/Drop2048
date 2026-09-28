@@ -76,6 +76,19 @@ jobs:
       GRAFANA_OTLP_INSTANCE_ID: ${{ secrets.GRAFANA_OTLP_INSTANCE_ID }}
       GRAFANA_LOGS_WRITE_TOKEN: ${{ secrets.GRAFANA_LOGS_WRITE_TOKEN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      # A beta build's crashes land in Sentry like any other, so it needs its
+      # mappings uploaded or those stacks are unreadable.
+      #
+      # It is also the only place the token gets exercised before a release.
+      # Without these three, `autoUploadProguardMapping` in
+      # apps/compose/build.gradle.kts resolves false, because it keys off the
+      # variable being present. The upload silently does not happen, and a
+      # broken token survives every beta to fail the release job instead. That
+      # is exactly how a token rejected since 2026-09-16 went unnoticed until
+      # the release on 2026-09-25.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
 
     steps:
       - name: Checkout
