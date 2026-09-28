@@ -21,47 +21,61 @@
   advertising, and Advertising Data is a new entry. That is `data-safety.md`
   §7.2 item 4, applied.
 
-  ## `NSPrivacyTracking` is false, and the two tracking keys are not independent
+  ## The two tracking keys are a pair, and there is no comfortable setting
 
   This file used to pair `NSPrivacyTracking = true` with an empty
-  `NSPrivacyTrackingDomains`, on the reasoning below that the domains are
-  Google's to declare. The reasoning about domains is right. The assumption that
-  the two keys could be set separately is not.
+  `NSPrivacyTrackingDomains`. Build 202609252110 was barred from TestFlight
+  review for it with **ITMS-91064**. Apple's mail states the rule in the other
+  direction, "NSPrivacyTracking must be true if NSPrivacyTrackingDomains isn't
+  empty", which was already satisfied and makes the mail read like it cannot
+  possibly apply. The validator enforces the converse too: tracking true
+  requires at least one domain.
 
-  Build 202609252110 was rejected from TestFlight review with **ITMS-91064**.
-  Apple's message states the rule in the other direction, "NSPrivacyTracking
-  must be true if NSPrivacyTrackingDomains isn't empty", which is satisfied
-  here and makes the mail read like it cannot possibly apply. The validator
-  enforces the converse as well: tracking true requires at least one domain.
+  Read the next two sections before changing either key. Both alternatives to
+  what is here now were tried in reasoning and are worse.
 
-  That leaves exactly two configurations, and one of them is unshippable.
+  ## Why not `false`
 
-  List Google's ad domains and iOS **blocks** connections to them whenever ATT
-  is not granted. The SDK expects to handle that case itself by withholding the
-  IDFA and serving non-personalised ads, so listing the domains does not degrade
-  ads for users who decline, it stops them loading at all. In the EEA that is
-  most users, and `legal/privacy.md` promises the opposite in as many words.
+  Because it would be untrue, and untrue in the shape reviewers look for.
+  `NSPrivacyTracking` is a declaration, not a switch: setting it false disables
+  nothing. `Info.plist` still ships `NSUserTrackingUsageDescription`,
+  `IOSAdNetwork` still runs UMP then ATT then `MobileAds.start()`, and AdMob
+  still reads the IDFA when permission is granted. An ATT prompt inside an app
+  claiming it does not track is a documented rejection pattern, and an
+  inaccurate manifest is grounds for removal after approval, not just refusal
+  before it.
 
-  So: `false`. It is also the declaration that matches the code. Our own
-  requests go to the config endpoint, Grafana and Sentry, none of which is a
-  tracking domain under Apple's definition, and the aggregated report still
-  reflects the ad SDK because Apple merges every bundled manifest with this one.
+  ## Why these two domains, and what to watch
 
-  Checked against the resolved SDK rather than assumed: GoogleMobileAds 13.9.0
-  ships its own signed manifest at
-  `GoogleMobileAds.xcframework/*/GoogleMobileAds.framework/PrivacyInfo.xcprivacy`,
-  and that file declares **no** `NSPrivacyTrackingDomains` and no
-  `NSPrivacyTracking` key at all. Google's own position is that its SDK needs
-  neither, because it gates IDFA access on ATT itself.
+  There is no third option where ads degrade instead of breaking. Checked by
+  reading the resolved binary rather than guessing: `strings` on
+  `GoogleMobileAds.framework/GoogleMobileAds` (13.9.0) yields exactly
+  `googleads.g.doubleclick.net` (the ad request endpoint),
+  `pagead2.googlesyndication.com` (creative serving) and `imasdk.googleapis.com`
+  (the IMA video SDK, which this app does not use). Every domain the SDK touches
+  is on the delivery path. There is no tracking-only domain to list instead.
 
-  One wrinkle to be comfortable with rather than surprised by. Device ID and
-  Advertising Data below still carry `NSPrivacyCollectedDataTypeTracking = true`,
-  because that is what AdMob does with the IDFA once permission is granted, and
-  it is what the App Store nutrition label says. Apple validates the two
-  tracking keys against each other and does not cross-check them against the
-  per-type flags. If a reviewer ever asks, the answer is that the app-level key
-  describes this target's own code and the per-type flags describe the data the
-  app is responsible for disclosing, including the SDK's.
+  That matters because iOS **blocks** connections to anything listed here
+  whenever ATT is not granted. The fallback we actually want, personalised when
+  permitted and non-personalised otherwise, already exists and comes from the
+  ATT prompt plus the SDK. This list cannot add it and can only remove it.
+
+  Apple documents the blocking plainly. Whether it is enforced is less clear:
+  developers have listed a domain, denied ATT, and watched the request succeed
+  anyway (Apple forum thread 738723). So this is the honest declaration with a
+  known risk rather than a safe configuration.
+
+  **Verify it before promoting any build.** On a physical device with tracking
+  denied under Settings, Privacy & Security, Tracking, confirm a banner still
+  loads. If ads fail there and load with tracking allowed, this list is the
+  cause. `legal/privacy.md` promises ads keep serving when a user declines, so
+  that outcome is a release blocker, not a tuning problem.
+
+  ## One wrinkle
+
+  Device ID and Advertising Data below carry
+  `NSPrivacyCollectedDataTypeTracking = true`, which is consistent with the
+  app-level key being true and with the App Store nutrition label.
 
   ## The SDK half of the requirement is not ours
 
@@ -87,7 +101,13 @@
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>
-	<false/>
+	<true/>
+
+	<key>NSPrivacyTrackingDomains</key>
+	<array>
+		<string>googleads.g.doubleclick.net</string>
+		<string>pagead2.googlesyndication.com</string>
+	</array>
 
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
