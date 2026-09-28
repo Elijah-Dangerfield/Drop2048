@@ -8,6 +8,10 @@ import com.dangerfield.drop2048.libraries.ads.AdGate
 import com.dangerfield.drop2048.libraries.ads.AdPlacement
 import com.dangerfield.drop2048.libraries.ads.BannerAds
 import com.dangerfield.drop2048.libraries.ads.InMemoryRunActivity
+import com.dangerfield.drop2048.libraries.billing.Entitlements
+import com.dangerfield.drop2048.libraries.billing.PurchaseOutcome
+import com.dangerfield.drop2048.libraries.billing.RestoreOutcome
+import kotlinx.coroutines.flow.StateFlow
 import com.dangerfield.drop2048.libraries.ads.InterstitialGate
 import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.ads.RunActivity
@@ -89,6 +93,7 @@ internal class GameScenario private constructor(
     val paywall: FakePaywallCoordinator,
     val banners: FakeBannerAds,
     private val continuesPerRun: Int,
+    private val isPro: Boolean,
 ) {
     val cues = mutableListOf<Cue>()
     val effects = mutableListOf<GameEffect>()
@@ -121,6 +126,7 @@ internal class GameScenario private constructor(
             runActivity = runActivity,
             paywall = paywall,
             banners = banners,
+            entitlements = FakeEntitlements(isPro),
             continuesPerRun = RewardedContinuesPerRun(
                 object : AppConfigMap() {
                     override val map: Map<String, *> = mapOf(
@@ -328,6 +334,7 @@ internal class GameScenario private constructor(
             /** Whether `ads.enabled`, `ads.banner.enabled` and not-Pro all hold (D28). */
             banners: FakeBannerAds = FakeBannerAds(),
             /** `ads.rewarded.continuesPerRun`. SPEC 12's hard cap is 2. */
+            isPro: Boolean = false,
             continuesPerRun: Int = 2,
             body: GameScenario.() -> T,
         ): T {
@@ -360,6 +367,7 @@ internal class GameScenario private constructor(
                 paywall = paywall,
                 banners = banners,
                 continuesPerRun = continuesPerRun,
+                isPro = isPro,
             )
             scenario.launch(backgroundScope)
             if (pressPlay && scenario.state.phase == GamePhase.Ready) {
@@ -649,4 +657,19 @@ internal class FakeBannerAds(
     override fun noteFilled() {
         fills++
     }
+}
+
+
+/**
+ * A player who has or has not bought Pro, fixed for the life of the scenario.
+ *
+ * Fixed rather than mutable because the one thing entitlement changes here is
+ * whether the continue costs a video, and that is read once when the offer is
+ * built. A test that needs both answers wants two scenarios, not a flip
+ * mid-run.
+ */
+internal class FakeEntitlements(pro: Boolean) : Entitlements {
+    override val isPro: StateFlow<Boolean> = MutableStateFlow(pro)
+    override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
+    override suspend fun restore(): RestoreOutcome = RestoreOutcome.Unavailable
 }

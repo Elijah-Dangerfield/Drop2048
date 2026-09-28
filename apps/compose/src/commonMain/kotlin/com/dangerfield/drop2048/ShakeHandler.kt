@@ -22,6 +22,16 @@ class ShakeHandler(
     private val router: Router,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /**
+     * Suppresses a second dialog while one is up, and **is only correct because
+     * `ShakeDialogEntryPoint` clears it when the dialog leaves composition.**
+     *
+     * That is a real coupling, not a detail: this latched to true on the first
+     * shake and nothing ever called [onDialogDismissed], so the gesture worked
+     * exactly once per process. If the shake stops working after one use again,
+     * this flag is the first place to look.
+     */
     private var isShowingDialog = false
     // Process-local flavor counter for the shake easter-egg copy.
     private var shakeCount = 0

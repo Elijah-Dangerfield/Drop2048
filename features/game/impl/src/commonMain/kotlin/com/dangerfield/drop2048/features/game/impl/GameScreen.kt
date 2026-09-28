@@ -86,6 +86,7 @@ import com.dangerfield.drop2048.system.typography.FredokaFontFamily
 import com.dangerfield.drop2048.system.typography.NunitoFontFamily
 import drop2048.libraries.resources.generated.resources.Res
 import drop2048.libraries.resources.generated.resources.continue_body
+import drop2048.libraries.resources.generated.resources.continue_body_pro
 import drop2048.libraries.resources.generated.resources.continue_body_second
 import drop2048.libraries.resources.generated.resources.continue_countdown_description
 import drop2048.libraries.resources.generated.resources.continue_decline
@@ -93,6 +94,7 @@ import drop2048.libraries.resources.generated.resources.continue_from_results
 import drop2048.libraries.resources.generated.resources.continue_pro
 import drop2048.libraries.resources.generated.resources.continue_title
 import drop2048.libraries.resources.generated.resources.continue_watch
+import drop2048.libraries.resources.generated.resources.continue_watch_pro
 import drop2048.libraries.resources.generated.resources.game_best_score
 import drop2048.libraries.resources.generated.resources.game_biggest
 import drop2048.libraries.resources.generated.resources.game_board
@@ -841,12 +843,24 @@ private fun ContinueOverlay(
             OverlayHeadline(stringResource(Res.string.continue_title))
             OverlayBody(
                 stringResource(
-                    if (state.continueAvailable) Res.string.continue_body_second
-                    else Res.string.continue_body,
+                    when {
+                        // Pro first: a Pro player is never offered a second save
+                        // (the cap is one for everybody), so this ordering cannot
+                        // hide the second-offer copy from anyone entitled to it.
+                        state.continueIsFree -> Res.string.continue_body_pro
+                        state.continueAvailable -> Res.string.continue_body_second
+                        else -> Res.string.continue_body
+                    },
                 ),
             )
             GamePrimaryButton(
-                label = stringResource(Res.string.continue_watch),
+                // Never promise an ad that is not coming. Pro's whole benefit at
+                // this placement is that the save is free, and a button still
+                // saying "watch an ad" makes the purchase feel inert.
+                label = stringResource(
+                    if (state.continueIsFree) Res.string.continue_watch_pro
+                    else Res.string.continue_watch,
+                ),
                 onClick = { onAction(GameAction.ContinueAccept) },
             )
             OverlayOption(stringResource(Res.string.continue_decline)) {

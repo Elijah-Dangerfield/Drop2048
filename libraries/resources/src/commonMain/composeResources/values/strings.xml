@@ -168,7 +168,7 @@
     <string name="settings_pro_active">Active</string>
     <string name="settings_pro_inactive">Not active</string>
     <string name="settings_pro_upgrade">Go Pro</string>
-    <string name="settings_pro_hint">No ads, every palette, two continues instead of one.</string>
+    <string name="settings_pro_hint">No interstitials, and your continue without watching an ad.</string>
     <string name="settings_restore">Restore purchases</string>
     <string name="settings_restore_working">Asking the store…</string>
     <string name="settings_restore_restored">Pro restored. Thank you.</string>
@@ -377,10 +377,8 @@
     <string name="paywall_subtitle">One purchase. Yours forever.</string>
     <string name="paywall_perk_ads">No interstitial ads, ever</string>
     <string name="paywall_perk_ads_detail">Rewarded videos stay, if you want them. Nothing interrupts a run.</string>
-    <string name="paywall_perk_palettes">Every block palette</string>
-    <string name="paywall_perk_palettes_detail">All five, including the three built for colour vision.</string>
-    <string name="paywall_perk_continues">Two continues a run</string>
-    <string name="paywall_perk_continues_detail">Instead of one, after you stack out.</string>
+    <string name="paywall_perk_continues">Your continue, without the ad</string>
+    <string name="paywall_perk_continues_detail">Everyone gets one save a run. Yours costs you nothing to take.</string>
     <string name="paywall_buy">Go Pro</string>
     <string name="paywall_buy_priced">Go Pro · %1$s</string>
     <string name="paywall_restore">Restore purchase</string>
@@ -398,6 +396,8 @@
     <string name="continue_body">Watch an ad: the top three rows clear, the level drops by one, your score stays.</string>
     <string name="continue_body_second">One more save, and it is the last. Same terms: three rows, a level, your score kept.</string>
     <string name="continue_watch">Watch an ad, keep this run</string>
+    <string name="continue_watch_pro">Keep this run</string>
+    <string name="continue_body_pro">Your Pro save: the top three rows clear, the level drops by one, your score stays.</string>
     <string name="continue_decline">No thanks</string>
     <string name="continue_pro">Or see Pro</string>
     <string name="continue_countdown">%1$d</string>

@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavGraphBuilder
 import com.dangerfield.drop2048.features.profile.BugReportRoute
 import com.dangerfield.drop2048.libraries.core.BuildInfo
@@ -20,11 +21,27 @@ import software.amazon.lastmile.kotlin.inject.anvil.SingleIn
 @Inject
 class ShakeDialogEntryPoint(
     private val networkInspector: NetworkInspector,
+    private val shakeHandler: ShakeHandler,
 ) : FeatureEntryPoint {
 
     override fun NavGraphBuilder.buildNavGraph(router: Router) {
         dialog<ShakeDialogRoute> { backStackEntry, dialogState ->
             val route = backStackEntry.toRouteOrNull<ShakeDialogRoute>()
+
+            // Releases the handler's "a dialog is already up" latch.
+            //
+            // On dispose rather than in the callbacks below, because there are
+            // five ways out of here and only three of them are callbacks: the
+            // two CTAs, dismiss, the system back gesture, and a tap on the
+            // scrim. Wiring the three would have left the other two latched,
+            // which is a subtler version of the bug this fixes — the shake
+            // worked exactly once per process because nothing called
+            // `onDialogDismissed` at all.
+            //
+            // Leaving composition is the one event every route out shares.
+            DisposableEffect(Unit) {
+                onDispose { shakeHandler.onDialogDismissed() }
+            }
 
             ShakeDialog(
                 state = dialogState,

@@ -45,8 +45,6 @@ import drop2048.libraries.resources.generated.resources.paywall_perk_ads
 import drop2048.libraries.resources.generated.resources.paywall_perk_ads_detail
 import drop2048.libraries.resources.generated.resources.paywall_perk_continues
 import drop2048.libraries.resources.generated.resources.paywall_perk_continues_detail
-import drop2048.libraries.resources.generated.resources.paywall_perk_palettes
-import drop2048.libraries.resources.generated.resources.paywall_perk_palettes_detail
 import drop2048.libraries.resources.generated.resources.paywall_restore
 import drop2048.libraries.resources.generated.resources.paywall_subtitle
 import drop2048.libraries.resources.generated.resources.paywall_title
@@ -218,16 +216,28 @@ private fun Buy(state: PaywallState, onAction: (PaywallAction) -> Unit) {
     )
 }
 
+/**
+ * Every line here has to be something a buyer actually gets, and one of them was
+ * not.
+ *
+ * The palettes perk is gone. It claimed "every block palette, all five,
+ * including the three built for colour vision" while all five shipped to
+ * everybody, so it was selling something free. The obvious repair was to gate
+ * them, and that is worse: `BlockPaletteChoice` is Default plus Deuteranopia,
+ * Protanopia, Tritanopia and HighContrast, so **every palette a buyer could be
+ * charged for is an accessibility palette**. Charging a colour-blind player for
+ * a readable board is not a perk.
+ *
+ * If Pro is to sell palettes, the palettes have to be drawn first, and they have
+ * to be cosmetic. Until then the sheet says two true things instead of three
+ * things where one is a lie.
+ */
 @Composable
 private fun Perks() {
     GamePanel(spacing = Dimension.D600) {
         Perk(
             title = stringResource(Res.string.paywall_perk_ads),
             detail = stringResource(Res.string.paywall_perk_ads_detail),
-        )
-        Perk(
-            title = stringResource(Res.string.paywall_perk_palettes),
-            detail = stringResource(Res.string.paywall_perk_palettes_detail),
         )
         Perk(
             title = stringResource(Res.string.paywall_perk_continues),

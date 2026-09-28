@@ -23,6 +23,7 @@ import com.dangerfield.drop2048.libraries.ads.BannerAds
 import com.dangerfield.drop2048.libraries.ads.InterstitialGate
 import com.dangerfield.drop2048.libraries.ads.RewardOutcome
 import com.dangerfield.drop2048.libraries.ads.RunActivity
+import com.dangerfield.drop2048.libraries.billing.Entitlements
 import com.dangerfield.drop2048.libraries.billing.PaywallCoordinator
 import com.dangerfield.drop2048.libraries.billing.PaywallTrigger
 import com.dangerfield.drop2048.libraries.core.Catching
@@ -121,6 +122,7 @@ class GameViewModel(
     private val paywall: PaywallCoordinator,
     private val banners: BannerAds,
     private val continuesPerRun: RewardedContinuesPerRun,
+    private val entitlements: Entitlements,
 ) : SEAViewModel<GameUiState, GameEffect, GameAction>(initialStateArg = GameUiState()) {
 
     private val logger = KLog.withTag("Game")
@@ -1249,6 +1251,7 @@ class GameViewModel(
                 // opens nothing is worse than none, and the two rules that
                 // would refuse it are the coordinator's.
                 proOnContinue = paywall.mayOffer(PaywallTrigger.Continue),
+                continueIsFree = entitlements.isPro.value,
             )
         }
         startCountdown()
@@ -1285,6 +1288,18 @@ class GameViewModel(
     private suspend fun GameAction.continueAccept() {
         if (state.continueBusy) return
         countdownJob?.cancel()
+
+        // What Pro buys at this placement, and the whole of it: the same single
+        // save everybody gets, without the video. The cap is deliberately not
+        // raised for Pro — see `RewardedContinuesPerRun` — so this is the only
+        // branch, and there is no rewarded call to note against SPEC 12's
+        // 45-second rule because no ad was shown.
+        if (entitlements.isPro.value) {
+            logger.logEvent("ads.continue_result", "outcome" to "Pro", "continues_used" to continuesUsed)
+            grantContinue()
+            return
+        }
+
         updateState { it.copy(continueBusy = true) }
 
         val outcome = Catching { adGate.showRewarded(AdPlacement.ContinueRun) }
@@ -1973,6 +1988,17 @@ data class GameUiState(
      * `pro.upsell.enabled` off, so the control is absent rather than dead.
      */
     val proOnContinue: Boolean = false,
+
+    /**
+     * Whether taking the save costs a video, which is the one thing Pro changes
+     * at this placement.
+     *
+     * The sheet has to say so before the tap, not after. "Watch an ad, keep this
+     * run" on a screen where no ad is coming is a small lie that makes the
+     * purchase feel like it did nothing, and it is the same class of mistake as
+     * the palette perk that sold what everybody already had.
+     */
+    val continueIsFree: Boolean = false,
 
     /**
      * Whether a banner **may be asked for**: ads on, `ads.banner.enabled` on,

@@ -113,15 +113,26 @@ class BannerEnabled(appConfigMap: AppConfigMap) : FlagConfigValue(appConfigMap) 
     override val default = true
 }
 
-/** SPEC 12's Continue placement: 1 free per run, a 2nd at higher friction, hard cap 2. */
+/**
+ * One save per run, for everybody.
+ *
+ * Was 2, which SPEC 12 spent as "1 free, a 2nd at higher friction". The owner's
+ * ruling of 2026-09-28 replaces that: a run gets exactly one continue, and what
+ * Pro buys is not *more* of them but not having to watch a video for the one
+ * everybody gets.
+ *
+ * The cap is the point rather than the price. Chaining saves turns a leaderboard
+ * score into a measure of patience with ad breaks, and the board this game is
+ * about stops being the thing being scored.
+ */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, boundType = QaConfigValue::class, multibinding = true)
 class RewardedContinuesPerRun(appConfigMap: AppConfigMap) : IntConfigValue(appConfigMap) {
     override val name = "Rewarded cap: continues per run"
-    override val description = "Hard cap on rewarded continues in one run. SPEC 12: 2."
+    override val description = "Hard cap on continues in one run. One save per run, Pro or not."
     override val path = "ads.rewarded.continuesPerRun"
-    override val default = 2
+    override val default = 1
 }
 
 @Inject

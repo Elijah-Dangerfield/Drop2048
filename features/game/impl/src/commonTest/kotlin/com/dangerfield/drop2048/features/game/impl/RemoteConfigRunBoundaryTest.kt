@@ -135,6 +135,7 @@ private fun startedRun(config: AppConfigMap): GameViewModel {
         runActivity = InMemoryRunActivity(),
         paywall = FakePaywallCoordinator(),
         banners = FakeBannerAds(),
+        entitlements = FakeEntitlements(pro = false),
         continuesPerRun = RewardedContinuesPerRun(config),
     )
     if (viewModel.state.phase == GamePhase.Ready) viewModel.takeAction(GameAction.Start)
