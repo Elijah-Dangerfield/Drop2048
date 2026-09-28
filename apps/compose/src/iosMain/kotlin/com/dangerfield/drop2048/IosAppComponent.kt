@@ -1,6 +1,7 @@
 package com.dangerfield.drop2048
 
 import com.dangerfield.drop2048.libraries.ads.AdNetwork
+import com.dangerfield.drop2048.libraries.ads.IosBannerViewFactory
 import com.dangerfield.drop2048.libraries.billing.StoreBilling
 import com.dangerfield.drop2048.libraries.drop2048.PermissionManager
 import com.dangerfield.drop2048.libraries.review.ReviewLauncher
@@ -16,6 +17,7 @@ abstract class IosAppComponent(
     private val reviewLauncher: ReviewLauncher,
     private val adNetwork: AdNetwork,
     private val storeBilling: StoreBilling,
+    private val bannerViewFactory: IosBannerViewFactory,
 ) : AppComponent {
 
     @Provides
@@ -41,6 +43,16 @@ abstract class IosAppComponent(
      */
     @Provides
     fun provideStoreBilling(): StoreBilling = storeBilling
+
+    /**
+     * The Swift `IOSBannerViewFactory`, so the graph can build
+     * [IosBannerSurface], which is what actually replaces `NoBannerSurface`.
+     *
+     * Provided rather than contributed for the same reason [provideAdNetwork]
+     * is: it comes from Swift and the graph cannot construct it.
+     */
+    @Provides
+    fun provideBannerViewFactory(): IosBannerViewFactory = bannerViewFactory
 }
 
 
@@ -50,4 +62,5 @@ expect fun create(
     reviewLauncher: ReviewLauncher,
     adNetwork: AdNetwork,
     storeBilling: StoreBilling,
+    bannerViewFactory: IosBannerViewFactory,
 ): IosAppComponent

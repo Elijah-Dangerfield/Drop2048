@@ -9,6 +9,7 @@ struct iOSApp: App {
     let reviewLauncher = IOSReviewLauncher()
     let adNetwork = IOSAdNetwork()
     let storeBilling = IOSStoreBilling()
+    let bannerViewFactory = IOSBannerViewFactory()
     private let iOSAppComponent: IosAppComponent
 
     init() {
@@ -16,7 +17,8 @@ struct iOSApp: App {
             permissionManager: permissionManager,
             reviewLauncher: reviewLauncher,
             adNetwork: adNetwork,
-            storeBilling: storeBilling
+            storeBilling: storeBilling,
+            bannerViewFactory: bannerViewFactory
         )
         iOSAppComponent.telemetry.initialize()
         // Construct every @AutoInit singleton up front — resolving the set is
