@@ -9,10 +9,15 @@
 
   ## Two things about this file before anything else
 
-  **It is not in the target yet.** A file on disk does nothing, Xcode has to add
-  it to the app target's Copy Bundle Resources phase, and nothing outside Xcode
-  can do that. Until an owner opens the project and adds it, this file ships
-  nowhere. That is on `docs/store/release-checklist.md`.
+  **It ships.** This used to say the opposite, that a file on disk does nothing
+  until an owner opens Xcode and adds it to Copy Bundle Resources. That was
+  wrong, and it was wrong in four documents at once. The target uses a
+  `PBXFileSystemSynchronizedRootGroup`, which pulls the directory in wholesale,
+  so no membership entry is needed or possible.
+
+  Settled beyond argument on 2026-09-25, when Apple read this file and barred
+  build 202609252110 over what it said (ITMS-91064, below). A file that shipped
+  nowhere could not have been rejected.
 
   **The ad SDK landed on 2026-09-21 and this file has been updated for it.**
   GoogleMobileAds 13.9.0 is a package dependency, `GADApplicationIdentifier` and
