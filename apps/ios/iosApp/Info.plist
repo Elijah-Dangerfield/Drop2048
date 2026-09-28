@@ -275,5 +275,23 @@
 			</array>
 		</dict>
 	</array>
+
+	<!--
+	  Answers App Store Connect's "App Encryption Documentation" prompt, which
+	  otherwise blocks every single build until someone clicks through it.
+
+	  False is a claim, not a formality: this app implements no encryption of
+	  its own. The only CacheEncryption is NoEncryption, which returns its
+	  input unchanged, and none of sentry-cocoa, google-mobile-ads or
+	  google-user-messaging-platform ships its own TLS. The HTTPS the app does
+	  speak is the system's, which is exempt.
+
+	  **Revisit this if that stops being true.** Encrypting the local cache,
+	  or linking anything that carries its own crypto rather than calling
+	  Apple's, makes this key a false declaration on an export form, and
+	  nothing in the build will tell you. See docs/store/export-compliance.md.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
