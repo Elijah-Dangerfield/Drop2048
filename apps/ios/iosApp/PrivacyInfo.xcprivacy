@@ -17,27 +17,51 @@
   **The ad SDK landed on 2026-09-21 and this file has been updated for it.**
   GoogleMobileAds 13.9.0 is a package dependency, `GADApplicationIdentifier` and
   `NSUserTrackingUsageDescription` are in `Info.plist`, and `IOSAdNetwork` runs
-  UMP then ATT then `MobileAds.start()`. So `NSPrivacyTracking` is now `true`,
-  Device ID is tracking and third-party advertising, and Advertising Data is a
-  new entry. That is `data-safety.md` §7.2 item 4, applied.
+  UMP then ATT then `MobileAds.start()`. Device ID is tracking and third-party
+  advertising, and Advertising Data is a new entry. That is `data-safety.md`
+  §7.2 item 4, applied.
 
-  ## Why `NSPrivacyTrackingDomains` is still empty
+  ## `NSPrivacyTracking` is false, and the two tracking keys are not independent
 
-  Not an oversight, and not the same question as `NSPrivacyTracking`.
+  This file used to pair `NSPrivacyTracking = true` with an empty
+  `NSPrivacyTrackingDomains`, on the reasoning below that the domains are
+  Google's to declare. The reasoning about domains is right. The assumption that
+  the two keys could be set separately is not.
+
+  Build 202609252110 was rejected from TestFlight review with **ITMS-91064**.
+  Apple's message states the rule in the other direction, "NSPrivacyTracking
+  must be true if NSPrivacyTrackingDomains isn't empty", which is satisfied
+  here and makes the mail read like it cannot possibly apply. The validator
+  enforces the converse as well: tracking true requires at least one domain.
+
+  That leaves exactly two configurations, and one of them is unshippable.
+
+  List Google's ad domains and iOS **blocks** connections to them whenever ATT
+  is not granted. The SDK expects to handle that case itself by withholding the
+  IDFA and serving non-personalised ads, so listing the domains does not degrade
+  ads for users who decline, it stops them loading at all. In the EEA that is
+  most users, and `legal/privacy.md` promises the opposite in as many words.
+
+  So: `false`. It is also the declaration that matches the code. Our own
+  requests go to the config endpoint, Grafana and Sentry, none of which is a
+  tracking domain under Apple's definition, and the aggregated report still
+  reflects the ad SDK because Apple merges every bundled manifest with this one.
 
   Checked against the resolved SDK rather than assumed: GoogleMobileAds 13.9.0
   ships its own signed manifest at
   `GoogleMobileAds.xcframework/*/GoogleMobileAds.framework/PrivacyInfo.xcprivacy`,
   and that file declares **no** `NSPrivacyTrackingDomains` and no
-  `NSPrivacyTracking` key at all. Apple aggregates the app manifest with every
-  bundled SDK manifest, so domains Google connects to are Google's to declare.
+  `NSPrivacyTracking` key at all. Google's own position is that its SDK needs
+  neither, because it gates IDFA access on ATT itself.
 
-  It also matters functionally. iOS **blocks** connections to domains listed
-  here whenever ATT is not granted. Google's SDK expects to handle that case
-  itself by withholding the IDFA and serving non-personalised ads, so listing
-  their domains here would break ads for every user who declines rather than
-  degrading them. Our own code connects to the config endpoint, Grafana and
-  Sentry, none of which is a tracking domain under Apple's definition.
+  One wrinkle to be comfortable with rather than surprised by. Device ID and
+  Advertising Data below still carry `NSPrivacyCollectedDataTypeTracking = true`,
+  because that is what AdMob does with the IDFA once permission is granted, and
+  it is what the App Store nutrition label says. Apple validates the two
+  tracking keys against each other and does not cross-check them against the
+  per-type flags. If a reviewer ever asks, the answer is that the app-level key
+  describes this target's own code and the per-type flags describe the data the
+  app is responsible for disclosing, including the SDK's.
 
   ## The SDK half of the requirement is not ours
 
@@ -63,10 +87,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSPrivacyTracking</key>
-	<true/>
-
-	<key>NSPrivacyTrackingDomains</key>
-	<array/>
+	<false/>
 
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
