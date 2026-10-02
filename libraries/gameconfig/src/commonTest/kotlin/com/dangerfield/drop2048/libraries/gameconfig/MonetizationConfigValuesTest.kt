@@ -24,7 +24,9 @@ class MonetizationConfigValuesTest {
         assertEquals(180, InterstitialCooldownSeconds(map)())
         assertEquals(45, InterstitialRewardedGapSeconds(map)())
         assertEquals(3, InterstitialSuppressDaysSinceInstall(map)())
-        assertEquals(2, RewardedContinuesPerRun(map)())
+        // One save a run since 2026-10-02, not SPEC 12's two. What Pro buys is
+        // that the one is free, rather than a second one.
+        assertEquals(1, RewardedContinuesPerRun(map)())
         assertTrue(ProUpsellEnabled(map)())
     }
 
@@ -68,6 +70,6 @@ class MonetizationConfigValuesTest {
         )
 
         assertEquals(180, InterstitialCooldownSeconds(map)())
-        assertEquals(2, RewardedContinuesPerRun(map)())
+        assertEquals(1, RewardedContinuesPerRun(map)())
     }
 }
