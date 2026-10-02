@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.3.0...v0.3.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **ios:** do not ask for a phased release on a first version ([4efc721](https://github.com/Elijah-Dangerfield/Drop2048/commit/4efc721079b21f1b7ee85004f90ffd8dc15dd96a))
+
 ## [0.3.0](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.2.0...v0.3.0) (2026-10-02)
 
 
