@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.2.0...v0.3.0) (2026-10-02)
+
+
+### Features
+
+* **ads:** give iOS a banner, which it has never had ([1472ad0](https://github.com/Elijah-Dangerfield/Drop2048/commit/1472ad0f13523def0151d43562c0c5e09ec7797e))
+* **game:** banner under the arrows, and draw the arrows instead of typing them ([272af7b](https://github.com/Elijah-Dangerfield/Drop2048/commit/272af7b5c1f5095a042e92ae5e3d2a631514c416))
+* **pro:** one save a run for everyone, and Pro skips the video ([30a888c](https://github.com/Elijah-Dangerfield/Drop2048/commit/30a888c4990c73f3a6343dd19a463f6cd5a9ff41))
+
+
+### Bug Fixes
+
+* **achievements:** inset the badge dialog so its button stops touching the card ([66dbf24](https://github.com/Elijah-Dangerfield/Drop2048/commit/66dbf24d370684732580d4b5b33aa7be31f9ca00))
+* **ads:** the iOS banner needs viewinterop, not the legacy interop package ([a1b04ef](https://github.com/Elijah-Dangerfield/Drop2048/commit/a1b04efaebbfa71a90f6e48113cb51858bf18bff))
+* **ios:** answer the export compliance question in the plist ([21fcaf9](https://github.com/Elijah-Dangerfield/Drop2048/commit/21fcaf9b205337271e02b2d9a38343f613a89ea1))
+* **ios:** declare tracking true with the SDK's real ad domains ([70aac67](https://github.com/Elijah-Dangerfield/Drop2048/commit/70aac6708c5654476bd7fbc95e30700d8ff78b3a))
+* **ios:** set NSPrivacyTracking false, the two tracking keys are paired ([93860eb](https://github.com/Elijah-Dangerfield/Drop2048/commit/93860eb5f2732d3ff598cb5b03d3829c8edcccc7))
+* **ios:** upload the dSYMs that actually exist, and fail when none do ([aeebade](https://github.com/Elijah-Dangerfield/Drop2048/commit/aeebadeacde7ff0a1dcd8a53318228e6c06c3b0d))
+* **shake:** take Sodogku's handler, which fixes three bugs not one ([cdafd9e](https://github.com/Elijah-Dangerfield/Drop2048/commit/cdafd9eb85fb90252f421a8f3c6991ad3d766968))
+* **sound:** ship WAV to iOS, which cannot decode Ogg Vorbis ([35f1e16](https://github.com/Elijah-Dangerfield/Drop2048/commit/35f1e166e6a596bdab5915248148f63dc53280a0))
+
 ## [0.2.0](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.1.0...v0.2.0) (2026-09-25)
 
 
