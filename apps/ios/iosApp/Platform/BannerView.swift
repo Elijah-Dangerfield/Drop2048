@@ -2,27 +2,19 @@
 //  BannerView.swift
 //  iosApp
 //
-//  The iOS banner, which until 2026-09-28 did not exist.
+//  The iOS banner. Until 2026-09-28 iOS had none at all: `NoBannerSurface` was
+//  bound there and drew nothing, so the format the shared code calls "the
+//  most-seen advertising the app has" was absent on one of two platforms with
+//  no error and nothing in telemetry.
 //
-//  `NoBannerSurface` was bound on iOS and drew nothing, so the format the
-//  shared code itself calls "the most-seen advertising the app has" was absent
-//  on one of two platforms, with no error and nothing in telemetry. A tester who
-//  allowed tracking and waited for a banner waited forever, and the only way to
-//  find out was to read `BannerAds.kt` and notice the KDoc said so.
+//  This file only builds a view and reports what happened to it. Every policy
+//  question above it — whether a banner is allowed, whether Pro removes it,
+//  whether the arrow row already owns the strip — is answered in shared Kotlin.
+//  The zero-height contract is enforced by `IosBannerSurface`, which only puts
+//  the view in the layout once a fill arrives with a height.
 //
-//  This file only builds a view and says when it filled. Every policy question
-//  above it — whether a banner is allowed at all, whether Pro removes it,
-//  whether the arrow row already owns the strip — is answered in shared Kotlin
-//  by `RealBannerAds` and `GameScreen`. The zero-height contract is enforced by
-//  `IosBannerSurface`, which only puts the view in the layout after `onFilled`.
-//
-//  The unit id comes from `AdUnits.kt`, the single file in the codebase allowed
-//  to carry one, so a QA build cannot request live inventory. Do not answer a
-//  resolution failure by hardcoding one here.
-//
-//  `#if canImport(GoogleMobileAds)` is kept for the same reason `AdNetwork.swift`
-//  keeps it: a missing SDK degrades to "no banner ever", which is a state the
-//  shared Kotlin already draws correctly. The `#else` should never fire.
+//  The unit id comes from `AdUnits.kt`, the only file allowed to carry one, so
+//  a QA build cannot request live inventory. Do not hardcode one here.
 //
 import ComposeApp
 import Foundation
@@ -34,40 +26,40 @@ import GoogleMobileAds
 
 class IOSBannerViewFactory: NSObject, IosBannerViewFactory {
 
-    /// Kept so the delegate is not deallocated while its banner is alive.
+    /// Keeps each banner's delegate alive for as long as the banner is.
     ///
-    /// `BannerView.delegate` is weak, which is correct for a view controller
-    /// that owns its banner and wrong here: nothing else holds this delegate,
-    /// so without the map it would be released at the end of `makeBanner` and
-    /// the fill callback would silently never arrive. The banner would load,
-    /// and the strip would stay collapsed forever.
+    /// `BannerView.delegate` is weak, which is right for a view controller that
+    /// owns its banner and wrong here, because nothing else holds it. Without
+    /// this map the delegate is released at the end of `makeBanner` and no
+    /// callback ever arrives: the ad loads, Kotlin is never told, and the strip
+    /// stays collapsed looking exactly like a no-fill.
     private var delegates: [ObjectIdentifier: AnyObject] = [:]
 
-    func makeBanner(
-        widthPoints: Double,
-        onFilled: @escaping (KotlinBoolean) -> Void
-    ) -> UIView? {
+    func makeBanner(widthPoints: Double, listener: IosBannerListener) -> UIView? {
         #if canImport(GoogleMobileAds)
         let size = currentOrientationAnchoredAdaptiveBanner(width: CGFloat(widthPoints))
         let banner = BannerView(adSize: size)
         banner.adUnitID = AdUnits.shared.ios(format: .banner)
 
-        // The view controller that *contains* the banner, not the top of the
+        // The controller that *contains* the banner, not the top of the
         // presentation stack. A banner uses this to present its landing page on
-        // a tap; handing it a sheet that is currently up would present from a
-        // controller that may be gone by the time anyone taps.
+        // a tap, and a sheet that happens to be up may be gone by then.
         banner.rootViewController = Self.hostViewController()
 
-        let listener = BannerFillListener { [weak self] filled, view in
-            onFilled(KotlinBoolean(bool: filled))
-            if !filled, let self { self.delegates[ObjectIdentifier(view)] = nil }
-        }
-        delegates[ObjectIdentifier(banner)] = listener
-        banner.delegate = listener
+        let fillListener = BannerFillListener(
+            onFilled: { height in listener.onFilled(heightPoints: Double(height)) },
+            onFailed: { reason in listener.onFailed(reason: reason) }
+        )
+        delegates[ObjectIdentifier(banner)] = fillListener
+        banner.delegate = fillListener
 
         banner.load(Request())
         return banner
         #else
+        // The SDK is not in the binary. Reported rather than returned silently,
+        // because this is a build problem and every other failure is a load
+        // that did not fill.
+        listener.onFailed(reason: "sdk_not_linked")
         return nil
         #endif
     }
@@ -86,25 +78,35 @@ class IOSBannerViewFactory: NSObject, IosBannerViewFactory {
 }
 
 #if canImport(GoogleMobileAds)
-/// Turns the SDK's two delegate callbacks into the one boolean Kotlin wants.
+/// Turns the SDK's delegate callbacks into the two Kotlin wants.
 ///
-/// A failure reports `false` rather than staying silent, because the shared
-/// surface uses that to collapse the strip and hand the space back to the
-/// board. Silence would leave a gap sized for an ad that is not coming.
+/// The reason travels with the failure because "no banner appeared" is the same
+/// picture whether consent was refused, the unit id is wrong, or the network
+/// had no inventory. It is logged as `ads.banner_failed`, which is the only way
+/// to tell those apart once the app is on someone else's phone.
 private class BannerFillListener: NSObject, BannerViewDelegate {
 
-    private let report: (Bool, UIView) -> Void
+    private let onFilled: (CGFloat) -> Void
+    private let onFailed: (String) -> Void
 
-    init(report: @escaping (Bool, UIView) -> Void) {
-        self.report = report
+    init(onFilled: @escaping (CGFloat) -> Void, onFailed: @escaping (String) -> Void) {
+        self.onFilled = onFilled
+        self.onFailed = onFailed
     }
 
     func bannerViewDidReceiveAd(_ bannerView: BannerView) {
-        report(true, bannerView)
+        // The view's own frame after a load, falling back to the requested ad
+        // size. An adaptive banner is told a width and chooses its height.
+        let height = bannerView.frame.height > 0
+            ? bannerView.frame.height
+            : bannerView.adSize.size.height
+        onFilled(height)
     }
 
     func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
-        report(false, bannerView)
+        // The SDK's numeric code is the stable part. The message is localised
+        // and changes between versions, so it is not what telemetry groups on.
+        onFailed("load_failed_\((error as NSError).code)")
     }
 }
 #endif

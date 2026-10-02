@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalObjCName::class)
+
 package com.dangerfield.drop2048.libraries.ads
 
+import kotlin.experimental.ExperimentalObjCName
+import kotlin.native.ObjCName
 import platform.UIKit.UIView
 
 /**
@@ -12,9 +16,9 @@ import platform.UIKit.UIView
  * Kotlin binding for an SDK Google changes on their own schedule.
  *
  * Until 2026-09-28 there was no iOS banner at all. `NoBannerSurface` was bound
- * there and drew nothing, so the format that the code itself calls "the
- * most-seen advertising the app has" was absent on one of two platforms with no
- * error anywhere, and a tester who allowed tracking still saw nothing.
+ * there and drew nothing, so the format the code itself calls "the most-seen
+ * advertising the app has" was absent on one of two platforms with no error
+ * anywhere.
  *
  * ### Why the factory returns the view rather than drawing it
  *
@@ -24,6 +28,7 @@ import platform.UIKit.UIView
  * the layout, which means Swift hands back a view and says when it filled, and
  * Kotlin does the rest.
  */
+@ObjCName("IosBannerViewFactory", exact = true)
 interface IosBannerViewFactory {
 
     /**
@@ -34,14 +39,10 @@ interface IosBannerViewFactory {
      * requirement rather than a preference, and getting it wrong is a rejected
      * release rather than a crash.
      *
-     * @param onFilled true when an ad is on screen, false when the load failed
-     *   or the creative went away. Called on the main thread. It may be called
-     *   more than once: the SDK's own refresh replaces the creative inside a
-     *   view that is already the right size.
      * @return the view, or null when the SDK is not present. Null degrades to
      *   the same nothing a no-fill already draws.
      */
-    fun makeBanner(widthPoints: Double, onFilled: (Boolean) -> Unit): UIView?
+    fun makeBanner(widthPoints: Double, listener: IosBannerListener): UIView?
 
     /**
      * Releases [view]. Kotlin owns the lifetime because Kotlin decides when the
@@ -49,4 +50,32 @@ interface IosBannerViewFactory {
      * refreshing against a screen nobody is looking at.
      */
     fun disposeBanner(view: UIView)
+}
+
+/**
+ * What Swift reports back about one banner.
+ *
+ * An interface rather than a `(Boolean) -> Unit` so that a failure can carry a
+ * reason. The first version reported nothing at all, and a banner that does not
+ * appear is the same picture whether the SDK is missing, consent was refused,
+ * the unit id is wrong, or the network simply had no inventory. "Nothing
+ * happened" is not something a tester can act on, and it is not something a
+ * dashboard can alert on either.
+ */
+@ObjCName("IosBannerListener", exact = true)
+interface IosBannerListener {
+
+    /**
+     * An ad is loaded, and the view is [heightPoints] tall.
+     *
+     * The height travels with the fill so the slot can be sized explicitly. See
+     * `IosBannerSurface` for why that is deliberate rather than defensive.
+     *
+     * May be called more than once: the SDK's own refresh replaces the creative
+     * inside a view that is already the right size.
+     */
+    fun onFilled(heightPoints: Double)
+
+    /** No ad. [reason] is logged as `ads.banner_failed`, so keep it short and stable. */
+    fun onFailed(reason: String)
 }
