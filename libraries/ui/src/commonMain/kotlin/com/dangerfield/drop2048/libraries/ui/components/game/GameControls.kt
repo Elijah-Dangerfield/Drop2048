@@ -1,5 +1,6 @@
 package com.dangerfield.drop2048.libraries.ui.components.game
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -12,6 +13,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -66,16 +68,63 @@ fun GameControlRow(
         modifier = modifier.fillMaxWidth().widthIn(max = ControlRowMaxWidth),
         horizontalArrangement = Arrangement.spacedBy(ControlGap),
     ) {
-        ControlButton(LeftGlyph, leftDescription, onLeft, enabled, ControlKind.Primary)
+        ControlButton(ControlDirection.Left, leftDescription, onLeft, enabled, ControlKind.Primary)
         ControlButton(
-            glyph = DropGlyph,
+            direction = ControlDirection.Down,
             contentDescription = dropDescription,
             onClick = onDrop,
             enabled = enabled,
             kind = ControlKind.Quiet,
             modifier = dropModifier,
         )
-        ControlButton(RightGlyph, rightDescription, onRight, enabled, ControlKind.Primary)
+        ControlButton(ControlDirection.Right, rightDescription, onRight, enabled, ControlKind.Primary)
+    }
+}
+
+/**
+ * Which way a control points.
+ *
+ * The three arrows were characters until 2026-10-02: ◀ ▶ ▼. The down one looked
+ * right and the other two came out as emoji, because U+25C0 and U+25B6 carry an
+ * emoji presentation and U+25BC does not, so iOS rendered two of the three in a
+ * colour emoji font and one in Fredoka. One row, two typefaces.
+ *
+ * `Perk` in the paywall sheet already wrote down the rule this breaks: a glyph
+ * is a bet that every font on every target carries that codepoint and renders
+ * it the way you meant. Drawing the shape cannot lose that bet, and three
+ * rotations of one path cannot drift apart from each other the way three
+ * codepoints can.
+ */
+enum class ControlDirection { Left, Right, Down }
+
+/**
+ * One filled triangle, the same triangle three ways.
+ *
+ * Sized in dp rather than sp: it is a shape, not text, so it should not grow
+ * with the reader's font scale while the 60dp button it sits in does not. The
+ * contrast between the two arrows and the drop is carried by [color] alone,
+ * which is what it was carrying before.
+ */
+@Composable
+private fun Triangle(direction: ControlDirection, color: Color) {
+    Canvas(modifier = Modifier.size(GlyphSize)) {
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            when (direction) {
+                ControlDirection.Left -> {
+                    moveTo(0f, h / 2f); lineTo(w, 0f); lineTo(w, h)
+                }
+                ControlDirection.Right -> {
+                    moveTo(w, h / 2f); lineTo(0f, 0f); lineTo(0f, h)
+                }
+                ControlDirection.Down -> {
+                    moveTo(w / 2f, h); lineTo(0f, 0f); lineTo(w, 0f)
+                }
+            }
+            close()
+        }
+        drawPath(path, color)
     }
 }
 
@@ -91,7 +140,7 @@ enum class ControlKind { Primary, Quiet }
  */
 @Composable
 fun RowScope.ControlButton(
-    glyph: String,
+    direction: ControlDirection,
     contentDescription: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -113,14 +162,9 @@ fun RowScope.ControlButton(
             .height(ControlHeight)
             .semantics { this.contentDescription = contentDescription },
     ) {
-        BasicText(
-            text = glyph,
-            style = TextStyle(
-                fontFamily = FredokaFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = if (quiet) QuietGlyphSize else GlyphSize,
-                color = if (quiet) GameColors.InkMuted else GameColors.Ink,
-            ),
+        Triangle(
+            direction = direction,
+            color = if (quiet) GameColors.InkMuted else GameColors.Ink,
         )
     }
 }
@@ -175,9 +219,6 @@ fun PauseButton(
  * bundled Fredoka), and swapping them is a one-line change here rather than a
  * change at three call sites.
  */
-private const val LeftGlyph = "◀"
-private const val RightGlyph = "▶"
-private const val DropGlyph = "▼"
 private const val PauseGlyph = "II"
 
 private val ControlRowMaxWidth: Dp = 370.dp
@@ -186,8 +227,14 @@ private val ControlHeight: Dp = 60.dp
 private val ControlRadius: Dp = 20.dp
 private val ControlDepth: Dp = 5.dp
 private val ControlPressedDepth: Dp = 2.dp
-private val GlyphSize = 22.sp
-private val QuietGlyphSize = 20.sp
+/**
+ * The arrow size, in dp because the arrows are drawn shapes rather than text.
+ *
+ * One value for all three. The two steering arrows and the drop used to be 22sp
+ * and 20sp, a difference nobody could see next to the colour difference that
+ * was already carrying the hierarchy.
+ */
+private val GlyphSize = 18.dp
 
 private val PauseSize: Dp = 44.dp
 private val PauseRadius: Dp = 14.dp

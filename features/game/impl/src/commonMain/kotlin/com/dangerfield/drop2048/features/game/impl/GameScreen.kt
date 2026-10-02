@@ -255,7 +255,21 @@ fun GameScreen(
                             dropModifier = Modifier.focusTarget(DropFocusKey),
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
-                    } else if (state.bannerAllowed) {
+                    }
+
+                    // Below the arrows rather than instead of them.
+                    //
+                    // The banner used to be the `else` of the arrow row, on the
+                    // reasoning that the two compete for one strip. In practice
+                    // that meant most players never saw a banner at all, since
+                    // the arrows are on by default, and the format the ads
+                    // library calls the most-seen advertising in the app was
+                    // reaching nobody.
+                    //
+                    // Safe to stack because the banner measures zero until an
+                    // ad is really in it, so a screen with arrows and no fill
+                    // is laid out exactly as it was before.
+                    if (state.bannerAllowed) {
                         BannerStrip(onAction = onAction)
                     }
                 }

@@ -143,22 +143,48 @@ class BoardTakesTheStripTest {
     }
 
     /**
-     * The arrow row is still the arrow row. A banner may only ever occupy the
-     * strip the row is not using, so a player who switched the arrows on must
-     * get the identical layout whatever the banner is doing.
+     * The banner sits under the arrow row rather than instead of it.
+     *
+     * This asserted the opposite until 2026-10-02, when the owner ruled that
+     * the banner should always show. The old rule gave the strip to whichever
+     * of the two wanted it, and since the arrows are on by default that meant
+     * most players never saw a banner at all.
+     *
+     * What survives the change is the half that was actually load-bearing: an
+     * ad that does **not** fill must still cost nothing. A board with arrows
+     * and no fill is laid out exactly as a board with arrows and no banner
+     * surface at all.
      */
     @Test
-    fun theBannerNeverAppearsWhenTheArrowsAreOn() {
+    fun anUnfilledBannerCostsNothingEvenWithTheArrowsOn() {
         val harness = compose.harness()
 
         val arrows = dragOnly().copy(controlScheme = ControlScheme.Both, bannerAllowed = true)
         val withoutASurface = harness.measure(arrows)
-        val withAFilledOne = harness.measure(state = arrows, surface = FilledBannerSurface)
+        val withAnEmptyOne = harness.measure(state = arrows, surface = FailingBannerSurface)
 
         assertEquals(
             withoutASurface,
-            withAFilledOne,
-            "an ad that filled must not move a board that has an arrow row under it",
+            withAnEmptyOne,
+            "a banner that never filled must not move a board that has an arrow row under it",
+        )
+    }
+
+    /**
+     * And when it does fill, it takes room from the board rather than from the
+     * arrows, which are the control the player chose to have.
+     */
+    @Test
+    fun aFilledBannerPushesTheBoardUpEvenWithTheArrowsOn() {
+        val harness = compose.harness()
+
+        val arrows = dragOnly().copy(controlScheme = ControlScheme.Both, bannerAllowed = true)
+        val absent = harness.measure(arrows)
+        val filled = harness.measure(state = arrows, surface = FilledBannerSurface)
+
+        assertTrue(
+            filled.bottom < absent.bottom,
+            "a filled banner pushes the board up: ${filled.bottom} vs ${absent.bottom}",
         )
     }
 
