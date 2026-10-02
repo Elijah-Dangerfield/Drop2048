@@ -231,7 +231,20 @@ def build_and_upload(distribute_external:, submit_to_app_store:)
       build_number: build_number.to_s,
       submit_for_review: true,
       automatic_release: true,
-      phased_release: true,
+      # Only when a released version already exists.
+      #
+      # A phased release throttles an update to people who already have the
+      # app, so on a first version there is nobody to throttle it to and Apple
+      # has no resource to create. The API answers with no body, and spaceship
+      # raises a bare "[!] No data" naming neither the call nor the reason.
+      # That killed v0.3.0 *after* the binary had uploaded: TestFlight got the
+      # build, the App Store submission did not happen, and Android was skipped
+      # behind it.
+      #
+      # The workflow decides, because answering it needs an App Store Connect
+      # query and this file should not grow one. Anything but "true" is false,
+      # so an unset value fails closed.
+      phased_release: ENV["PHASED_RELEASE"] == "true",
       force: true,
       skip_binary_upload: true,
       metadata_path: metadata_path,

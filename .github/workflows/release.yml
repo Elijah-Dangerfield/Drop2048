@@ -610,6 +610,35 @@ jobs:
               echo "Existing builds found on ASC — full release lane"
               echo "is_first_release=false" >> "$GITHUB_OUTPUT"
             fi
+
+            # Whether the App Store has ever *released* a version, which is a
+            # different question from whether TestFlight has builds and the one
+            # phased release actually depends on.
+            #
+            # A phased release throttles an update to people who already have
+            # the app. On a first version there is nobody to throttle it to, so
+            # Apple has no phased-release resource to create and the API answers
+            # with no body at all. fastlane's spaceship raises a bare
+            # "[!] No data" from `model.rb:parse`, which names neither the call
+            # nor the reason. That killed v0.3.0 after the binary had already
+            # uploaded: TestFlight got the build, the App Store submission did
+            # not happen, and the Android job was skipped behind it.
+            RELEASED=$(curl -g -fsS -H "Authorization: Bearer $TOKEN" \
+              "https://api.appstoreconnect.apple.com/v1/apps/$APP_ID/appStoreVersions?filter[appStoreState]=READY_FOR_SALE&limit=1" \
+              || echo '')
+            if [ -z "$RELEASED" ]; then
+              echo "::warning::Could not ask App Store Connect for released versions. Not requesting a phased release."
+              echo "phased_release=false" >> "$GITHUB_OUTPUT"
+            else
+              RELEASED_COUNT=$(printf '%s' "$RELEASED" | python3 -c 'import json,sys;print(len(json.load(sys.stdin).get("data",[])))' 2>/dev/null || echo "0")
+              if [ "$RELEASED_COUNT" = "0" ]; then
+                echo "No released App Store version yet — first release, so no phased rollout."
+                echo "phased_release=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "A released version exists — phased rollout applies."
+                echo "phased_release=true" >> "$GITHUB_OUTPUT"
+              fi
+            fi
           fi
 
       - name: Resolve release lane
@@ -663,6 +692,10 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF_NAME: ${{ needs.resolve-tag.outputs.tag }}
           TESTFLIGHT_CHANGELOG: ${{ steps.notes.outputs.notes }}
+          # Empty on the beta lane, which never reaches `deliver`. The Fastfile
+          # treats anything but "true" as false, so a missing value cannot ask
+          # Apple for a phased release that does not exist.
+          PHASED_RELEASE: ${{ steps.ios_first_release.outputs.phased_release }}
         run: bundle exec fastlane ${{ steps.lane.outputs.lane }}
 
       - name: Upload ipa artifact
