@@ -17,8 +17,8 @@ questionnaire, which is the same on both branches because the game's *content* d
 is the audience and distribution answers, which are different on each branch and are presented as a
 pair. `data-safety.md` §6 is the code-level diff between the branches.
 
-**The single sentence that matters:** the content rating is almost certainly Everyone / 4+ on both
-branches. That is not the same as being *for* children, and answering the content questionnaire
+**The single sentence that matters:** the content rating is Everyone / 4+ on both branches. Apple's
+filed rating is still 13+, because the terms set a minimum age (§2, Branch A). That is not the same as being *for* children, and answering the content questionnaire
 does not answer the kids question.
 
 ---
@@ -69,7 +69,7 @@ These are placeholder art (`OWNER-TODO.md`, "Badge art"). If the real badge set 
 | PEGI | 3 | |
 | USK | 0 | |
 | ClassInd, ACB, GRAC | Lowest band | |
-| **Apple** | **4+** | Content only; Apple's own questionnaire has no violence or gambling to catch here. |
+| **Apple** | **4+ calculated, filed as 13+** | The questionnaire calculates 4+ from content alone. Filed with "Override to Higher Age Rating" at 13+ because the terms require 13 or older (§2, Branch A). |
 
 Play will attach the "In-app purchases" and "Ads" interactive-element labels automatically from the
 answers above. That is correct and it is not a rating.
@@ -86,7 +86,7 @@ answers above. That is correct and it is not a rating.
 | Play "Designed for Families" | **Do not enrol** |
 | Play ads declaration | Yes, contains ads |
 | Play "appeals to children" follow-up | No |
-| Apple age rating | 4+ (content) |
+| Apple age rating | **13+**, override of a calculated 4+. Filed 2026-10-04 |
 | Apple Kids Category | **Do not select** |
 | AdMob child-directed treatment | `TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE`, already set (`AdMobAdNetwork.kt:209-216`) |
 | `tagForUnderAgeOfConsent` | Deliberately left unset, reasoning in the class KDoc |
@@ -100,9 +100,15 @@ answers above. That is correct and it is not a rating.
 does not exist (`OWNER-TODO.md`, "Art"), so this is a live constraint on the art brief rather than
 a problem to fix later: **bright is fine, toybox is not.**
 
-Note also the tension inside Branch A: Apple's content rating is **4+** while Play's target
-audience is **13+**. Those are different questions and both answers are right. 4+ describes what is
-in the app; 13+ describes who it is aimed at and therefore which ad rules apply.
+**Why Apple is 13+ and not 4+.** Apple's questionnaire calculates 4+ from content, then says that
+an app whose EULA sets a minimum age must pick a rating that matches it. `legal/terms.md` says "You
+must be 13 or older", so the rating was overridden to 13+ when it was filed on 2026-10-04. Apple
+maps that per region: 13+ in 172 countries or regions, 12+ in Brazil and Vietnam, and Korea needs
+an RCN. If the terms ever drop the age floor, the override can go back to 4+.
+
+Apple's answers as filed: every content row None or No, Advertising **Yes** (iOS links
+`GoogleMobileAds`), no parental controls, no age assurance, no web access, UGC, social media or
+messaging, and no contests, gambling or loot boxes.
 
 ### Branch B: child-directed (Play Families and/or Apple Kids Category)
 
