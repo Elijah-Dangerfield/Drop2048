@@ -212,6 +212,31 @@ true of a player who never ends a drop early and of nobody else.
 
 ## Soon
 
+### The monthly Baseline Profile run fails, and does not say why
+
+**The symptom.** `baseline-profile.yml` has been failing on its schedule. Run
+[37112375341](https://github.com/Elijah-Dangerfield/Drop2048/actions/runs/37112375341)
+died on `:libraries:core:compileReleaseKotlinAndroid` against `4efc721`.
+
+**What makes it worth a real look rather than a rerun.** The compiler error is
+not in the log. Not in `--log-failed`, not in the full log: there is a
+`FAILED` line and a `What went wrong` header, and no `e:` line anywhere between
+them. So the job tells you a module failed to compile and refuses to say what
+was wrong with it.
+
+That matters more than the profile does. The same module compiles fine in CI's
+`Build + test` on the same commit, so whatever this is, it is specific to the
+profile job's configuration (release variant, KSP, an emulator-bound task graph
+running concurrently) and not to the code. Chasing it from the log alone is not
+possible today, which is the first thing to fix.
+
+**Not release-blocking.** The profile is regenerated monthly and opened as a PR;
+`release.yml` does not reference it. A stale profile costs first-run
+performance, not correctness, so this can wait behind anything a user would
+notice. It should not wait forever: the profile drifts as the app's shape
+changes, and the whole point of the monthly run is that nobody has to remember.
+
+
 ### The saved-run blob carries a full `EngineConfig` copy, ~3KB
 
 Correct for determinism (D5) — a seed only replays if the numbers it was played under travel with
