@@ -15,6 +15,9 @@ OUTPUT_DIR = "build"
 # Also names the gym archive. The beta/release workflows glob
 # apps/ios/build/*.ipa, so the name is free to change.
 OUTPUT_NAME = "Drop2048.ipa"
+# Written by :release, read by :submit. See the :submit lane for why the build
+# number cannot simply be recomputed.
+BUILD_NUMBER_FILE = "build_number.txt"
 # Effective bundle id (the pbxproj hardcodes it; the xcconfig's $(TEAM_ID)
 # suffix never applies). Must match the ASC app record.
 APP_IDENTIFIER = "com.dangerfield.drop2048.Drop2048"
@@ -32,12 +35,36 @@ platform :ios do
 
   desc "Preview: upload to TestFlight internal only (used on pushes to main)"
   lane :beta do
-    build_and_upload(distribute_external: false, submit_to_app_store: false)
+    build_and_upload(distribute_external: false)
   end
 
-  desc "Production: TestFlight external group + App Store submit + phased rollout"
+  desc "Production: build, TestFlight external group. Does NOT submit — see :submit"
   lane :release do
-    build_and_upload(distribute_external: true, submit_to_app_store: true)
+    build_and_upload(distribute_external: true)
+  end
+
+  # Its own lane so the App Store submission is its own CI job.
+  #
+  # These used to be one lane and one job, so a submission that tripped over
+  # App Store Connect state looked identical to a build that would not
+  # compile. The Android job gates on the iOS job, correctly, to stop the two
+  # stores drifting apart — and it was therefore skipped by a failure that
+  # happened *after* the iOS binary had already uploaded. On 2026-10-02 that
+  # cost a whole release: TestFlight had the build, Play had nothing, and the
+  # recovery was a hand-dispatched run.
+  #
+  # Splitting them means Android depends on the upload rather than on the
+  # submission, so the gate still stops a broken build and no longer stops a
+  # good one.
+  #
+  # `deliver` already ran with `skip_binary_upload: true`, so this needs no
+  # artifact: it addresses the build by number on ASC. That number is a
+  # timestamp minted during the build, so it is written out by [release] and
+  # passed back in here rather than recomputed, which would submit a build
+  # that does not exist.
+  desc "Production: submit an already-uploaded build for App Store review"
+  lane :submit do
+    submit_for_app_store_review
   end
 
   desc "Local-only: build without uploading (smoke-test the Fastfile)"
@@ -63,7 +90,88 @@ platform :ios do
   end
 end
 
-def build_and_upload(distribute_external:, submit_to_app_store:)
+# The App Store submission, standalone.
+#
+# Everything it needs it can derive or is handed: the key from the environment,
+# the marketing version from the xcconfig, and the build number from the file
+# :release wrote. No IPA, because `deliver` runs with `skip_binary_upload: true`
+# and addresses the build by number on App Store Connect.
+def submit_for_app_store_review
+  api_key = asc_api_key
+  marketing_version = read_marketing_version || "1.0"
+
+  number_path = File.join(OUTPUT_DIR, BUILD_NUMBER_FILE)
+  build_number = ENV["SUBMIT_BUILD_NUMBER"].to_s.strip
+  build_number = File.read(number_path).strip if build_number.empty? && File.exist?(number_path)
+  if build_number.empty?
+    UI.user_error!(
+      "No build number to submit. :release writes #{number_path}; CI passes it " \
+      "back as SUBMIT_BUILD_NUMBER. Recomputing it here would submit a build " \
+      "that was never uploaded."
+    )
+  end
+
+  changelog = build_changelog(build_number, marketing_version)
+
+  # App Store review requires a non-empty "What's New" on every submission
+  # past the first. `skip_metadata: true` skips the entire metadata upload
+  # path, so whatsNew stays blank on ASC and `submit_for_review` errors
+  # with: "You must provide a value for the attribute 'whatsNew'". Build
+  # a minimal metadata folder containing only release_notes.txt for each
+  # ASC locale — deliver uploads what's in the folder and leaves all other
+  # fields untouched. Cleaned up in the ensure block below.
+  metadata_path = build_release_notes_metadata(changelog)
+
+  deliver(
+    api_key: api_key,
+    app_version: marketing_version,
+    build_number: build_number.to_s,
+    submit_for_review: true,
+    automatic_release: true,
+    # Only when a released version already exists.
+    #
+    # A phased release throttles an update to people who already have the
+    # app, so on a first version there is nobody to throttle it to and Apple
+    # has no resource to create. The API answers with no body, and spaceship
+    # raises a bare "[!] No data" naming neither the call nor the reason.
+    # That killed v0.3.0 *after* the binary had uploaded: TestFlight got the
+    # build, the App Store submission did not happen, and Android was skipped
+    # behind it.
+    #
+    # The workflow decides, because answering it needs an App Store Connect
+    # query and this file should not grow one. Anything but "true" is false,
+    # so an unset value fails closed.
+    phased_release: ENV["PHASED_RELEASE"] == "true",
+    force: true,
+    skip_binary_upload: true,
+    metadata_path: metadata_path,
+    skip_screenshots: true,
+    precheck_include_in_app_purchases: false,
+    submission_information: {
+      export_compliance_uses_encryption: false,
+      add_id_info_uses_idfa: false,
+    },
+  )
+ensure
+  if defined?(metadata_path) && metadata_path && File.directory?(metadata_path)
+    FileUtils.rm_rf(metadata_path)
+  end
+end
+
+# One definition, because :release and :submit both need it and a second copy
+# would be a second place for the key duration to drift.
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_content: ENV.fetch("ASC_KEY_P8_BASE64"),
+    is_key_content_base64: true,
+    duration: 1200,
+    in_house: false,
+  )
+end
+
+def build_and_upload(distribute_external:)
   team_id = ENV.fetch("APPLE_TEAM_ID")
   key_id = ENV.fetch("ASC_KEY_ID")
   issuer_id = ENV.fetch("ASC_ISSUER_ID")
@@ -103,14 +211,7 @@ def build_and_upload(distribute_external:, submit_to_app_store:)
     )
   end
 
-  api_key = app_store_connect_api_key(
-    key_id: key_id,
-    issuer_id: issuer_id,
-    key_content: key_content_b64,
-    is_key_content_base64: true,
-    duration: 1200,
-    in_house: false,
-  )
+  api_key = asc_api_key
 
   # Write .p8 to a temp file so xcodebuild's -authenticationKeyPath can read it.
   # Without this, -allowProvisioningUpdates can't talk to App Store Connect and
@@ -192,6 +293,12 @@ def build_and_upload(distribute_external:, submit_to_app_store:)
   changelog = build_changelog(build_number, marketing_version)
   ipa_path = File.join(OUTPUT_DIR, OUTPUT_NAME)
 
+  # Handed to the submit job, which cannot derive it: `build_number` is
+  # `Time.now` and a second call would mint a different one and submit a build
+  # that was never uploaded.
+  FileUtils.mkdir_p(OUTPUT_DIR)
+  File.write(File.join(OUTPUT_DIR, BUILD_NUMBER_FILE), build_number)
+
   # Rescue TestFlight upload/distribute so a fastlane↔ASC API hiccup at the
   # last step — e.g. the "Cannot add internal group to a build" regression in
   # fastlane#22051 — doesn't skip the App Store submission below. The binary
@@ -213,48 +320,6 @@ def build_and_upload(distribute_external:, submit_to_app_store:)
   rescue => e
     UI.important("upload_to_testflight raised (non-fatal): #{e.message}")
     UI.important("If the log above shows the binary reached ASC, distribute manually via TestFlight → External Testing → '#{external_group}'. Continuing to App Store submission.")
-  end
-
-  if submit_to_app_store
-    # App Store review requires a non-empty "What's New" on every submission
-    # past the first. `skip_metadata: true` skips the entire metadata upload
-    # path, so whatsNew stays blank on ASC and `submit_for_review` errors
-    # with: "You must provide a value for the attribute 'whatsNew'". Build
-    # a minimal metadata folder containing only release_notes.txt for each
-    # ASC locale — deliver uploads what's in the folder and leaves all other
-    # fields untouched. Cleaned up in the ensure block below.
-    metadata_path = build_release_notes_metadata(changelog)
-
-    deliver(
-      api_key: api_key,
-      app_version: marketing_version,
-      build_number: build_number.to_s,
-      submit_for_review: true,
-      automatic_release: true,
-      # Only when a released version already exists.
-      #
-      # A phased release throttles an update to people who already have the
-      # app, so on a first version there is nobody to throttle it to and Apple
-      # has no resource to create. The API answers with no body, and spaceship
-      # raises a bare "[!] No data" naming neither the call nor the reason.
-      # That killed v0.3.0 *after* the binary had uploaded: TestFlight got the
-      # build, the App Store submission did not happen, and Android was skipped
-      # behind it.
-      #
-      # The workflow decides, because answering it needs an App Store Connect
-      # query and this file should not grow one. Anything but "true" is false,
-      # so an unset value fails closed.
-      phased_release: ENV["PHASED_RELEASE"] == "true",
-      force: true,
-      skip_binary_upload: true,
-      metadata_path: metadata_path,
-      skip_screenshots: true,
-      precheck_include_in_app_purchases: false,
-      submission_information: {
-        export_compliance_uses_encryption: false,
-        add_id_info_uses_idfa: false,
-      },
-    )
   end
 
   upload_sentry_release(marketing_version, build_number)

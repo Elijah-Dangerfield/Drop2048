@@ -142,9 +142,18 @@ jobs:
     name: Android AAB + Play submit
     # Gate on iOS so a "Google shipped, Apple didn't" split can't happen by
     # accident: Android runs only when iOS SUCCEEDED or was intentionally
-    # skipped (skip_ios). If iOS fails, Android is skipped too. To re-run
-    # Android alone after a partial failure, dispatch with skip_ios:true
-    # (skips the ~90m iOS build); to retry iOS alone, use skip_play_store:true.
+    # skipped (skip_ios). To re-run Android alone after a partial failure,
+    # dispatch with skip_ios:true (skips the ~90m iOS build); to retry iOS
+    # alone, use skip_play_store:true.
+    #
+    # It depends on the iOS **upload**, not on the App Store submission, and
+    # that boundary is the whole reason `ios-submit` is a separate job. The
+    # gate exists to stop the two stores drifting apart, which is a reason to
+    # wait for a binary and not a reason to wait for a review queue. When the
+    # two were one job, a submission that tripped over App Store Connect state
+    # skipped Android even though the iOS binary had already uploaded. On
+    # 2026-10-02 that cost a release: TestFlight had the build, Play had
+    # nothing, and the recovery was a hand-dispatched run with skip_ios:true.
     needs: [resolve-tag, build-number, ios]
     if: ${{ always() && needs.resolve-tag.result == 'success' && needs.build-number.result == 'success' && (needs.ios.result == 'success' || needs.ios.result == 'skipped') }}
     runs-on: ubuntu-latest
@@ -378,9 +387,16 @@ jobs:
           retention-days: 90
 
   ios:
-    name: iOS TestFlight external + App Store submit
+    name: iOS build + TestFlight external
     needs: [resolve-tag, build-number]
     if: ${{ !inputs.skip_ios }}
+    outputs:
+      # Handed to ios-submit, which cannot derive them. The build number is a
+      # timestamp minted during the build, so recomputing it would address a
+      # build that was never uploaded.
+      build_number: ${{ steps.ios_build.outputs.build_number }}
+      lane: ${{ steps.lane.outputs.lane }}
+      phased_release: ${{ steps.ios_first_release.outputs.phased_release }}
     # Standard runner (7GB) with a 10g daemon heap: the K/N release-LTO link
     # spills into macOS swap instead of OOMing. See beta.yml's ios job for the
     # sizing history; macos-26-xlarge (14GB) works but bills per minute even on
@@ -698,6 +714,17 @@ jobs:
           PHASED_RELEASE: ${{ steps.ios_first_release.outputs.phased_release }}
         run: bundle exec fastlane ${{ steps.lane.outputs.lane }}
 
+      - name: Publish the build number the upload used
+        id: ios_build
+        if: success()
+        working-directory: apps/ios
+        run: |
+          if [ -f build/build_number.txt ]; then
+            echo "build_number=$(cat build/build_number.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::build/build_number.txt is missing; ios-submit will have nothing to address."
+          fi
+
       - name: Upload ipa artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -706,6 +733,60 @@ jobs:
           path: apps/ios/build/*.ipa
           if-no-files-found: ignore
           retention-days: 90
+
+  ios-submit:
+    name: iOS App Store submit
+    needs: [resolve-tag, ios]
+    # Only the release lane submits, and only if the upload actually happened.
+    # `needs.ios.result == 'success'` rather than `always()`: there is no build
+    # on App Store Connect to address if the upload failed.
+    if: ${{ needs.ios.result == 'success' && needs.ios.outputs.lane == 'release' }}
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
+
+      - name: Set up Ruby / Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: apps/ios
+
+      - name: Fetch release notes for the submission
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY=$(gh release view "${{ needs.resolve-tag.outputs.tag }}" --json body -q .body 2>/dev/null || true)
+          if [ -z "$BODY" ]; then
+            BODY="v${{ needs.resolve-tag.outputs.version }}"
+          fi
+          {
+            echo "notes<<EOF"
+            printf "%s\n" "$BODY" | head -c 3000
+            echo
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Submit for App Store review
+        working-directory: apps/ios
+        env:
+          TESTFLIGHT_CHANGELOG: ${{ steps.notes.outputs.notes }}
+          PHASED_RELEASE: ${{ needs.ios.outputs.phased_release }}
+          # The build the previous job uploaded. The Fastfile refuses to guess:
+          # recomputing the timestamp would submit a build that does not exist.
+          SUBMIT_BUILD_NUMBER: ${{ needs.ios.outputs.build_number }}
+        run: bundle exec fastlane submit
 
   attach-artifacts:
     name: Attach artifacts to GitHub Release
