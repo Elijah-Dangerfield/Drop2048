@@ -396,6 +396,41 @@ class AdsAtTheBoardTest : CoroutineTest() {
         }
     }
 
+    @Test
+    fun `buying Pro removes the banner before the current run ends`() = runUnitTest {
+        playing(picture = StackedOutBoard, fallingAt = Cell(2, 0)) {
+            act(GameAction.Pause)
+            assertTrue(state.bannerAllowed)
+
+            entitlements.isPro.value = true
+
+            assertFalse(state.bannerAllowed)
+            assertPhase(GamePhase.Paused)
+            act(GameAction.Resume, GameAction.Tick)
+            assertFalse(state.bannerAllowed)
+        }
+    }
+
+    @Test
+    fun `losing Pro waits until the next run to allow a banner`() = runUnitTest {
+        val bannerPolicy = FakeBannerAds(allowed = false)
+        playing(
+            picture = StackedOutBoard,
+            fallingAt = Cell(2, 0),
+            isPro = true,
+            banners = bannerPolicy,
+        ) {
+            assertFalse(state.bannerAllowed)
+
+            bannerPolicy.allowed = true
+            entitlements.isPro.value = false
+
+            assertFalse(state.bannerAllowed)
+            act(GameAction.Restart)
+            assertTrue(state.bannerAllowed)
+        }
+    }
+
     /**
      * A banner on screen is an ad this player has seen, which is what the Pro
      * card is gated on. A banner that never filled is not, and reporting one

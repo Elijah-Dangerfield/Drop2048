@@ -240,6 +240,9 @@ class GameViewModel(
         appCache.updates.collectIn(viewModelScope) { data ->
             takeAction(GameAction.SettingsChanged(data))
         }
+        entitlements.isPro.collectIn(viewModelScope) { pro ->
+            takeAction(GameAction.ProChanged(pro))
+        }
     }
 
     override suspend fun handleAction(action: GameAction) {
@@ -262,6 +265,9 @@ class GameViewModel(
             GameAction.Share -> action.share()
             GameAction.ShowStats -> sendEvent(GameEffect.OpenStats)
             is GameAction.SettingsChanged -> action.settingsChanged(action.data)
+            is GameAction.ProChanged -> action.updateState {
+                it.copy(bannerAllowed = it.bannerAllowed && !action.isPro)
+            }
             GameAction.OpenSettings -> sendEvent(GameEffect.OpenSettings)
             GameAction.ConfirmQuit -> action.leaveRun()
             GameAction.DismissQuitConfirm -> action.updateState { it.copy(confirmingQuit = false) }
@@ -1799,8 +1805,8 @@ class GameViewModel(
     )
 
     /**
-     * Whether a banner may be asked for, re-read at a **run boundary** and
-     * nowhere else.
+     * New banners are allowed only at a run boundary. Becoming Pro removes
+     * an existing banner immediately through [GameAction.ProChanged].
      *
      * Not in [published], which runs on every tick: resolving three config
      * values sixty times a second to answer a question that can only change
@@ -2102,6 +2108,8 @@ sealed interface GameAction {
 
     /** `AppData` changed under a live board — see `settingsChanged`. */
     data class SettingsChanged(val data: AppData) : GameAction
+
+    data class ProChanged(val isPro: Boolean) : GameAction
 
     data object OpenSettings : GameAction
     data object ConfirmQuit : GameAction

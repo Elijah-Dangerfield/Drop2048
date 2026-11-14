@@ -93,10 +93,11 @@ internal class GameScenario private constructor(
     val paywall: FakePaywallCoordinator,
     val banners: FakeBannerAds,
     private val continuesPerRun: Int,
-    private val isPro: Boolean,
+    isPro: Boolean,
 ) {
     val cues = mutableListOf<Cue>()
     val effects = mutableListOf<GameEffect>()
+    val entitlements = FakeEntitlements(isPro)
 
     lateinit var viewModel: GameViewModel
         private set
@@ -126,7 +127,7 @@ internal class GameScenario private constructor(
             runActivity = runActivity,
             paywall = paywall,
             banners = banners,
-            entitlements = FakeEntitlements(isPro),
+            entitlements = entitlements,
             continuesPerRun = RewardedContinuesPerRun(
                 object : AppConfigMap() {
                     override val map: Map<String, *> = mapOf(
@@ -661,15 +662,10 @@ internal class FakeBannerAds(
 
 
 /**
- * A player who has or has not bought Pro, fixed for the life of the scenario.
- *
- * Fixed rather than mutable because the one thing entitlement changes here is
- * whether the continue costs a video, and that is read once when the offer is
- * built. A test that needs both answers wants two scenarios, not a flip
- * mid-run.
+ * Entitlements can change while the paywall is open over the board.
  */
 internal class FakeEntitlements(pro: Boolean) : Entitlements {
-    override val isPro: StateFlow<Boolean> = MutableStateFlow(pro)
+    override val isPro = MutableStateFlow(pro)
     override suspend fun purchasePro(trigger: String?): PurchaseOutcome = PurchaseOutcome.Unavailable
     override suspend fun restore(): RestoreOutcome = RestoreOutcome.Unavailable
 }
