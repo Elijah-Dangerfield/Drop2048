@@ -5,8 +5,9 @@ stores. Every item was checked against the code or the console rather than
 copied from `OWNER-TODO.md` or `todos.md`, both of which carry stale entries.
 
 Google Play is published, confirmed by the owner on 2026-11-14. Apple rejected
-version 0.3.0 on 2026-10-30 with a Guideline 2.1 information request. The current
-blocker is a physical-device recording and written review information, detailed below.
+version 0.3.0 on 2026-10-30 with a Guideline 2.1 information request. On 2026-11-14,
+the requested recording and written answers were sent and the original build was
+resubmitted. It is Waiting for Review.
 
 ## Context
 
@@ -63,14 +64,24 @@ Apple requires all of the following in both a reply and App Review Information �
 5. Regional differences, or confirmation of consistent functionality.
 6. Any applicable regulated-service credentials or third-party content permissions.
 
-The Notes field was empty when checked. The owner has already purchased Pro in
-TestFlight. To record free → ad → purchase → Pro, use a fresh Sandbox Apple Account
-with the existing build and verify the free state before capture. The debug Pro
-grant cannot remove a real purchase. Password creation and the physical phone's
-unlock require the owner. No recording or review response has been completed yet.
+On 2026-11-14, the owner supplied a 41-second physical iPhone recording showing
+launch, free gameplay with a test banner, the real StoreKit sandbox purchase and
+Pro gameplay without the banner. All six answers were saved in App Review Notes
+and sent with the video in the review thread. Update Review followed by Resubmit
+to App Review returned all 26 items to Waiting for Review. Automatic release
+after approval remains selected.
 
-This information request does not itself require a replacement binary. If testing
-finds a code defect, its fix goes through the normal release-please flow.
+The submitted binary remains **0.3.0 (202610022036)**. The recording was explicitly
+identified as development-signed **0.3.0 (2026111402)** on an iPhone 13 Pro with
+iOS 26.7.3, using test ads and accelerated local ad timing. The reply disclosed
+that this development build includes the immediate banner-removal fix; the
+submitted binary removes an existing banner at the next run after upgrading.
+Commit `2fba7dd` is pushed to main for a subsequent release, not this submission.
+Its regression and all 191 game unit tests passed.
+
+A sandbox purchase-history reset followed by Restore purchases and the tester's
+password refreshed ownership successfully. Signing out was unnecessary in this
+case. No local entitlement flag was changed to simulate ownership.
 
 ### Confirm on a device: ads with tracking denied · **you**
 
@@ -110,9 +121,6 @@ Nothing here blocks a submission, and none of it needs doing before release one.
   `contact@nightjarlabs.llc`; the site footer says `hello@`. Pick one. **agent**
 - **The sound bank is 15 generated placeholders**, not sound design. The merge
   sample is the one that matters; it is pitched up an octave. **you**
-- **iOS has no banner surface** (`NoBannerSurface`), which is a coherent state
-  rather than a bug: interstitials and rewarded video work on both platforms.
-  **agent**
 - **`tagForUnderAgeOfConsent` is unset** at `AdMobAdNetwork.kt:62`, deliberately,
   so an under-16 EEA player may get personalised ads. Worth a ruling. **you**
 - **Nobody but an agent has played the game.** Three feel questions are in
