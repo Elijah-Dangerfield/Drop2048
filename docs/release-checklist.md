@@ -4,9 +4,9 @@ Everything between the current tree and Doublestack being downloadable on both
 stores. Every item was checked against the code or the console rather than
 copied from `OWNER-TODO.md` or `todos.md`, both of which carry stale entries.
 
-**Release one is submitted on both stores, 2026-10-04.** Nothing is left but
-waiting on review, plus one device check that was never recorded as done (below).
-Everything else has moved to "Already done" at the bottom.
+Google Play is published, confirmed by the owner on 2026-11-14. Apple rejected
+version 0.3.0 on 2026-10-30 with a Guideline 2.1 information request. The current
+blocker is a physical-device recording and written review information, detailed below.
 
 ## Context
 
@@ -41,20 +41,36 @@ the privacy policy gets published. [`OWNER-TODO.md`](OWNER-TODO.md) and
 
 ## Required
 
-### In review · nothing to do
+### Apple: respond to the information request
 
-Submitted 2026-10-04. Both stores release on approval with no further click.
+Submitted 2026-10-04. On 2026-10-30, Apple requested additional information because
+the developer account has limited App Review history. The message does not identify
+a specific app defect. Read the
+[review thread](https://appstoreconnect.apple.com/apps/6814213924/distribution/reviewsubmissions/details/fa9b05bd-495d-492e-918d-3c77cca4f436).
 
-- **Apple:** version 0.3.0, build `202610022036`, submitted together with
-  `drop2048_pro`, both leaderboards and all 22 achievements (26 items in one
-  submission). Apple usually takes one to three days.
-- **Play:** production release `132 (0.3.0)`, full rollout, all 177 countries
-  plus rest of world, sent with the first-launch store listing and App content
-  declarations (12 changes). Managed publishing is off, so it goes live the
-  moment Google approves it. Google quotes up to 7 days for a new app.
+Version 0.3.0, build `202610022036`, was submitted with `drop2048_pro`, both
+leaderboards and all 22 achievements, 26 items total. On 2026-11-14 the version
+was Rejected and Pro was Ready for Review in that submission. The product API's
+separate `READY_TO_SUBMIT` value does not mean Pro was omitted.
 
-If either store rejects, the fix goes through the normal release-please flow.
-From release two onward `release.yml` goes straight to production without you.
+Apple requires all of the following in both a reply and App Review Information → Notes:
+
+1. A physical-device screen recording on the latest OS, starting with launch,
+   showing normal gameplay and access to paid features.
+2. The app's purpose, audience and value.
+3. Setup and instructions for accessing the main features.
+4. External services used by the app.
+5. Regional differences, or confirmation of consistent functionality.
+6. Any applicable regulated-service credentials or third-party content permissions.
+
+The Notes field was empty when checked. The owner has already purchased Pro in
+TestFlight. To record free → ad → purchase → Pro, use a fresh Sandbox Apple Account
+with the existing build and verify the free state before capture. The debug Pro
+grant cannot remove a real purchase. Password creation and the physical phone's
+unlock require the owner. No recording or review response has been completed yet.
+
+This information request does not itself require a replacement binary. If testing
+finds a code defect, its fix goes through the normal release-please flow.
 
 ### Confirm on a device: ads with tracking denied · **you**
 
