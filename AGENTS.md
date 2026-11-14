@@ -1,6 +1,21 @@
 # AGENTS.md
 
-Guidelines for AI agents working in the Drop 2048 repository.
+Guidelines for every coding agent working in Drop 2048. This file is the source of truth;
+`CLAUDE.md` points here. Keep shared rules here, not in a tool-specific file.
+
+## Agent setup
+
+- Project skills live in `.agents/skills/<name>/SKILL.md`. `.claude/skills` is a relative
+  symlink to that directory so Claude Code uses the same files. Add new skills there.
+- Personal skills live in `~/.agents/skills`, including `orchestrate`. They are shared
+  across projects on the maintainer's machine, not copied into this repository.
+- Some skills name Claude Code tools. Use your agent's equivalent tools and available
+  models; Opson-specific paths and examples apply only when they exist in this repo.
+- `feedback-triage` is the project skill for turning in-app Sentry reports into items in
+  `docs/todos.md`. Its canonical path is `.agents/skills/feedback-triage/SKILL.md`.
+- Google Play is published; the Apple app is not yet published. Preserve existing players'
+  progress when changing shared code or storage.
+- Completed changes may be committed and pushed directly to `main` without asking.
 
 ## Overview
 

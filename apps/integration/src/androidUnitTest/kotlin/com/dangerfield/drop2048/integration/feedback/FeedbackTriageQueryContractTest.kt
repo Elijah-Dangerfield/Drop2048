@@ -113,7 +113,7 @@ class FeedbackTriageQueryContractTest {
     private companion object {
         const val KindSource =
             "libraries/drop2048/src/commonMain/kotlin/com/dangerfield/drop2048/libraries/FeedbackKind.kt"
-        const val Skill = ".claude/skills/feedback-triage/SKILL.md"
+        const val Skill = ".agents/skills/feedback-triage/SKILL.md"
         const val Ledger = "docs/feedback-log.md"
 
         /** `tag = "owner_directive"` in an enum entry's constructor call. */

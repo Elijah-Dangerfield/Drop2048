@@ -21,7 +21,7 @@ android {
  * The repo root, for the one test that reads the repo as text.
  *
  * `FeedbackTriageQueryContractTest` holds `FeedbackKind`'s tag values against the
- * queries in `.claude/skills/feedback-triage/SKILL.md`, which means reading two
+ * queries in `.agents/skills/feedback-triage/SKILL.md`, which means reading two
  * files that are not on any classpath. A unit test's working directory is the
  * module, so it needs telling where the root is; the alternative is walking up
  * looking for `settings.gradle.kts`, which is the same fact guessed at instead

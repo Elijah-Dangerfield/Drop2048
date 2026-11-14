@@ -39,7 +39,10 @@ This is the one case the pipeline is not optimized for. Branch from the previous
 
 ## How automated fixes land (what the bots do)
 
-Sentry triage runs as a **Claude Code routine on the maintainer's machine**, not as a CI job — so it uses your normal Claude subscription and the Sentry MCP instead of a paid API key + curl. Schedule it weekly (or on demand) with the prompt at [scripts/prompts/sentry-triage.md](../scripts/prompts/sentry-triage.md). The prompt is the only thing you edit to change behavior.
+Sentry triage runs locally through an agent with Sentry MCP access. The prompt at
+[scripts/prompts/sentry-triage.md](../scripts/prompts/sentry-triage.md) works with Claude Code
+or Codex and can be run on demand or scheduled weekly. Scheduling belongs to the agent app;
+moving the prompt does not move an existing schedule. Edit the prompt to change behavior.
 
 Each run:
 
@@ -52,7 +55,7 @@ Each run:
 
 **To block a specific PR from auto-merging**: remove the `ai-autofix` label or close the PR — GitHub's auto-merge cancels.
 
-**To pause triage entirely**: disable the routine in Claude Code. No CI to touch.
+To pause triage, disable the schedule in the agent app where it was created.
 
 ### Post-release monitoring
 
@@ -63,7 +66,7 @@ There's no automated rollout guard. Apple's built-in phased release (7-day gradu
 ## System map
 
 ```
-PR   ──►  commitlint + CI                 Claude routine (local, weekly)
+PR   ──►  commitlint + CI                 Agent routine (local, weekly)
   │          │                                       │ reads Sentry MCP
   │          ▼ (green)                                ▼
   │      merge to main ◄──────── opens fix: PRs (label ai-autofix)
@@ -98,7 +101,8 @@ rollouts. Halt manually if crash-free rate tanks.
 | [release.yml](../.github/workflows/release.yml) | dispatched by release-please.yml after tag creation; also `workflow_dispatch` with an explicit tag for re-runs; also fires on tag pushes made by a human | Full production release to both stores. |
 | [auto-merge.yml](../.github/workflows/auto-merge.yml) | PR labeled `ai-autofix` | Enables GitHub auto-merge. |
 
-Sentry triage is not a workflow — it runs as a Claude Code routine on the maintainer's machine. See [scripts/prompts/sentry-triage.md](../scripts/prompts/sentry-triage.md).
+Sentry triage runs locally through an agent with Sentry MCP access. See
+[scripts/prompts/sentry-triage.md](../scripts/prompts/sentry-triage.md).
 
 ## Versioning
 

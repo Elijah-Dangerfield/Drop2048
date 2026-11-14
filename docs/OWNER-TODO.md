@@ -25,10 +25,11 @@ the ledger that keeps it idempotent.
 reachable from the Sentry MCP and had to fall back to the carrier's extra and attachment — the
 skill is written against that, and it should be corrected from whatever is actually true here.
 
-### `.gitignore` changed, and it is the first time `.claude/` is committed
+### Review which agent files the repo carries
 
-`.claude/` became `.claude/*` plus `!.claude/skills/`, so the triage skill is source and agent
-worktrees and settings stay ignored. Worth a look since it changes what the repo carries.
+Project skills now live in `.agents/skills/`, with `.claude/skills` tracked as a relative
+symlink. Agent worktrees, local settings and scratch reports stay ignored. The feedback query
+contract test reads the canonical skill path. Worth a look since it changes what the repo carries.
 
 
 ### Xcode: create the `xcode_select_link`
