@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.3.1...v0.3.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* **ads:** remove the banner immediately when Pro activates ([2fba7dd](https://github.com/Elijah-Dangerfield/Drop2048/commit/2fba7dd162e034d0edaf422108d0f790c0110cc0))
+
 ## [0.3.1](https://github.com/Elijah-Dangerfield/Drop2048/compare/v0.3.0...v0.3.1) (2026-10-02)
 
 
